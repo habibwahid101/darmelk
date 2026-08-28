@@ -4,7 +4,7 @@ import { BrandMark } from "@/components/brand-mark";
 export function SiteFooter() {
   return (
     <footer className="border-t border-line bg-cream">
-      <div className="container-pg grid gap-10 py-12 md:grid-cols-[1.4fr_1fr_1fr]">
+      <div className="container-pg grid gap-8 py-8 md:grid-cols-[1.4fr_1fr_1fr] md:gap-10 md:py-12">
         <div className="max-w-sm space-y-4">
           <BrandMark />
           <p className="text-sm leading-relaxed text-muted">

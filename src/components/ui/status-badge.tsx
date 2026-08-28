@@ -22,6 +22,7 @@ const MAP: Record<string, { label: string; tone: keyof typeof TONES }> = {
   posted: { label: "Posted", tone: "ok" },
   qualified: { label: "Qualified", tone: "ok" },
   "not-qualified": { label: "Not qualified", tone: "muted" },
+  "coming-soon": { label: "Coming soon", tone: "muted" },
   admin: { label: "Admin", tone: "ok" },
   member: { label: "Member", tone: "muted" },
 };
@@ -37,7 +38,7 @@ export function StatusBadge({
   return (
     <span
       className={cn(
-        "inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-medium uppercase tracking-wide",
+        "inline-flex shrink-0 items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-medium uppercase tracking-wide",
         TONES[mapped.tone],
         className,
       )}

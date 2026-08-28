@@ -27,7 +27,7 @@ function AdminUsers() {
               const sponsor = memberById(members, m.sponsorUserId);
               return (
                 <li key={m.userId} className="space-y-2 px-5 py-4">
-                  <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
                     <p className="font-medium">{m.name}</p>
                     <StatusBadge status={m.role} />
                     <StatusBadge status={m.activationStatus} />

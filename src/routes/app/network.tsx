@@ -47,6 +47,7 @@ function NetworkPage() {
           label="Your referral code"
           value={member.referralCode}
           hint="Share this code. Cross-offer sponsorship is supported."
+          compact
         />
       </div>
 

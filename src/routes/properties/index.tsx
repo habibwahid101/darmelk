@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { PropertyCard } from "@/components/property-card";
+import { FeaturedOffer, PropertyCard } from "@/components/property-card";
 import { Badge } from "@/components/ui/badge";
 import { CATEGORIES, OFFERS, offersInCategory } from "@/lib/offers";
 import { cn } from "@/lib/utils";
@@ -33,36 +33,41 @@ function PropertiesPage() {
         </p>
       </section>
 
-      <section className="container-pg flex flex-wrap gap-2 pb-10">
-        <FilterChip to="/properties" active={!category}>
-          All available
-        </FilterChip>
-        {CATEGORIES.map((c) => (
-          <FilterChip
-            key={c.slug}
-            to="/properties"
-            search={{ category: c.slug }}
-            active={category === c.slug}
-            disabled={!c.available}
-          >
-            {c.title}
-            {!c.available ? " · Soon" : ""}
-          </FilterChip>
-        ))}
+      <section className="pb-10">
+        <div className="container-pg">
+          <div className="-mx-1 overflow-x-auto px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <div className="flex w-max gap-2 pb-1">
+              <FilterChip to="/properties" active={!category}>
+                All available
+              </FilterChip>
+              {CATEGORIES.map((c) => (
+                <FilterChip
+                  key={c.slug}
+                  to="/properties"
+                  search={{ category: c.slug }}
+                  active={category === c.slug}
+                  disabled={!c.available}
+                >
+                  {c.title}
+                  {!c.available ? " · Soon" : ""}
+                </FilterChip>
+              ))}
+            </div>
+          </div>
+        </div>
       </section>
 
       <section className="container-pg pb-20">
         {list.length > 0 ? (
-          <div
-            className={cn(
-              "grid gap-6",
-              list.length === 1 ? "max-w-xl" : "sm:grid-cols-2",
-            )}
-          >
-            {list.map((offer) => (
-              <PropertyCard key={offer.slug} offer={offer} />
-            ))}
-          </div>
+          list.length === 1 ? (
+            <FeaturedOffer offer={list[0]} />
+          ) : (
+            <div className="grid gap-6 sm:grid-cols-2">
+              {list.map((offer) => (
+                <PropertyCard key={offer.slug} offer={offer} />
+              ))}
+            </div>
+          )
         ) : (
           <div className="rounded-2xl bg-cream px-6 py-16 text-center shadow-[var(--shadow-card)]">
             <Badge>{active?.available ? "No offers" : "Coming soon"}</Badge>
@@ -100,7 +105,7 @@ function FilterChip({
 }) {
   if (disabled) {
     return (
-      <span className="inline-flex h-10 items-center rounded-full bg-mist px-4 text-sm text-subtle">
+      <span className="inline-flex h-11 shrink-0 items-center rounded-full bg-mist px-4 text-sm text-subtle">
         {children}
       </span>
     );
@@ -110,7 +115,7 @@ function FilterChip({
       to={to}
       search={search}
       className={cn(
-        "inline-flex h-10 items-center rounded-full px-4 text-sm font-medium transition-colors duration-150",
+        "inline-flex h-11 shrink-0 items-center rounded-full px-4 text-sm font-medium transition-colors duration-150",
         active
           ? "bg-pine text-pine-fg"
           : "bg-cream text-ink shadow-[0_0_0_1px_rgb(26_25_22/0.08)] hover:bg-mist",

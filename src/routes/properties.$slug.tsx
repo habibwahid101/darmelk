@@ -1,8 +1,9 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { MapPin } from "lucide-react";
+import { AmountRow } from "@/components/states";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { formatBdt, getOffer } from "@/lib/offers";
+import { getOffer } from "@/lib/offers";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 
 export const Route = createFileRoute("/properties/$slug")({
@@ -36,7 +37,7 @@ function PropertyDetail() {
               {offer.status === "available" ? "Available" : "Coming soon"}
             </Badge>
           </div>
-          <h1 className="mt-4 font-display text-4xl font-semibold tracking-tight">
+          <h1 className="mt-4 font-display text-3xl font-semibold tracking-tight md:text-4xl">
             {offer.title}
           </h1>
           {offer.location ? (
@@ -48,47 +49,35 @@ function PropertyDetail() {
           <p className="mt-4 text-[15px] leading-relaxed text-muted">{offer.summary}</p>
           <p className="mt-3 text-sm text-muted">Figures below are specific to this offer.</p>
           <dl className="mt-8 space-y-4 rounded-2xl bg-cream p-6 shadow-[var(--shadow-card)]">
-            {[
-              ["Retail value", offer.retailValue],
-              ["Booking amount", offer.bookingAmount],
-              ["Qualification benefit", offer.qualificationBenefit],
-            ].map(([label, value]) => (
-              <div
-                key={String(label)}
-                className="flex items-baseline justify-between gap-4 border-b border-line pb-3 last:border-0 last:pb-0"
-              >
-                <dt className="text-sm text-muted">{label}</dt>
-                <dd className="font-display text-xl font-semibold tabular-nums">
-                  {formatBdt(value as number)}
-                </dd>
-              </div>
-            ))}
+            <AmountRow label="Retail value" value={offer.retailValue} />
+            <AmountRow label="Booking amount" value={offer.bookingAmount} />
+            <AmountRow label="Qualification benefit" value={offer.qualificationBenefit} />
           </dl>
           <div className="mt-6 flex flex-col gap-3 sm:flex-row">
             {canBook ? (
               isPending ? (
-                <Button className="flex-1" disabled>
+                <Button className="sm:flex-1" disabled>
                   Start booking
                 </Button>
               ) : user ? (
-                <Button asChild className="flex-1">
+                <Button asChild className="sm:flex-1">
                   <Link to="/app/book/$slug" params={{ slug: offer.slug }}>
                     Start booking
                   </Link>
                 </Button>
               ) : (
-                <Button asChild className="flex-1">
+                <Button asChild className="sm:flex-1">
                   <Link to="/login" search={{ intent: "book", offer: offer.slug }}>
                     Start booking
                   </Link>
                 </Button>
               )
             ) : (
-              <Button className="flex-1" disabled>
+              <Button className="sm:flex-1" disabled>
                 Coming soon
               </Button>
             )}
-            <Button asChild variant="secondary" className="flex-1">
+            <Button asChild variant="ghost" className="sm:flex-1">
               <Link to="/" hash="how-it-works">
                 How it works
               </Link>

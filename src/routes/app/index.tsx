@@ -105,7 +105,7 @@ function OverviewPage() {
         />
       )}
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           label="Qualification"
           value={qualified ? "Qualified" : "Not qualified"}
@@ -128,10 +128,12 @@ function OverviewPage() {
         />
       </div>
 
-      <Surface>
-        <p className="text-[11px] font-medium uppercase tracking-wide text-subtle">Next action</p>
-        <NextAction bookingStatus={booking?.status} bookingId={booking?.id} />
-      </Surface>
+      {booking ? (
+        <Surface>
+          <p className="text-[11px] font-medium uppercase tracking-wide text-subtle">Next action</p>
+          <NextAction bookingStatus={booking.status} bookingId={booking.id} />
+        </Surface>
+      ) : null}
 
       <div>
         <h2 className="font-display text-xl font-semibold">Recent activity</h2>
@@ -149,7 +151,7 @@ function OverviewPage() {
                   <p className="text-xs text-muted">{t.reference}</p>
                 </div>
                 <div className="flex items-center gap-3">
-                  <p className="text-sm font-semibold tabular-nums">{formatBdt(t.amount)}</p>
+                  <p className="whitespace-nowrap text-sm font-semibold tabular-nums">{formatBdt(t.amount)}</p>
                   <StatusBadge status={t.status} />
                 </div>
               </li>
@@ -165,25 +167,10 @@ function NextAction({
   bookingStatus,
   bookingId,
 }: {
-  bookingStatus?: string;
-  bookingId?: string;
+  bookingStatus: string;
+  bookingId: string;
 }) {
-  if (!bookingStatus) {
-    return (
-      <>
-        <p className="mt-2 font-display text-2xl font-semibold">Book a published offer</p>
-        <p className="mt-1 max-w-xl text-sm text-muted">
-          Your qualification benefit is attached to the offer you book.
-        </p>
-        <Button asChild className="mt-4">
-          <Link to="/properties/$slug" params={{ slug: FLAGSHIP.slug }}>
-            View flagship offer
-          </Link>
-        </Button>
-      </>
-    );
-  }
-  if (bookingStatus === "pending" && bookingId) {
+  if (bookingStatus === "pending") {
     return (
       <>
         <p className="mt-2 font-display text-2xl font-semibold">Booking pending confirmation</p>

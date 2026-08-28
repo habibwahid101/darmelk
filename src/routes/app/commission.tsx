@@ -24,7 +24,7 @@ function CommissionPage() {
         description="Rates: L1 10% · L2 8% · L3 6% · L4 4% · L5 2%. Each line uses that source booking’s actual confirmed amount — never a universal booking figure."
       />
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label="Available" value={formatBdt(wallet.available)} />
         <StatCard label="Pending" value={formatBdt(wallet.pending)} />
         <StatCard label="Paid" value={formatBdt(wallet.paid)} />

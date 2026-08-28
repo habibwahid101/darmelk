@@ -56,7 +56,7 @@ function QualificationPage() {
         {own ? (
           <>
             <p className="mt-2 font-medium">{own.offerTitle}</p>
-            <p className="mt-1 font-display text-3xl font-semibold tabular-nums">
+            <p className="mt-1 whitespace-nowrap font-display text-3xl font-semibold tabular-nums">
               {formatBdt(own.qualificationBenefit)}
             </p>
             <p className="mt-2 text-sm text-muted">

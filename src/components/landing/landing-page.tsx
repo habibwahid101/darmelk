@@ -13,7 +13,8 @@ import {
   Sprout,
   Wallet,
 } from "lucide-react";
-import { PropertyCard } from "@/components/property-card";
+import { AmountRow } from "@/components/states";
+import { PropertyCard, FeaturedOffer } from "@/components/property-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -220,14 +221,14 @@ export function LandingPage() {
 
 function Hero() {
   return (
-    <section className="relative min-h-[100svh] overflow-hidden bg-ink">
+    <section className="relative min-h-[70svh] overflow-hidden bg-ink md:min-h-[100svh]">
       <img
         src="/images/hero-hotel.jpg"
         alt="Five-star hotel at dusk with a still reflecting pool"
         className="absolute inset-0 size-full object-cover"
       />
       <div className="absolute inset-0 bg-[linear-gradient(180deg,rgb(26_25_22/0.45)_0%,rgb(26_25_22/0.28)_40%,rgb(26_25_22/0.72)_100%)]" />
-      <div className="relative container-pg flex min-h-[100svh] flex-col justify-end pb-16 pt-28 md:pb-24">
+      <div className="relative container-pg flex min-h-[70svh] flex-col justify-end pb-14 pt-28 md:min-h-[100svh] md:pb-24">
         <div className="max-w-2xl">
           <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-cream/70">
             Curated property offers
@@ -307,21 +308,9 @@ function Flagship() {
               <h3 className="mt-2 font-display text-2xl font-semibold">{FLAGSHIP.title}</h3>
               <p className="mt-3 text-sm leading-relaxed text-muted">{FLAGSHIP.summary}</p>
               <dl className="mt-8 space-y-4">
-                {[
-                  ["Retail value", FLAGSHIP.retailValue],
-                  ["Booking amount", FLAGSHIP.bookingAmount],
-                  ["Qualification benefit", FLAGSHIP.qualificationBenefit],
-                ].map(([label, value]) => (
-                  <div
-                    key={String(label)}
-                    className="flex items-baseline justify-between gap-4 border-b border-line pb-3"
-                  >
-                    <dt className="text-sm text-muted">{label}</dt>
-                    <dd className="text-base font-semibold tabular-nums text-ink">
-                      {formatBdt(value as number)}
-                    </dd>
-                  </div>
-                ))}
+                <AmountRow label="Retail value" value={FLAGSHIP.retailValue} />
+                <AmountRow label="Booking amount" value={FLAGSHIP.bookingAmount} />
+                <AmountRow label="Qualification benefit" value={FLAGSHIP.qualificationBenefit} />
               </dl>
             </div>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
@@ -392,10 +381,16 @@ function Opportunities() {
           title="Available property opportunities"
           body="Each card shows the offer’s own retail value, booking amount, and qualification benefit. Commission is not the primary content."
         />
-        <div className="mx-auto mt-12 grid max-w-xl gap-6">
-          {OFFERS.map((offer) => (
-            <PropertyCard key={offer.slug} offer={offer} />
-          ))}
+        <div className="mt-12">
+          {OFFERS.length === 1 ? (
+            <FeaturedOffer offer={OFFERS[0] ?? FLAGSHIP} />
+          ) : (
+            <div className="grid gap-6 sm:grid-cols-2">
+              {OFFERS.map((offer) => (
+                <PropertyCard key={offer.slug} offer={offer} />
+              ))}
+            </div>
+          )}
         </div>
         <p className="mt-8 text-center text-sm text-muted">
           Additional categories will appear here as offers are published.
@@ -418,7 +413,7 @@ function HowItWorks() {
           {STEPS.map((step) => (
             <li
               key={step.n}
-              className="flex min-h-[15.5rem] flex-col rounded-2xl bg-paper p-6 shadow-[var(--shadow-card)]"
+              className="flex flex-col rounded-2xl bg-paper p-6 shadow-[var(--shadow-card)]"
             >
               <span className="font-display text-2xl text-pine">{step.n}</span>
               <h3 className="mt-4 font-display text-xl font-semibold tracking-tight">
@@ -457,11 +452,15 @@ function Qualification() {
               across five levels.
             </p>
           </div>
-          <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-5">
-            {LEVELS.map((lvl) => (
+          <div className="mt-6 grid grid-cols-6 gap-3 sm:grid-cols-5">
+            {LEVELS.map((lvl, i) => (
               <div
                 key={lvl.label}
-                className="rounded-xl bg-paper px-3 py-4 text-center"
+                className={cn(
+                  "rounded-xl bg-paper px-3 py-4 text-center",
+                  i < 3 ? "col-span-2" : "col-span-3",
+                  "sm:col-span-1",
+                )}
               >
                 <p className="text-[11px] font-medium uppercase tracking-wide text-subtle">
                   {lvl.label}
@@ -473,9 +472,9 @@ function Qualification() {
               </div>
             ))}
           </div>
-          <div className="mt-6 flex flex-col gap-2 rounded-xl bg-pine px-5 py-4 text-pine-fg sm:flex-row sm:items-center sm:justify-between">
+          <div className="mt-6 flex flex-col gap-1 rounded-xl bg-pine px-5 py-4 text-pine-fg min-[420px]:flex-row min-[420px]:items-baseline min-[420px]:justify-between min-[420px]:gap-3">
             <p className="text-sm font-medium">Total across Levels 1–5</p>
-            <p className="font-display text-2xl font-semibold tabular-nums">
+            <p className="whitespace-nowrap font-display text-2xl font-semibold tabular-nums">
               {TOTAL_POSITIONS} positions
             </p>
           </div>
@@ -524,7 +523,7 @@ function Commission({ exampleTotal }: { exampleTotal: number }) {
           <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-cream/60">
             Example only — not a guaranteed figure
           </p>
-          <p className="mt-2 font-display text-3xl font-semibold tabular-nums text-cream">
+          <p className="mt-2 whitespace-nowrap font-display text-3xl font-semibold tabular-nums text-cream">
             {formatBdt(exampleTotal)}
           </p>
           <p className="mt-3 text-sm leading-relaxed text-cream/70">
@@ -580,27 +579,27 @@ function Benefit() {
               Five-Star Hotel Share
             </p>
             <dl className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <div>
+              <div className="flex items-baseline justify-between gap-3 sm:block">
                 <dt className="text-[11px] uppercase tracking-wide text-subtle">
                   Retail
                 </dt>
-                <dd className="mt-1 font-semibold tabular-nums">
+                <dd className="whitespace-nowrap font-semibold tabular-nums sm:mt-1">
                   {formatBdt(650_000)}
                 </dd>
               </div>
-              <div>
+              <div className="flex items-baseline justify-between gap-3 sm:block">
                 <dt className="text-[11px] uppercase tracking-wide text-subtle">
                   Booking
                 </dt>
-                <dd className="mt-1 font-semibold tabular-nums">
+                <dd className="whitespace-nowrap font-semibold tabular-nums sm:mt-1">
                   {formatBdt(50_000)}
                 </dd>
               </div>
-              <div>
+              <div className="flex items-baseline justify-between gap-3 sm:block">
                 <dt className="text-[11px] uppercase tracking-wide text-subtle">
                   Benefit
                 </dt>
-                <dd className="mt-1 font-semibold tabular-nums">
+                <dd className="whitespace-nowrap font-semibold tabular-nums sm:mt-1">
                   {formatBdt(600_000)}
                 </dd>
               </div>
@@ -621,11 +620,14 @@ function Pillars() {
           title="Why Property Gateway"
           body="Clear terms. Separate outcomes. Nothing dressed up as urgency."
         />
-        <div className="mt-12 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {PILLARS.map((p) => (
+        <div className="mt-12 grid grid-cols-1 gap-4 md:grid-cols-6">
+          {PILLARS.map((p, i) => (
             <article
               key={p.title}
-              className="rounded-2xl bg-paper p-6 shadow-[var(--shadow-card)]"
+              className={cn(
+                "rounded-2xl bg-paper p-6 shadow-[var(--shadow-card)]",
+                i < 3 ? "md:col-span-2" : "md:col-span-3",
+              )}
             >
               <p.icon className="size-5 text-pine" strokeWidth={1.75} />
               <h3 className="mt-4 font-display text-lg font-semibold">{p.title}</h3>

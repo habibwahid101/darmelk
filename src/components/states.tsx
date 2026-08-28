@@ -1,5 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
+import { formatBdt } from "@/lib/offers";
 import { cn } from "@/lib/utils";
 
 export function PageHeader({
@@ -14,21 +15,21 @@ export function PageHeader({
   action?: ReactNode;
 }) {
   return (
-    <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-      <div className="min-w-0">
-        {kicker ? (
-          <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-pine">
-            {kicker}
-          </p>
-        ) : null}
-        <h1 className="mt-2 font-display text-3xl font-semibold tracking-tight md:text-4xl">
+    <div>
+      {kicker ? (
+        <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-pine">
+          {kicker}
+        </p>
+      ) : null}
+      <div className="mt-2 flex items-start justify-between gap-3">
+        <h1 className="min-w-0 font-display text-3xl font-semibold tracking-tight md:text-4xl">
           {title}
         </h1>
-        {description ? (
-          <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted">{description}</p>
-        ) : null}
+        {action ? <div className="shrink-0 pt-1">{action}</div> : null}
       </div>
-      {action ? <div className="shrink-0">{action}</div> : null}
+      {description ? (
+        <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted">{description}</p>
+      ) : null}
     </div>
   );
 }
@@ -45,7 +46,7 @@ export function EmptyState({
   action?: ReactNode;
 }) {
   return (
-    <div className="rounded-2xl bg-cream px-6 py-14 text-center shadow-[var(--shadow-card)]">
+    <div className="rounded-2xl bg-cream px-6 py-10 text-center shadow-[var(--shadow-card)]">
       <div className="mx-auto grid size-12 place-items-center rounded-full bg-mist text-pine">
         <Icon className="size-5" strokeWidth={1.75} />
       </div>
@@ -123,21 +124,45 @@ export function StatCard({
   value,
   hint,
   action,
+  compact = false,
 }: {
   label: string;
   value: string;
   hint?: string;
   action?: ReactNode;
+  compact?: boolean;
 }) {
   return (
     <article className="flex h-full flex-col rounded-2xl bg-cream p-5 shadow-[var(--shadow-card)]">
       <p className="text-[11px] font-medium uppercase tracking-wide text-subtle">{label}</p>
-      <p className="mt-3 font-display text-2xl font-semibold tracking-tight tabular-nums">
+      <p
+        className={cn(
+          "mt-3 font-display font-semibold tracking-tight tabular-nums whitespace-nowrap",
+          compact ? "text-xl" : "text-2xl",
+        )}
+      >
         {value}
       </p>
       {hint ? <p className="mt-1 text-sm text-muted">{hint}</p> : null}
       {action ? <div className="mt-4">{action}</div> : null}
     </article>
+  );
+}
+
+export function AmountRow({
+  label,
+  value,
+}: {
+  label: string;
+  value: number;
+}) {
+  return (
+    <div className="flex flex-col gap-1 border-b border-line pb-3 last:border-0 last:pb-0 sm:flex-row sm:items-baseline sm:justify-between sm:gap-4">
+      <dt className="text-sm text-muted">{label}</dt>
+      <dd className="whitespace-nowrap font-display text-lg font-semibold tabular-nums sm:text-xl">
+        {formatBdt(value)}
+      </dd>
+    </div>
   );
 }
 

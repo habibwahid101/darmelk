@@ -85,7 +85,7 @@ export const COMMISSION_LEVELS = [
 export const TOTAL_POSITIONS = 363;
 
 export function formatBdt(amount: number) {
-  return `BDT ${amount.toLocaleString("en-US")}`;
+  return `BDT\u00A0${amount.toLocaleString("en-US")}`;
 }
 
 export function exampleCommission(bookingAmount: number, rate: number, positions: number) {

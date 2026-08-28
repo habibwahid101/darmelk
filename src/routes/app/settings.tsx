@@ -44,7 +44,7 @@ function SettingsPage() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="mx-auto max-w-2xl space-y-8">
       <PageHeader kicker="Account" title="Profile & settings" description="Keep this record accurate. Sponsor assignment is not edited here." />
 
       <Surface>

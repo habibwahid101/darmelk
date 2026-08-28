@@ -3,9 +3,11 @@ import { cn } from "@/lib/utils";
 export function BrandMark({
   className,
   inverted = false,
+  compact = false,
 }: {
   className?: string;
   inverted?: boolean;
+  compact?: boolean;
 }) {
   return (
     <span className={cn("inline-flex items-center gap-2.5", className)}>
@@ -38,6 +40,7 @@ export function BrandMark({
           className={cn(
             "mt-0.5 text-[10px] font-medium tracking-[0.16em] uppercase",
             inverted ? "text-cream/70" : "text-muted",
+            compact && "max-xl:hidden",
           )}
         >
           Property first

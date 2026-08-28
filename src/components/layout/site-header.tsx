@@ -22,7 +22,7 @@ function AuthSlot({ inverted }: { inverted: boolean }) {
   }
   if (user) {
     return (
-      <Button asChild variant={inverted ? "invertGhost" : "ghost"} size="sm">
+      <Button asChild variant={inverted ? "invertGhost" : "ghost"} size="md">
         <Link to="/app">Dashboard</Link>
       </Button>
     );
@@ -74,10 +74,10 @@ export function SiteHeader() {
     >
       <div className="container-pg flex h-16 items-center justify-between gap-4 md:h-[4.25rem]">
         <Link to="/" aria-label="Property Gateway home" className="shrink-0">
-          <BrandMark inverted={inverted} />
+          <BrandMark inverted={inverted} compact />
         </Link>
 
-        <nav className="hidden items-center gap-7 lg:flex" aria-label="Primary">
+        <nav className="hidden items-center gap-6 xl:flex" aria-label="Primary">
           {NAV.map((item) => (
             <Link
               key={item.label}
@@ -101,7 +101,7 @@ export function SiteHeader() {
           ))}
         </nav>
 
-        <div className="hidden items-center gap-2 lg:flex">
+        <div className="hidden items-center gap-2 xl:flex">
           <AuthSlot inverted={inverted} />
           <Button asChild variant={inverted ? "invert" : "primary"} size="md">
             <Link to="/properties">Explore properties</Link>
@@ -111,7 +111,7 @@ export function SiteHeader() {
         <button
           type="button"
           className={cn(
-            "relative inline-flex size-11 items-center justify-center rounded-lg lg:hidden",
+            "relative inline-flex size-11 items-center justify-center rounded-lg xl:hidden",
             inverted ? "text-cream" : "text-ink",
           )}
           aria-label={open ? "Close menu" : "Open menu"}
@@ -123,7 +123,7 @@ export function SiteHeader() {
       </div>
 
       {open ? (
-        <div className="border-t border-line bg-paper lg:hidden">
+        <div className="border-t border-line bg-paper xl:hidden">
           <nav className="container-pg flex flex-col gap-1 py-4" aria-label="Mobile">
             {NAV.map((item) => (
               <Link

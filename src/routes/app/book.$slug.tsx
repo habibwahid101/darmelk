@@ -1,7 +1,7 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { PageHeader, SuccessBanner, Surface } from "@/components/states";
+import { AmountRow, PageHeader, SuccessBanner, Surface } from "@/components/states";
 import { useMemberSession } from "@/components/layout/use-member";
 import { ACTIVATION_FEE } from "@/lib/platform";
 import { formatBdt, getOffer } from "@/lib/offers";
@@ -46,7 +46,7 @@ function BookOfferPage() {
           <p className="text-sm text-muted">Reference</p>
           <p className="font-medium">{bookingId}</p>
           <p className="mt-4 text-sm text-muted">{offer.title}</p>
-          <p className="font-display text-2xl font-semibold">{formatBdt(offer.bookingAmount)}</p>
+          <p className="whitespace-nowrap font-display text-2xl font-semibold">{formatBdt(offer.bookingAmount)}</p>
           <div className="mt-6 flex flex-col gap-3 sm:flex-row">
             <Button asChild className="flex-1">
               <Link to="/app/bookings/$id" params={{ id: bookingId }}>
@@ -95,21 +95,9 @@ function BookOfferPage() {
       </Surface>
 
       <dl className="space-y-3 rounded-2xl bg-cream p-5 shadow-[var(--shadow-card)]">
-        {[
-          ["Retail value", offer.retailValue],
-          ["Amount due now (booking)", offer.bookingAmount],
-          ["Qualification benefit (this offer)", offer.qualificationBenefit],
-        ].map(([label, value]) => (
-          <div
-            key={String(label)}
-            className="flex items-baseline justify-between gap-4 border-b border-line pb-3 last:border-0 last:pb-0"
-          >
-            <dt className="text-sm text-muted">{label}</dt>
-            <dd className="font-display text-xl font-semibold tabular-nums">
-              {formatBdt(value as number)}
-            </dd>
-          </div>
-        ))}
+        <AmountRow label="Retail value" value={offer.retailValue} />
+        <AmountRow label="Amount due now (booking)" value={offer.bookingAmount} />
+        <AmountRow label="Qualification benefit (this offer)" value={offer.qualificationBenefit} />
       </dl>
 
       {step === 2 ? (
@@ -127,13 +115,11 @@ function BookOfferPage() {
         </Surface>
       ) : null}
 
-      <div className="flex flex-col gap-3 sm:flex-row">
+      <div className="flex flex-col items-stretch gap-2">
         {step === 1 ? (
           <>
-            <Button className="flex-1" onClick={() => setStep(2)}>
-              Continue to summary
-            </Button>
-            <Button asChild variant="secondary" className="flex-1">
+            <Button onClick={() => setStep(2)}>Continue to summary</Button>
+            <Button asChild variant="ghost">
               <Link to="/properties/$slug" params={{ slug: offer.slug }}>
                 Back to offer
               </Link>
@@ -141,10 +127,10 @@ function BookOfferPage() {
           </>
         ) : (
           <>
-            <Button className="flex-1" onClick={submit} disabled={pending}>
+            <Button onClick={submit} disabled={pending}>
               {pending ? "Submitting…" : "Submit booking request"}
             </Button>
-            <Button variant="secondary" className="flex-1" onClick={() => setStep(1)}>
+            <Button variant="ghost" onClick={() => setStep(1)}>
               Back
             </Button>
           </>

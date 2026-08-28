@@ -199,7 +199,7 @@ export function AdminShell() {
             <Link to="/app">Member area</Link>
           </Button>
         </div>
-        <main className="px-5 py-6 pb-28 md:px-8 lg:pb-12">
+        <main className="px-5 py-6 pb-28 md:px-8 md:py-8 lg:pb-12">
           <div className="mx-auto max-w-6xl">
             <Outlet />
           </div>

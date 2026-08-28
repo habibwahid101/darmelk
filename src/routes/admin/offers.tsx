@@ -26,7 +26,7 @@ function AdminOffers() {
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                <StatusBadge status={o.status === "available" ? "available" : "pending"} />
+                <StatusBadge status={o.status === "available" ? "available" : "coming-soon"} />
                 <Link to="/properties/$slug" params={{ slug: o.slug }} className="text-sm text-pine hover:underline">
                   View
                 </Link>
@@ -43,7 +43,7 @@ function AdminOffers() {
             <li key={c.slug} className="rounded-2xl bg-cream p-5 shadow-[var(--shadow-card)]">
               <div className="flex items-center justify-between gap-3">
                 <p className="font-medium">{c.title}</p>
-                <StatusBadge status={c.available ? "available" : "pending"} />
+                <StatusBadge status={c.available ? "available" : "coming-soon"} />
               </div>
               <p className="mt-2 text-sm text-muted">{c.blurb}</p>
             </li>

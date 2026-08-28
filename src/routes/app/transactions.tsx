@@ -82,7 +82,7 @@ function TransactionsPage() {
                   <p className="text-xs text-subtle">{formatWhen(t.createdAt)}</p>
                 </div>
                 <div className="flex items-center gap-3">
-                  <p className="text-sm font-semibold tabular-nums">{formatBdt(t.amount)}</p>
+                  <p className="whitespace-nowrap text-sm font-semibold tabular-nums">{formatBdt(t.amount)}</p>
                   <StatusBadge status={t.status} />
                 </div>
               </li>

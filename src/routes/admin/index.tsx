@@ -27,7 +27,7 @@ function AdminOverview() {
         description="Figures below come from this environment’s real records. Empty stays empty — nothing is invented."
       />
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label="Members" value={String(members.length)} hint={`${active} with active annual activation`} />
         <StatCard label="Published offers" value={String(published)} hint={`${CATEGORIES.filter((c) => !c.available).length} categories coming soon`} />
         <StatCard label="Bookings" value={String(bookings.length)} hint={`${confirmed} confirmed · ${pending} pending`} />

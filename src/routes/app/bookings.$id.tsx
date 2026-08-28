@@ -38,7 +38,7 @@ function BookingDetailPage() {
         ].map(([label, value]) => (
           <Surface key={String(label)}>
             <dt className="text-[11px] font-medium uppercase tracking-wide text-subtle">{label}</dt>
-            <dd className="mt-2 font-display text-2xl font-semibold tabular-nums">
+            <dd className="mt-2 whitespace-nowrap font-display text-2xl font-semibold tabular-nums">
               {formatBdt(value as number)}
             </dd>
             <p className="mt-1 text-xs text-subtle">This offer only</p>
