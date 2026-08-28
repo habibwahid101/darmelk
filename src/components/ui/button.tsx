@@ -17,9 +17,9 @@ const buttonVariants = cva(
           "bg-transparent text-cream shadow-[0_0_0_1px_rgb(251_250_246/0.28)] hover:bg-cream/10",
       },
       size: {
-        sm: "h-9 rounded-md px-3.5 text-sm",
-        md: "h-12 rounded-lg px-5 text-sm",
-        lg: "h-[3.25rem] rounded-lg px-6 text-[15px]",
+        sm: "h-9 min-h-9 rounded-md px-3.5 text-sm",
+        md: "h-[3.25rem] min-h-[3.25rem] rounded-lg px-6 text-[15px]",
+        lg: "h-[3.25rem] min-h-[3.25rem] rounded-lg px-6 text-[15px]",
       },
     },
     defaultVariants: {

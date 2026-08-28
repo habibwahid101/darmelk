@@ -48,12 +48,12 @@ function BookOfferPage() {
           <p className="mt-4 text-sm text-muted">{offer.title}</p>
           <p className="whitespace-nowrap font-display text-2xl font-semibold">{formatBdt(offer.bookingAmount)}</p>
           <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-            <Button asChild className="flex-1">
+            <Button asChild className="w-full sm:flex-1">
               <Link to="/app/bookings/$id" params={{ id: bookingId }}>
                 View booking
               </Link>
             </Button>
-            <Button asChild variant="secondary" className="flex-1">
+            <Button asChild variant="secondary" className="w-full sm:flex-1">
               <Link to="/app">Overview</Link>
             </Button>
           </div>

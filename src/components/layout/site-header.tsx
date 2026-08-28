@@ -18,18 +18,18 @@ const NAV = [
 function AuthSlot({ inverted }: { inverted: boolean }) {
   const { user, isPending } = useCurrentUserState();
   if (isPending) {
-    return <div className="h-11 w-24 animate-pulse rounded-lg bg-ink/10" />;
+    return <div className="h-9 w-20 animate-pulse rounded-md bg-ink/10" />;
   }
   if (user) {
     return (
-      <Button asChild variant={inverted ? "invertGhost" : "ghost"} size="md">
+      <Button asChild variant={inverted ? "invertGhost" : "ghost"} size="sm">
         <Link to="/app">Dashboard</Link>
       </Button>
     );
   }
   return (
     <SignedOut>
-      <Button asChild variant={inverted ? "invertGhost" : "ghost"} size="md">
+      <Button asChild variant={inverted ? "invertGhost" : "ghost"} size="sm">
         <Link to="/login">Sign in</Link>
       </Button>
     </SignedOut>
@@ -103,7 +103,7 @@ export function SiteHeader() {
 
         <div className="hidden items-center gap-2 lg:flex">
           <AuthSlot inverted={inverted} />
-          <Button asChild variant={inverted ? "invert" : "primary"} size="md" className="px-4">
+          <Button asChild variant={inverted ? "invert" : "primary"} size="lg">
             <Link to="/properties">Explore properties</Link>
           </Button>
         </div>

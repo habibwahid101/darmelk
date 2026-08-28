@@ -86,7 +86,7 @@ const PILLARS = [
   },
   {
     icon: FileText,
-    title: "Historical booking snapshot",
+    title: "Booking snapshot",
     body: "Confirmed bookings stay on record so progress and commission can be reviewed against actual amounts.",
   },
   {
@@ -96,7 +96,7 @@ const PILLARS = [
   },
   {
     icon: Wallet,
-    title: "Separate commission & benefit",
+    title: "Commission & benefit",
     body: "Commission is paid from confirmed booking amounts. Property benefit is a different outcome, tied to your offer.",
   },
   {
@@ -314,12 +314,12 @@ function Flagship() {
               </dl>
             </div>
             <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-              <Button asChild className="flex-1">
+              <Button asChild className="w-full sm:flex-1">
                 <Link to="/login" search={{ intent: "book", offer: FLAGSHIP.slug }}>
                   Start booking
                 </Link>
               </Button>
-              <Button asChild variant="secondary" className="flex-1">
+              <Button asChild variant="secondary" className="w-full sm:flex-1">
                 <Link to="/properties/$slug" params={{ slug: FLAGSHIP.slug }}>
                   View details
                 </Link>
