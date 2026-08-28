@@ -277,55 +277,9 @@ function Flagship() {
   return (
     <section id="properties" className="section-y scroll-mt-24">
       <div className="container-pg">
-        <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-          <div className="max-w-xl">
-            <Eyebrow>Flagship offer</Eyebrow>
-            <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight md:text-4xl">
-              Five-Star Hotel Share
-            </h2>
-            <p className="mt-3 text-[15px] leading-relaxed text-muted">
-              Values below belong to this offer only. They are not universal
-              Property Gateway figures.
-            </p>
-          </div>
-          <Badge tone="pine">Currently available</Badge>
-        </div>
-
-        <div className="mt-10 grid items-stretch gap-6 lg:grid-cols-[1.35fr_1fr]">
-          <div className="overflow-hidden rounded-2xl bg-mist">
-            <img
-              src={FLAGSHIP.heroImage ?? FLAGSHIP.image}
-              alt="Exterior of the flagship five-star hotel"
-              className="aspect-[16/11] size-full object-cover md:aspect-[16/10]"
-            />
-          </div>
-          <div className="flex flex-col justify-between rounded-2xl bg-cream p-6 shadow-[var(--shadow-card)] md:p-8">
-            <div>
-              <p className="text-sm text-muted">
-                {FLAGSHIP.category}
-                {FLAGSHIP.location ? ` · ${FLAGSHIP.location}` : ""}
-              </p>
-              <h3 className="mt-2 font-display text-2xl font-semibold">{FLAGSHIP.title}</h3>
-              <p className="mt-3 text-sm leading-relaxed text-muted">{FLAGSHIP.summary}</p>
-              <dl className="mt-6">
-                <AmountRow label="Retail value" value={FLAGSHIP.retailValue} />
-                <AmountRow label="Booking amount" value={FLAGSHIP.bookingAmount} />
-                <AmountRow label="Qualification benefit" value={FLAGSHIP.qualificationBenefit} />
-              </dl>
-            </div>
-            <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-              <Button asChild className="w-full sm:flex-1">
-                <Link to="/login" search={{ intent: "book", offer: FLAGSHIP.slug }}>
-                  Start booking
-                </Link>
-              </Button>
-              <Button asChild variant="secondary" className="w-full sm:flex-1">
-                <Link to="/properties/$slug" params={{ slug: FLAGSHIP.slug }}>
-                  View details
-                </Link>
-              </Button>
-            </div>
-          </div>
+        <Eyebrow>Flagship offer</Eyebrow>
+        <div className="mt-6 md:mt-8">
+          <FeaturedOffer offer={FLAGSHIP} />
         </div>
       </div>
     </section>
