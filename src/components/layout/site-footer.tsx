@@ -18,24 +18,24 @@ export function SiteFooter() {
             <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-subtle">
               Explore
             </p>
-            <ul className="mt-3 space-y-1 text-sm">
+            <ul className="mt-2 space-y-0 text-sm">
               <li>
-                <Link to="/properties" className="inline-flex min-h-10 items-center text-ink/80 hover:text-ink">
+                <Link to="/properties" className="inline-flex min-h-8 items-center text-ink/80 hover:text-ink">
                   Properties
                 </Link>
               </li>
               <li>
-                <Link to="/" hash="how-it-works" className="inline-flex min-h-10 items-center text-ink/80 hover:text-ink">
+                <Link to="/" hash="how-it-works" className="inline-flex min-h-8 items-center text-ink/80 hover:text-ink">
                   How it works
                 </Link>
               </li>
               <li>
-                <Link to="/" hash="commission" className="inline-flex min-h-10 items-center text-ink/80 hover:text-ink">
+                <Link to="/" hash="commission" className="inline-flex min-h-8 items-center text-ink/80 hover:text-ink">
                   Commission
                 </Link>
               </li>
               <li>
-                <Link to="/" hash="faq" className="inline-flex min-h-10 items-center text-ink/80 hover:text-ink">
+                <Link to="/" hash="faq" className="inline-flex min-h-8 items-center text-ink/80 hover:text-ink">
                   FAQ
                 </Link>
               </li>
@@ -45,9 +45,9 @@ export function SiteFooter() {
             <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-subtle">
               Account
             </p>
-            <ul className="mt-3 space-y-1 text-sm">
+            <ul className="mt-2 space-y-0 text-sm">
               <li>
-                <Link to="/login" className="inline-flex min-h-10 items-center text-ink/80 hover:text-ink">
+                <Link to="/login" className="inline-flex min-h-8 items-center text-ink/80 hover:text-ink">
                   Sign in
                 </Link>
               </li>
@@ -55,18 +55,18 @@ export function SiteFooter() {
                 <Link
                   to="/login"
                   search={{ mode: "create" }}
-                  className="inline-flex min-h-10 items-center text-ink/80 hover:text-ink"
+                  className="inline-flex min-h-8 items-center text-ink/80 hover:text-ink"
                 >
                   Create account
                 </Link>
               </li>
               <li>
-                <Link to="/app" className="inline-flex min-h-10 items-center text-ink/80 hover:text-ink">
+                <Link to="/app" className="inline-flex min-h-8 items-center text-ink/80 hover:text-ink">
                   Member area
                 </Link>
               </li>
               <li>
-                <Link to="/forgot-password" className="inline-flex min-h-10 items-center text-ink/80 hover:text-ink">
+                <Link to="/forgot-password" className="inline-flex min-h-8 items-center text-ink/80 hover:text-ink">
                   Forgot password
                 </Link>
               </li>
