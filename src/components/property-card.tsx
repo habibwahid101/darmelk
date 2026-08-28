@@ -3,7 +3,7 @@ import { MapPin } from "lucide-react";
 import { AmountRow } from "@/components/states";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { formatBdt, type PropertyOffer } from "@/lib/offers";
+import { type PropertyOffer } from "@/lib/offers";
 import { cn } from "@/lib/utils";
 
 export function PropertyCard({
@@ -48,31 +48,10 @@ export function PropertyCard({
             </p>
           ) : null}
         </div>
-        <dl className="mt-auto grid grid-cols-1 gap-3 border-t border-line pt-4 min-[400px]:grid-cols-3 min-[400px]:gap-2">
-          <div className="flex items-baseline justify-between gap-3 min-[400px]:block">
-            <dt className="text-[11px] font-medium uppercase tracking-wide text-subtle">
-              Retail
-            </dt>
-            <dd className="whitespace-nowrap text-sm font-semibold tabular-nums text-ink min-[400px]:mt-1">
-              {formatBdt(offer.retailValue)}
-            </dd>
-          </div>
-          <div className="flex items-baseline justify-between gap-3 min-[400px]:block">
-            <dt className="text-[11px] font-medium uppercase tracking-wide text-subtle">
-              Booking
-            </dt>
-            <dd className="whitespace-nowrap text-sm font-semibold tabular-nums text-ink min-[400px]:mt-1">
-              {formatBdt(offer.bookingAmount)}
-            </dd>
-          </div>
-          <div className="flex items-baseline justify-between gap-3 min-[400px]:block">
-            <dt className="text-[11px] font-medium uppercase tracking-wide text-subtle">
-              Benefit
-            </dt>
-            <dd className="whitespace-nowrap text-sm font-semibold tabular-nums text-ink min-[400px]:mt-1">
-              {formatBdt(offer.qualificationBenefit)}
-            </dd>
-          </div>
+        <dl className="mt-auto border-t border-line pt-3">
+          <AmountRow compact label="Retail" value={offer.retailValue} />
+          <AmountRow compact label="Booking" value={offer.bookingAmount} />
+          <AmountRow compact label="Benefit" value={offer.qualificationBenefit} />
         </dl>
         <Button asChild variant="secondary" className="w-full">
           <Link to="/properties/$slug" params={{ slug: offer.slug }}>
@@ -111,14 +90,14 @@ export function FeaturedOffer({ offer }: { offer: PropertyOffer }) {
           </h2>
           <p className="mt-3 text-sm leading-relaxed text-muted">{offer.summary}</p>
           <p className="mt-2 text-xs text-subtle">Figures below belong to this offer only.</p>
-          <dl className="mt-6 space-y-4">
+          <dl className="mt-5">
             <AmountRow label="Retail value" value={offer.retailValue} />
             <AmountRow label="Booking amount" value={offer.bookingAmount} />
             <AmountRow label="Qualification benefit" value={offer.qualificationBenefit} />
           </dl>
         </div>
-        <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-          <Button asChild className="sm:flex-1">
+        <div className="mt-6">
+          <Button asChild className="w-full">
             <Link to="/properties/$slug" params={{ slug: offer.slug }}>
               View details
             </Link>

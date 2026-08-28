@@ -18,13 +18,13 @@ const buttonVariants = cva(
       },
       size: {
         sm: "h-9 rounded-md px-3.5 text-sm",
-        md: "h-11 rounded-lg px-5 text-sm",
-        lg: "h-12 rounded-lg px-6 text-[15px]",
+        md: "h-12 rounded-lg px-5 text-sm",
+        lg: "h-[3.25rem] rounded-lg px-6 text-[15px]",
       },
     },
     defaultVariants: {
       variant: "primary",
-      size: "md",
+      size: "lg",
     },
   },
 );

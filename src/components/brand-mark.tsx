@@ -40,7 +40,7 @@ export function BrandMark({
           className={cn(
             "mt-0.5 text-[10px] font-medium tracking-[0.16em] uppercase",
             inverted ? "text-cream/70" : "text-muted",
-            compact && "max-xl:hidden",
+            compact && "hidden xl:inline",
           )}
         >
           Property first

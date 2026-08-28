@@ -1,6 +1,5 @@
 import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
-import { formatBdt } from "@/lib/offers";
 import { cn } from "@/lib/utils";
 
 export function PageHeader({
@@ -152,15 +151,27 @@ export function StatCard({
 export function AmountRow({
   label,
   value,
+  compact = false,
 }: {
   label: string;
   value: number;
+  compact?: boolean;
 }) {
+  const figure = value.toLocaleString("en-US");
   return (
-    <div className="flex flex-col gap-1 border-b border-line pb-3 last:border-0 last:pb-0 sm:flex-row sm:items-baseline sm:justify-between sm:gap-4">
-      <dt className="text-sm text-muted">{label}</dt>
-      <dd className="whitespace-nowrap font-display text-lg font-semibold tabular-nums sm:text-xl">
-        {formatBdt(value)}
+    <div className="grid grid-cols-[minmax(0,1fr)_auto_8.5ch] items-baseline gap-x-3 border-b border-line py-2.5 last:border-0 last:pb-0 first:pt-0">
+      <dt className="min-w-0 text-sm text-muted">{label}</dt>
+      <span aria-hidden="true" className="text-sm font-medium text-muted">
+        BDT
+      </span>
+      <dd
+        className={cn(
+          "text-right font-display font-semibold tabular-nums whitespace-nowrap",
+          compact ? "text-base" : "text-lg sm:text-xl",
+        )}
+      >
+        <span className="sr-only">BDT </span>
+        {figure}
       </dd>
     </div>
   );

@@ -307,13 +307,13 @@ function Flagship() {
               </p>
               <h3 className="mt-2 font-display text-2xl font-semibold">{FLAGSHIP.title}</h3>
               <p className="mt-3 text-sm leading-relaxed text-muted">{FLAGSHIP.summary}</p>
-              <dl className="mt-8 space-y-4">
+              <dl className="mt-6">
                 <AmountRow label="Retail value" value={FLAGSHIP.retailValue} />
                 <AmountRow label="Booking amount" value={FLAGSHIP.bookingAmount} />
                 <AmountRow label="Qualification benefit" value={FLAGSHIP.qualificationBenefit} />
               </dl>
             </div>
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row">
               <Button asChild className="flex-1">
                 <Link to="/login" search={{ intent: "book", offer: FLAGSHIP.slug }}>
                   Start booking
@@ -413,13 +413,15 @@ function HowItWorks() {
           {STEPS.map((step) => (
             <li
               key={step.n}
-              className="flex flex-col rounded-2xl bg-paper p-6 shadow-[var(--shadow-card)]"
+              className="flex flex-col rounded-2xl bg-paper p-5 shadow-[var(--shadow-card)] md:p-6"
             >
-              <span className="font-display text-2xl text-pine">{step.n}</span>
-              <h3 className="mt-4 font-display text-xl font-semibold tracking-tight">
-                {step.title}
-              </h3>
-              <p className="mt-2 text-sm leading-relaxed text-muted">{step.body}</p>
+              <div className="flex items-center gap-3">
+                <span className="font-display text-2xl text-pine">{step.n}</span>
+                <h3 className="font-display text-xl font-semibold tracking-tight">
+                  {step.title}
+                </h3>
+              </div>
+              <p className="mt-2.5 text-sm leading-relaxed text-muted">{step.body}</p>
             </li>
           ))}
         </ol>
@@ -578,31 +580,10 @@ function Benefit() {
             <p className="mt-1 font-display text-2xl font-semibold">
               Five-Star Hotel Share
             </p>
-            <dl className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <div className="flex items-baseline justify-between gap-3 sm:block">
-                <dt className="text-[11px] uppercase tracking-wide text-subtle">
-                  Retail
-                </dt>
-                <dd className="whitespace-nowrap font-semibold tabular-nums sm:mt-1">
-                  {formatBdt(650_000)}
-                </dd>
-              </div>
-              <div className="flex items-baseline justify-between gap-3 sm:block">
-                <dt className="text-[11px] uppercase tracking-wide text-subtle">
-                  Booking
-                </dt>
-                <dd className="whitespace-nowrap font-semibold tabular-nums sm:mt-1">
-                  {formatBdt(50_000)}
-                </dd>
-              </div>
-              <div className="flex items-baseline justify-between gap-3 sm:block">
-                <dt className="text-[11px] uppercase tracking-wide text-subtle">
-                  Benefit
-                </dt>
-                <dd className="whitespace-nowrap font-semibold tabular-nums sm:mt-1">
-                  {formatBdt(600_000)}
-                </dd>
-              </div>
+            <dl className="mt-5">
+              <AmountRow compact label="Retail" value={650_000} />
+              <AmountRow compact label="Booking" value={50_000} />
+              <AmountRow compact label="Benefit" value={600_000} />
             </dl>
           </div>
         </div>
@@ -625,13 +606,15 @@ function Pillars() {
             <article
               key={p.title}
               className={cn(
-                "rounded-2xl bg-paper p-6 shadow-[var(--shadow-card)]",
+                "rounded-2xl bg-paper p-5 shadow-[var(--shadow-card)] md:p-6",
                 i < 3 ? "md:col-span-2" : "md:col-span-3",
               )}
             >
-              <p.icon className="size-5 text-pine" strokeWidth={1.75} />
-              <h3 className="mt-4 font-display text-lg font-semibold">{p.title}</h3>
-              <p className="mt-2 text-sm leading-relaxed text-muted">{p.body}</p>
+              <div className="flex items-center gap-3">
+                <p.icon className="size-6 shrink-0 text-pine" strokeWidth={1.75} />
+                <h3 className="font-display text-lg font-semibold">{p.title}</h3>
+              </div>
+              <p className="mt-2.5 text-sm leading-relaxed text-muted">{p.body}</p>
             </article>
           ))}
         </div>

@@ -48,7 +48,7 @@ function PropertyDetail() {
           ) : null}
           <p className="mt-4 text-[15px] leading-relaxed text-muted">{offer.summary}</p>
           <p className="mt-3 text-sm text-muted">Figures below are specific to this offer.</p>
-          <dl className="mt-8 space-y-4 rounded-2xl bg-cream p-6 shadow-[var(--shadow-card)]">
+          <dl className="mt-6 rounded-2xl bg-cream p-5 shadow-[var(--shadow-card)] sm:p-6">
             <AmountRow label="Retail value" value={offer.retailValue} />
             <AmountRow label="Booking amount" value={offer.bookingAmount} />
             <AmountRow label="Qualification benefit" value={offer.qualificationBenefit} />

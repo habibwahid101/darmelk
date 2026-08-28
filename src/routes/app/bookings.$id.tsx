@@ -1,9 +1,8 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
-import { PageHeader, Surface } from "@/components/states";
+import { AmountRow, PageHeader, Surface } from "@/components/states";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { useMemberSession } from "@/components/layout/use-member";
-import { formatBdt } from "@/lib/offers";
 import { formatWhen, usePlatform } from "@/lib/platform";
 
 export const Route = createFileRoute("/app/bookings/$id")({
@@ -30,21 +29,14 @@ function BookingDetailPage() {
         <img src={booking.image} alt="" className="aspect-[16/8] w-full object-cover" />
       </div>
 
-      <dl className="grid gap-3 sm:grid-cols-3">
-        {[
-          ["Retail value", booking.retailValue],
-          ["Booking amount", booking.bookingAmount],
-          ["Qualification benefit", booking.qualificationBenefit],
-        ].map(([label, value]) => (
-          <Surface key={String(label)}>
-            <dt className="text-[11px] font-medium uppercase tracking-wide text-subtle">{label}</dt>
-            <dd className="mt-2 whitespace-nowrap font-display text-2xl font-semibold tabular-nums">
-              {formatBdt(value as number)}
-            </dd>
-            <p className="mt-1 text-xs text-subtle">This offer only</p>
-          </Surface>
-        ))}
-      </dl>
+      <Surface>
+        <dl>
+          <AmountRow label="Retail value" value={booking.retailValue} />
+          <AmountRow label="Booking amount" value={booking.bookingAmount} />
+          <AmountRow label="Qualification benefit" value={booking.qualificationBenefit} />
+        </dl>
+        <p className="mt-3 text-xs text-subtle">Figures belong to this offer only.</p>
+      </Surface>
 
       <Surface>
         <h2 className="font-display text-xl font-semibold">Timeline</h2>

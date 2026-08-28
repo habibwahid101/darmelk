@@ -77,7 +77,7 @@ export function SiteHeader() {
           <BrandMark inverted={inverted} compact />
         </Link>
 
-        <nav className="hidden items-center gap-6 xl:flex" aria-label="Primary">
+        <nav className="hidden items-center gap-4 lg:flex xl:gap-6" aria-label="Primary">
           {NAV.map((item) => (
             <Link
               key={item.label}
@@ -101,9 +101,9 @@ export function SiteHeader() {
           ))}
         </nav>
 
-        <div className="hidden items-center gap-2 xl:flex">
+        <div className="hidden items-center gap-2 lg:flex">
           <AuthSlot inverted={inverted} />
-          <Button asChild variant={inverted ? "invert" : "primary"} size="md">
+          <Button asChild variant={inverted ? "invert" : "primary"} size="md" className="px-4">
             <Link to="/properties">Explore properties</Link>
           </Button>
         </div>
@@ -111,7 +111,7 @@ export function SiteHeader() {
         <button
           type="button"
           className={cn(
-            "relative inline-flex size-11 items-center justify-center rounded-lg xl:hidden",
+            "relative inline-flex size-11 items-center justify-center rounded-lg lg:hidden",
             inverted ? "text-cream" : "text-ink",
           )}
           aria-label={open ? "Close menu" : "Open menu"}
@@ -123,7 +123,7 @@ export function SiteHeader() {
       </div>
 
       {open ? (
-        <div className="border-t border-line bg-paper xl:hidden">
+        <div className="border-t border-line bg-paper lg:hidden">
           <nav className="container-pg flex flex-col gap-1 py-4" aria-label="Mobile">
             {NAV.map((item) => (
               <Link
@@ -144,7 +144,7 @@ export function SiteHeader() {
                 {item.label}
               </Link>
             ))}
-            <div className="mt-3 flex flex-col gap-2 border-t border-line pt-4">
+            <div className="mt-3 flex flex-col gap-3 border-t border-line pt-4">
               {isPending ? (
                 <div className="h-11 animate-pulse rounded-lg bg-ink/8" />
               ) : user ? (

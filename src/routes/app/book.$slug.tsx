@@ -94,7 +94,7 @@ function BookOfferPage() {
         </div>
       </Surface>
 
-      <dl className="space-y-3 rounded-2xl bg-cream p-5 shadow-[var(--shadow-card)]">
+      <dl className="rounded-2xl bg-cream p-5 shadow-[var(--shadow-card)]">
         <AmountRow label="Retail value" value={offer.retailValue} />
         <AmountRow label="Amount due now (booking)" value={offer.bookingAmount} />
         <AmountRow label="Qualification benefit (this offer)" value={offer.qualificationBenefit} />
@@ -115,7 +115,7 @@ function BookOfferPage() {
         </Surface>
       ) : null}
 
-      <div className="flex flex-col items-stretch gap-2">
+      <div className="flex flex-col items-stretch gap-3">
         {step === 1 ? (
           <>
             <Button onClick={() => setStep(2)}>Continue to summary</Button>
