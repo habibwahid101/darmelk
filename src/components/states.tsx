@@ -82,9 +82,9 @@ export function SuccessBanner({
   description: string;
 }) {
   return (
-    <div className="rounded-2xl bg-pine px-5 py-4 text-pine-fg shadow-[var(--shadow-card)]">
+    <div className="rounded-2xl bg-ok px-5 py-4 text-ok-fg shadow-[var(--shadow-card)]">
       <p className="font-medium">{title}</p>
-      <p className="mt-1 text-sm text-pine-fg/80">{description}</p>
+      <p className="mt-1 text-sm text-ok-fg/80">{description}</p>
     </div>
   );
 }
@@ -103,7 +103,7 @@ export function AlertBanner({
       className={cn(
         "rounded-2xl px-5 py-4 shadow-[var(--shadow-card)]",
         tone === "neutral" && "bg-cream",
-        tone === "ok" && "bg-pine/10",
+        tone === "ok" && "bg-ok/10",
         tone === "warn" && "bg-gold/10",
         tone === "danger" && "bg-clay/10",
       )}

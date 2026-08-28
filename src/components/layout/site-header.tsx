@@ -69,7 +69,7 @@ export function SiteHeader() {
         "fixed inset-x-0 top-0 z-50 transition-[background-color,box-shadow,backdrop-filter] duration-200",
         inverted
           ? "bg-gradient-to-b from-ink/50 to-transparent"
-          : "border-b border-line/80 bg-paper/92 shadow-[0_1px_0_rgb(26_25_22/0.04)] backdrop-blur-md",
+          : "border-b border-line/80 bg-paper/92 shadow-[0_1px_0_rgb(40_33_30/0.04)] backdrop-blur-md",
       )}
     >
       <div className="container-pg flex h-16 items-center justify-between gap-4 md:h-[4.25rem]">

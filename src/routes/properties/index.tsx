@@ -118,7 +118,7 @@ function FilterChip({
         "inline-flex h-11 shrink-0 items-center rounded-full px-4 text-sm font-medium transition-colors duration-150",
         active
           ? "bg-pine text-pine-fg"
-          : "bg-cream text-ink shadow-[0_0_0_1px_rgb(26_25_22/0.08)] hover:bg-mist",
+          : "bg-cream text-ink shadow-[0_0_0_1px_rgb(40_33_30/0.08)] hover:bg-mist",
       )}
     >
       {children}

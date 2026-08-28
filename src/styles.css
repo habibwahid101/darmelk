@@ -4,18 +4,41 @@
   --font-sans: "Figtree", ui-sans-serif, system-ui, sans-serif;
   --font-display: "Fraunces", "Iowan Old Style", Georgia, serif;
 
-  --color-paper: #f4f0e8;
-  --color-cream: #fbfaf6;
-  --color-ink: #1a1916;
-  --color-muted: #6f6a62;
-  --color-subtle: #8f8a82;
-  --color-pine: #2f4a40;
-  --color-pine-deep: #1e322c;
-  --color-pine-fg: #f4f0e8;
-  --color-line: #e4dfd4;
-  --color-mist: #ece7dc;
+  /* Brand — sampled from Darmelk lockup #AC6D50 */
+  --color-brand: #ac6d50;
+  --color-brand-hover: #9c644a;
+  --color-brand-deep: #7f4c37;
+  --color-brand-fg: #fcf9f4;
+
+  /* Surfaces */
+  --color-background: #f7f3ec;
+  --color-surface: #fcf9f4;
+  --color-surface-muted: #efe7dc;
+  --color-paper: #f7f3ec;
+  --color-cream: #fcf9f4;
+  --color-mist: #efe7dc;
+
+  /* Text */
+  --color-text: #28211e;
+  --color-text-muted: #6b635c;
+  --color-ink: #28211e;
+  --color-muted: #6b635c;
+  --color-subtle: #8a827a;
+
+  /* Borders */
+  --color-border: #ded4c8;
+  --color-line: #ded4c8;
+
+  /* Primary CTA alias — logo terracotta deepened for 4.5:1 ivory text */
+  --color-pine: #9c644a;
+  --color-pine-deep: #7f4c37;
+  --color-pine-fg: #fcf9f4;
+
+  /* Semantic status — not brand */
+  --color-ok: #3d6a4c;
+  --color-ok-fg: #f7f3ec;
   --color-clay: #8a4336;
-  --color-clay-fg: #fbfaf6;
+  --color-clay-fg: #fcf9f4;
   --color-gold: #8a6a3b;
 
   --radius-xs: 4px;
@@ -26,13 +49,13 @@
   --radius-2xl: 32px;
 
   --shadow-card:
-    0 0 0 1px rgb(26 25 22 / 0.06),
-    0 1px 2px -1px rgb(26 25 22 / 0.06),
-    0 8px 24px -12px rgb(26 25 22 / 0.1);
+    0 0 0 1px rgb(40 33 30 / 0.06),
+    0 1px 2px -1px rgb(40 33 30 / 0.06),
+    0 8px 24px -12px rgb(40 33 30 / 0.1);
   --shadow-card-hover:
-    0 0 0 1px rgb(26 25 22 / 0.08),
-    0 1px 2px -1px rgb(26 25 22 / 0.08),
-    0 16px 32px -16px rgb(26 25 22 / 0.16);
+    0 0 0 1px rgb(40 33 30 / 0.08),
+    0 1px 2px -1px rgb(40 33 30 / 0.08),
+    0 16px 32px -16px rgb(40 33 30 / 0.16);
 }
 
 @layer base {
@@ -44,8 +67,8 @@
   }
 
   body {
-    background: var(--color-paper);
-    color: var(--color-ink);
+    background: var(--color-background);
+    color: var(--color-text);
     font-family: var(--font-sans);
   }
 
@@ -66,12 +89,16 @@
   }
 
   img {
-    outline: 1px solid rgb(26 25 22 / 0.08);
+    outline: 1px solid rgb(40 33 30 / 0.08);
     outline-offset: -1px;
   }
 
+  img[src^="/brand/"] {
+    outline: none;
+  }
+
   ::selection {
-    background: color-mix(in oklab, var(--color-pine) 22%, transparent);
+    background: color-mix(in oklab, var(--color-brand) 22%, transparent);
     color: var(--color-ink);
   }
 
@@ -113,11 +140,11 @@
   height: 2.75rem;
   width: 100%;
   border-radius: var(--radius-sm);
-  background: var(--color-cream);
+  background: var(--color-surface);
   padding-inline: 0.75rem;
   font-size: 0.875rem;
-  color: var(--color-ink);
-  box-shadow: 0 0 0 1px rgb(26 25 22 / 0.12);
+  color: var(--color-text);
+  box-shadow: 0 0 0 1px rgb(40 33 30 / 0.12);
   outline: none;
   transition: box-shadow 150ms ease;
 }
@@ -127,7 +154,7 @@
 }
 
 .field-control:focus {
-  box-shadow: 0 0 0 2px var(--color-pine);
+  box-shadow: 0 0 0 2px var(--color-brand-hover);
 }
 
 .field-control:disabled {

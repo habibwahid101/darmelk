@@ -59,7 +59,7 @@ function SettingsPage() {
             <Input value={phone} onChange={(e) => setPhone(e.target.value)} autoComplete="tel" />
           </Field>
           <Button type="submit">Save profile</Button>
-          {saved ? <p className="text-sm text-pine">Saved.</p> : null}
+          {saved ? <p className="text-sm text-ok">Saved.</p> : null}
         </form>
       </Surface>
 

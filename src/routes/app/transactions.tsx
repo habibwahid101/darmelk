@@ -56,7 +56,7 @@ function TransactionsPage() {
               className={
                 type === t
                   ? "h-11 rounded-full bg-pine px-4 text-sm font-medium text-pine-fg"
-                  : "h-11 rounded-full bg-cream px-4 text-sm font-medium text-ink shadow-[0_0_0_1px_rgb(26_25_22/0.08)]"
+                  : "h-11 rounded-full bg-cream px-4 text-sm font-medium text-ink shadow-[0_0_0_1px_rgb(40_33_30/0.08)]"
               }
             >
               {t === "all" ? "All" : t}

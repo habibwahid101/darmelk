@@ -21,10 +21,10 @@ export const Route = createRootRoute({
         content:
           "Explore curated property, hotel-share, and land offers. Book with defined terms and progress toward offer-specific benefits.",
       },
-      { name: "theme-color", content: "#2F4A40" },
+      { name: "theme-color", content: "#AC6D50" },
     ],
     links: [
-      { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" },
+      { rel: "icon", type: "image/png", href: "/brand/darmelk-mark.png" },
       { rel: "stylesheet", href: appCss },
       { rel: "manifest", href: "/__grok/manifest.webmanifest" },
       { rel: "apple-touch-icon", href: "/__grok/icon-180.png" },

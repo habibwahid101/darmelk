@@ -2,7 +2,7 @@ import { cn } from "@/lib/utils";
 
 const TONES = {
   pending: "bg-mist text-gold",
-  ok: "bg-pine/12 text-pine-deep",
+  ok: "bg-ok/12 text-ok",
   danger: "bg-clay/12 text-clay",
   muted: "bg-ink/6 text-muted",
 } as const;

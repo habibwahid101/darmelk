@@ -227,7 +227,7 @@ function Hero() {
         alt="Five-star hotel at dusk with a still reflecting pool"
         className="absolute inset-0 size-full object-cover"
       />
-      <div className="absolute inset-0 bg-[linear-gradient(180deg,rgb(26_25_22/0.45)_0%,rgb(26_25_22/0.28)_40%,rgb(26_25_22/0.72)_100%)]" />
+      <div className="absolute inset-0 bg-[linear-gradient(180deg,rgb(40_33_30/0.48)_0%,rgb(40_33_30/0.30)_40%,rgb(40_33_30/0.74)_100%)]" />
       <div className="relative container-pg flex min-h-[70svh] flex-col justify-end pb-14 pt-28 md:min-h-[100svh] md:pb-24">
         <div className="max-w-2xl">
           <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-cream/70">
@@ -308,7 +308,7 @@ function Categories() {
                 alt={cat.title}
                 className="aspect-[4/5] w-full object-cover transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:scale-[1.03] min-[520px]:aspect-[3/4] lg:aspect-[4/5]"
               />
-              <div className="absolute inset-0 bg-[linear-gradient(180deg,transparent_35%,rgb(26_25_22/0.78)_100%)]" />
+              <div className="absolute inset-0 bg-[linear-gradient(180deg,transparent_35%,rgb(40_33_30/0.78)_100%)]" />
               <div className="absolute inset-x-0 bottom-0 p-5">
                 <Badge tone={cat.available ? "pine" : "cream"}>
                   {cat.available ? "Available" : "Coming soon"}
@@ -367,7 +367,7 @@ function HowItWorks() {
           {STEPS.map((step) => (
             <li
               key={step.n}
-              className="flex flex-col rounded-2xl bg-paper p-5 shadow-[var(--shadow-card)] md:p-6"
+              className="flex flex-col rounded-2xl bg-mist p-5 shadow-[var(--shadow-card)] md:p-6"
             >
               <div className="flex items-center gap-3">
                 <span className="font-display text-2xl text-pine">{step.n}</span>
@@ -560,7 +560,7 @@ function Pillars() {
             <article
               key={p.title}
               className={cn(
-                "rounded-2xl bg-paper p-5 shadow-[var(--shadow-card)] md:p-6",
+                "rounded-2xl bg-mist p-5 shadow-[var(--shadow-card)] md:p-6",
                 i < 3 ? "md:col-span-2" : "md:col-span-3",
               )}
             >
