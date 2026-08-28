@@ -3,6 +3,7 @@ import { MapPin } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatBdt, getOffer } from "@/lib/offers";
+import { useCurrentUserState } from "@/lib/auth/use-current-user";
 
 export const Route = createFileRoute("/properties/$slug")({
   loader: ({ params }) => {
@@ -15,10 +16,11 @@ export const Route = createFileRoute("/properties/$slug")({
 
 function PropertyDetail() {
   const { offer } = Route.useLoaderData();
+  const { user, isPending } = useCurrentUserState();
+  const canBook = offer.status === "available";
 
   return (
-    <main className="pt-24">
-      <div className="container-pg grid gap-8 py-10 lg:grid-cols-[1.25fr_1fr] lg:py-14">
+    <div className="container-pg grid gap-8 py-10 lg:grid-cols-[1.25fr_1fr] lg:py-14">
         <div className="overflow-hidden rounded-2xl bg-mist">
           <img
             src={offer.heroImage ?? offer.image}
@@ -44,9 +46,7 @@ function PropertyDetail() {
             </p>
           ) : null}
           <p className="mt-4 text-[15px] leading-relaxed text-muted">{offer.summary}</p>
-          <p className="mt-3 text-sm text-muted">
-            Figures below are specific to this offer.
-          </p>
+          <p className="mt-3 text-sm text-muted">Figures below are specific to this offer.</p>
           <dl className="mt-8 space-y-4 rounded-2xl bg-cream p-6 shadow-[var(--shadow-card)]">
             {[
               ["Retail value", offer.retailValue],
@@ -65,11 +65,29 @@ function PropertyDetail() {
             ))}
           </dl>
           <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-            <Button asChild className="flex-1">
-              <Link to="/login" search={{ intent: "book", offer: offer.slug }}>
-                Start booking
-              </Link>
-            </Button>
+            {canBook ? (
+              isPending ? (
+                <Button className="flex-1" disabled>
+                  Start booking
+                </Button>
+              ) : user ? (
+                <Button asChild className="flex-1">
+                  <Link to="/app/book/$slug" params={{ slug: offer.slug }}>
+                    Start booking
+                  </Link>
+                </Button>
+              ) : (
+                <Button asChild className="flex-1">
+                  <Link to="/login" search={{ intent: "book", offer: offer.slug }}>
+                    Start booking
+                  </Link>
+                </Button>
+              )
+            ) : (
+              <Button className="flex-1" disabled>
+                Coming soon
+              </Button>
+            )}
             <Button asChild variant="secondary" className="flex-1">
               <Link to="/" hash="how-it-works">
                 How it works
@@ -77,7 +95,6 @@ function PropertyDetail() {
             </Button>
           </div>
         </div>
-      </div>
-    </main>
+    </div>
   );
 }

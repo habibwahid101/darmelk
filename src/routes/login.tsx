@@ -1,6 +1,9 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { PasswordField } from "@/components/ui/password-field";
 import {
   GROK_PROVIDERS,
   authClient,
@@ -36,25 +39,39 @@ function Login() {
   const [pending, setPending] = useState(false);
 
   const selected = offer ? getOffer(offer) : intent === "book" ? FLAGSHIP : undefined;
-  const callbackURL = "/account";
+  const afterAuth =
+    intent === "book" && selected
+      ? `/app/book/${selected.slug}`
+      : "/app";
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    if (password.length < 8) {
+      setError("Use at least 8 characters.");
+      return;
+    }
     setPending(true);
     try {
       if (create) {
+        if (!name.trim()) {
+          throw new Error("Enter your name.");
+        }
         const { error: err } = await authClient.signUp.email({
           email,
           password,
-          name: name || email.split("@")[0] || "Member",
+          name: name.trim(),
         });
         if (err) throw new Error(err.message || "Could not create account");
       } else {
         const { error: err } = await authClient.signIn.email({ email, password });
         if (err) throw new Error(err.message || "Could not sign in");
       }
-      await navigate({ to: "/account" });
+      if (intent === "book" && selected) {
+        await navigate({ to: "/app/book/$slug", params: { slug: selected.slug } });
+      } else {
+        await navigate({ to: "/app" });
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
@@ -66,11 +83,7 @@ function Login() {
     <main className="container-pg grid min-h-[100svh] place-items-center py-24">
       <div className="grid w-full max-w-4xl overflow-hidden rounded-2xl bg-cream shadow-[var(--shadow-card)] lg:grid-cols-2">
         <div className="relative hidden min-h-[28rem] lg:block">
-          <img
-            src="/images/hero-hotel.jpg"
-            alt=""
-            className="absolute inset-0 size-full object-cover"
-          />
+          <img src="/images/hero-hotel.jpg" alt="" className="absolute inset-0 size-full object-cover" />
           <div className="absolute inset-0 bg-ink/45" />
           <div className="relative flex h-full flex-col justify-end p-8 text-cream">
             <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-cream/70">
@@ -80,8 +93,7 @@ function Login() {
               {create ? "Create your account" : "Welcome back"}
             </p>
             <p className="mt-3 max-w-sm text-sm text-cream/75">
-              Review offer terms before you book. Progress, commission, and
-              benefit stay separate.
+              Review offer terms before you book. Progress, commission, and benefit stay separate.
             </p>
           </div>
         </div>
@@ -102,9 +114,7 @@ function Login() {
                 Booking intent
               </p>
               <p className="mt-1 font-medium text-ink">{selected.title}</p>
-              <p className="text-muted">
-                Booking amount {formatBdt(selected.bookingAmount)}
-              </p>
+              <p className="text-muted">Booking amount {formatBdt(selected.bookingAmount)}</p>
             </div>
           ) : null}
 
@@ -116,7 +126,7 @@ function Login() {
                   type="button"
                   variant="secondary"
                   className="w-full"
-                  onClick={() => signIn(p.providerId, { callbackURL })}
+                  onClick={() => signIn(p.providerId, { callbackURL: afterAuth })}
                 >
                   Continue with {p.label}
                 </Button>
@@ -135,34 +145,49 @@ function Login() {
 
           <form onSubmit={onSubmit} className="space-y-3">
             {create ? (
-              <Field
-                label="Full name"
-                value={name}
-                onChange={setName}
-                autoComplete="name"
-              />
+              <Field label="Full name">
+                <Input
+                  id="full-name"
+                  name="name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  autoComplete="name"
+                  required
+                />
+              </Field>
             ) : null}
-            <Field
-              label="Email"
-              type="email"
-              value={email}
-              onChange={setEmail}
-              autoComplete="email"
-              required
-            />
-            <Field
+            <Field label="Email">
+              <Input
+                id="email"
+                name="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                autoComplete="email"
+                required
+              />
+            </Field>
+            <PasswordField
               label="Password"
-              type="password"
               value={password}
               onChange={setPassword}
               autoComplete={create ? "new-password" : "current-password"}
               required
+              hint={create ? "At least 8 characters." : undefined}
             />
-            {error ? <p className="text-sm text-red-700">{error}</p> : null}
+            {error ? <p className="text-sm text-clay">{error}</p> : null}
             <Button type="submit" className="w-full" disabled={pending || !authEnabled}>
               {pending ? "Please wait…" : create ? "Create account" : "Sign in"}
             </Button>
           </form>
+
+          {!create ? (
+            <p className="mt-3 text-center text-sm">
+              <Link to="/forgot-password" className="text-pine hover:underline">
+                Forgot password?
+              </Link>
+            </p>
+          ) : null}
 
           <p className="mt-5 text-center text-sm text-muted">
             {create ? "Already have an account?" : "New here?"}{" "}
@@ -185,35 +210,5 @@ function Login() {
         </div>
       </div>
     </main>
-  );
-}
-
-function Field({
-  label,
-  value,
-  onChange,
-  type = "text",
-  autoComplete,
-  required,
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  type?: string;
-  autoComplete?: string;
-  required?: boolean;
-}) {
-  return (
-    <label className="block">
-      <span className="text-[12px] font-medium text-ink/80">{label}</span>
-      <input
-        type={type}
-        value={value}
-        required={required}
-        autoComplete={autoComplete}
-        onChange={(e) => onChange(e.target.value)}
-        className="mt-1 h-11 w-full rounded-lg bg-paper px-3 text-sm text-ink shadow-[0_0_0_1px_rgb(26_25_22/0.12)] outline-none transition-[box-shadow] duration-150 placeholder:text-subtle focus:shadow-[0_0_0_2px_var(--color-pine)]"
-      />
-    </label>
   );
 }

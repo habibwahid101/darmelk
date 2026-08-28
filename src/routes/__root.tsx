@@ -1,4 +1,5 @@
-import { createRootRoute, HeadContent, Link, Outlet, Scripts } from "@tanstack/react-router";
+import { createRootRoute, HeadContent, Link, Outlet, Scripts, useRouterState } from "@tanstack/react-router";
+import { Toaster } from "sonner";
 import { AuthProvider } from "@/lib/auth/provider";
 import { PreviewHostBridge } from "@/components/preview-host-bridge";
 import { SiteFooter } from "@/components/layout/site-footer";
@@ -53,13 +54,15 @@ function RootDocument() {
         <PreviewHostBridge />
         <AuthProvider>
           <HashScroll />
-          <div className="flex min-h-dvh flex-col">
-            <SiteHeader />
-            <div className="flex-1">
-              <Outlet />
-            </div>
-            <SiteFooter />
-          </div>
+          <Toaster
+            position="top-center"
+            toastOptions={{
+              classNames: {
+                toast: "font-sans bg-cream text-ink border-line",
+              },
+            }}
+          />
+          <Shell />
         </AuthProvider>
         <Scripts />
       </body>
@@ -67,13 +70,28 @@ function RootDocument() {
   );
 }
 
+function Shell() {
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const framed = pathname.startsWith("/app") || pathname.startsWith("/admin");
+  if (framed) {
+    return <Outlet />;
+  }
+  return (
+    <div className="flex min-h-dvh flex-col">
+      <SiteHeader />
+      <div className="flex-1">
+        <Outlet />
+      </div>
+      <SiteFooter />
+    </div>
+  );
+}
+
 function NotFound() {
   return (
     <main className="container-pg grid min-h-[70svh] place-items-center py-32 text-center">
       <div>
-        <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-pine">
-          404
-        </p>
+        <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-pine">404</p>
         <h1 className="mt-3 font-display text-4xl font-semibold">Page not found</h1>
         <p className="mt-3 text-sm text-muted">
           That route doesn’t exist. Browse published property offers instead.

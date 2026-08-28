@@ -60,8 +60,13 @@ export function SiteFooter() {
               </Link>
             </li>
             <li>
-              <Link to="/account" className="text-ink/80 hover:text-ink">
+              <Link to="/app" className="text-ink/80 hover:text-ink">
                 Member area
+              </Link>
+            </li>
+            <li>
+              <Link to="/forgot-password" className="text-ink/80 hover:text-ink">
+                Forgot password
               </Link>
             </li>
           </ul>

@@ -11,10 +11,36 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AccountRouteImport } from './routes/account'
+import { Route as AdminRouteImport } from './routes/admin'
+import { Route as AppRouteImport } from './routes/app'
+import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as PropertiesRouteImport } from './routes/properties'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
+import { Route as AdminIndexRouteImport } from './routes/admin/index'
+import { Route as AdminActivationRouteImport } from './routes/admin/activation'
+import { Route as AdminBookingsRouteImport } from './routes/admin/bookings'
+import { Route as AdminCommissionRouteImport } from './routes/admin/commission'
+import { Route as AdminDocumentsRouteImport } from './routes/admin/documents'
+import { Route as AdminNetworkRouteImport } from './routes/admin/network'
+import { Route as AdminOffersRouteImport } from './routes/admin/offers'
+import { Route as AdminSettingsRouteImport } from './routes/admin/settings'
+import { Route as AdminUsersRouteImport } from './routes/admin/users'
+import { Route as AppIndexRouteImport } from './routes/app/index'
+import { Route as AppActivationRouteImport } from './routes/app/activation'
+import { Route as AppBookingsRouteImport } from './routes/app/bookings'
+import { Route as AppCommissionRouteImport } from './routes/app/commission'
+import { Route as AppDocumentsRouteImport } from './routes/app/documents'
+import { Route as AppNetworkRouteImport } from './routes/app/network'
+import { Route as AppOnboardingRouteImport } from './routes/app/onboarding'
+import { Route as AppQualificationRouteImport } from './routes/app/qualification'
+import { Route as AppSettingsRouteImport } from './routes/app/settings'
+import { Route as AppTransactionsRouteImport } from './routes/app/transactions'
+import { Route as PropertiesIndexRouteImport } from './routes/properties/index'
 import { Route as PropertiesSlugRouteImport } from './routes/properties.$slug'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
+import { Route as AppBookSlugRouteImport } from './routes/app/book.$slug'
+import { Route as AppBookingsIdRouteImport } from './routes/app/bookings.$id'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -24,6 +50,21 @@ const IndexRoute = IndexRouteImport.update({
 const AccountRoute = AccountRouteImport.update({
   id: '/account',
   path: '/account',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AppRoute = AppRouteImport.update({
+  id: '/app',
+  path: '/app',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
+  id: '/forgot-password',
+  path: '/forgot-password',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -36,6 +77,111 @@ const PropertiesRoute = PropertiesRouteImport.update({
   path: '/properties',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminIndexRoute = AdminIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminActivationRoute = AdminActivationRouteImport.update({
+  id: '/activation',
+  path: '/activation',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminBookingsRoute = AdminBookingsRouteImport.update({
+  id: '/bookings',
+  path: '/bookings',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminCommissionRoute = AdminCommissionRouteImport.update({
+  id: '/commission',
+  path: '/commission',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminDocumentsRoute = AdminDocumentsRouteImport.update({
+  id: '/documents',
+  path: '/documents',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminNetworkRoute = AdminNetworkRouteImport.update({
+  id: '/network',
+  path: '/network',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminOffersRoute = AdminOffersRouteImport.update({
+  id: '/offers',
+  path: '/offers',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminSettingsRoute = AdminSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminUsersRoute = AdminUsersRouteImport.update({
+  id: '/users',
+  path: '/users',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AppIndexRoute = AppIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppActivationRoute = AppActivationRouteImport.update({
+  id: '/activation',
+  path: '/activation',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppBookingsRoute = AppBookingsRouteImport.update({
+  id: '/bookings',
+  path: '/bookings',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppCommissionRoute = AppCommissionRouteImport.update({
+  id: '/commission',
+  path: '/commission',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppDocumentsRoute = AppDocumentsRouteImport.update({
+  id: '/documents',
+  path: '/documents',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppNetworkRoute = AppNetworkRouteImport.update({
+  id: '/network',
+  path: '/network',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppOnboardingRoute = AppOnboardingRouteImport.update({
+  id: '/onboarding',
+  path: '/onboarding',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppQualificationRoute = AppQualificationRouteImport.update({
+  id: '/qualification',
+  path: '/qualification',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppSettingsRoute = AppSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppTransactionsRoute = AppTransactionsRouteImport.update({
+  id: '/transactions',
+  path: '/transactions',
+  getParentRoute: () => AppRoute,
+} as any)
+const PropertiesIndexRoute = PropertiesIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => PropertiesRoute,
+} as any)
 const PropertiesSlugRoute = PropertiesSlugRouteImport.update({
   id: '/$slug',
   path: '/$slug',
@@ -46,64 +192,228 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   path: '/api/auth/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AppBookSlugRoute = AppBookSlugRouteImport.update({
+  id: '/book/$slug',
+  path: '/book/$slug',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppBookingsIdRoute = AppBookingsIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => AppBookingsRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/account': typeof AccountRoute
+  '/admin': typeof AdminRouteWithChildren
+  '/app': typeof AppRouteWithChildren
+  '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
   '/properties': typeof PropertiesRouteWithChildren
+  '/reset-password': typeof ResetPasswordRoute
+  '/admin/activation': typeof AdminActivationRoute
+  '/admin/bookings': typeof AdminBookingsRoute
+  '/admin/commission': typeof AdminCommissionRoute
+  '/admin/documents': typeof AdminDocumentsRoute
+  '/admin/network': typeof AdminNetworkRoute
+  '/admin/offers': typeof AdminOffersRoute
+  '/admin/settings': typeof AdminSettingsRoute
+  '/admin/users': typeof AdminUsersRoute
+  '/app/activation': typeof AppActivationRoute
+  '/app/bookings': typeof AppBookingsRouteWithChildren
+  '/app/commission': typeof AppCommissionRoute
+  '/app/documents': typeof AppDocumentsRoute
+  '/app/network': typeof AppNetworkRoute
+  '/app/onboarding': typeof AppOnboardingRoute
+  '/app/qualification': typeof AppQualificationRoute
+  '/app/settings': typeof AppSettingsRoute
+  '/app/transactions': typeof AppTransactionsRoute
   '/properties/$slug': typeof PropertiesSlugRoute
+  '/admin/': typeof AdminIndexRoute
+  '/app/': typeof AppIndexRoute
+  '/properties/': typeof PropertiesIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/app/book/$slug': typeof AppBookSlugRoute
+  '/app/bookings/$id': typeof AppBookingsIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/account': typeof AccountRoute
+  '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
-  '/properties': typeof PropertiesRouteWithChildren
+  '/reset-password': typeof ResetPasswordRoute
+  '/admin/activation': typeof AdminActivationRoute
+  '/admin/bookings': typeof AdminBookingsRoute
+  '/admin/commission': typeof AdminCommissionRoute
+  '/admin/documents': typeof AdminDocumentsRoute
+  '/admin/network': typeof AdminNetworkRoute
+  '/admin/offers': typeof AdminOffersRoute
+  '/admin/settings': typeof AdminSettingsRoute
+  '/admin/users': typeof AdminUsersRoute
+  '/app/activation': typeof AppActivationRoute
+  '/app/bookings': typeof AppBookingsRouteWithChildren
+  '/app/commission': typeof AppCommissionRoute
+  '/app/documents': typeof AppDocumentsRoute
+  '/app/network': typeof AppNetworkRoute
+  '/app/onboarding': typeof AppOnboardingRoute
+  '/app/qualification': typeof AppQualificationRoute
+  '/app/settings': typeof AppSettingsRoute
+  '/app/transactions': typeof AppTransactionsRoute
   '/properties/$slug': typeof PropertiesSlugRoute
+  '/admin': typeof AdminIndexRoute
+  '/app': typeof AppIndexRoute
+  '/properties': typeof PropertiesIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/app/book/$slug': typeof AppBookSlugRoute
+  '/app/bookings/$id': typeof AppBookingsIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/account': typeof AccountRoute
+  '/admin': typeof AdminRouteWithChildren
+  '/app': typeof AppRouteWithChildren
+  '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
   '/properties': typeof PropertiesRouteWithChildren
+  '/reset-password': typeof ResetPasswordRoute
+  '/admin/activation': typeof AdminActivationRoute
+  '/admin/bookings': typeof AdminBookingsRoute
+  '/admin/commission': typeof AdminCommissionRoute
+  '/admin/documents': typeof AdminDocumentsRoute
+  '/admin/network': typeof AdminNetworkRoute
+  '/admin/offers': typeof AdminOffersRoute
+  '/admin/settings': typeof AdminSettingsRoute
+  '/admin/users': typeof AdminUsersRoute
+  '/app/activation': typeof AppActivationRoute
+  '/app/bookings': typeof AppBookingsRouteWithChildren
+  '/app/commission': typeof AppCommissionRoute
+  '/app/documents': typeof AppDocumentsRoute
+  '/app/network': typeof AppNetworkRoute
+  '/app/onboarding': typeof AppOnboardingRoute
+  '/app/qualification': typeof AppQualificationRoute
+  '/app/settings': typeof AppSettingsRoute
+  '/app/transactions': typeof AppTransactionsRoute
   '/properties/$slug': typeof PropertiesSlugRoute
+  '/admin/': typeof AdminIndexRoute
+  '/app/': typeof AppIndexRoute
+  '/properties/': typeof PropertiesIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/app/book/$slug': typeof AppBookSlugRoute
+  '/app/bookings/$id': typeof AppBookingsIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
     | '/account'
+    | '/admin'
+    | '/app'
+    | '/forgot-password'
     | '/login'
     | '/properties'
+    | '/reset-password'
+    | '/admin/activation'
+    | '/admin/bookings'
+    | '/admin/commission'
+    | '/admin/documents'
+    | '/admin/network'
+    | '/admin/offers'
+    | '/admin/settings'
+    | '/admin/users'
+    | '/app/activation'
+    | '/app/bookings'
+    | '/app/commission'
+    | '/app/documents'
+    | '/app/network'
+    | '/app/onboarding'
+    | '/app/qualification'
+    | '/app/settings'
+    | '/app/transactions'
     | '/properties/$slug'
+    | '/admin/'
+    | '/app/'
+    | '/properties/'
     | '/api/auth/$'
+    | '/app/book/$slug'
+    | '/app/bookings/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/account'
+    | '/forgot-password'
     | '/login'
-    | '/properties'
+    | '/reset-password'
+    | '/admin/activation'
+    | '/admin/bookings'
+    | '/admin/commission'
+    | '/admin/documents'
+    | '/admin/network'
+    | '/admin/offers'
+    | '/admin/settings'
+    | '/admin/users'
+    | '/app/activation'
+    | '/app/bookings'
+    | '/app/commission'
+    | '/app/documents'
+    | '/app/network'
+    | '/app/onboarding'
+    | '/app/qualification'
+    | '/app/settings'
+    | '/app/transactions'
     | '/properties/$slug'
+    | '/admin'
+    | '/app'
+    | '/properties'
     | '/api/auth/$'
+    | '/app/book/$slug'
+    | '/app/bookings/$id'
   id:
     | '__root__'
     | '/'
     | '/account'
+    | '/admin'
+    | '/app'
+    | '/forgot-password'
     | '/login'
     | '/properties'
+    | '/reset-password'
+    | '/admin/activation'
+    | '/admin/bookings'
+    | '/admin/commission'
+    | '/admin/documents'
+    | '/admin/network'
+    | '/admin/offers'
+    | '/admin/settings'
+    | '/admin/users'
+    | '/app/activation'
+    | '/app/bookings'
+    | '/app/commission'
+    | '/app/documents'
+    | '/app/network'
+    | '/app/onboarding'
+    | '/app/qualification'
+    | '/app/settings'
+    | '/app/transactions'
     | '/properties/$slug'
+    | '/admin/'
+    | '/app/'
+    | '/properties/'
     | '/api/auth/$'
+    | '/app/book/$slug'
+    | '/app/bookings/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AccountRoute: typeof AccountRoute
+  AdminRoute: typeof AdminRouteWithChildren
+  AppRoute: typeof AppRouteWithChildren
+  ForgotPasswordRoute: typeof ForgotPasswordRoute
   LoginRoute: typeof LoginRoute
   PropertiesRoute: typeof PropertiesRouteWithChildren
+  ResetPasswordRoute: typeof ResetPasswordRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
 }
 
@@ -123,6 +433,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AccountRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/app': {
+      id: '/app'
+      path: '/app'
+      fullPath: '/app'
+      preLoaderRoute: typeof AppRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/forgot-password': {
+      id: '/forgot-password'
+      path: '/forgot-password'
+      fullPath: '/forgot-password'
+      preLoaderRoute: typeof ForgotPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/login': {
       id: '/login'
       path: '/login'
@@ -136,6 +467,153 @@ declare module '@tanstack/react-router' {
       fullPath: '/properties'
       preLoaderRoute: typeof PropertiesRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/': {
+      id: '/admin/'
+      path: '/'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AdminIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/activation': {
+      id: '/admin/activation'
+      path: '/activation'
+      fullPath: '/admin/activation'
+      preLoaderRoute: typeof AdminActivationRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/bookings': {
+      id: '/admin/bookings'
+      path: '/bookings'
+      fullPath: '/admin/bookings'
+      preLoaderRoute: typeof AdminBookingsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/commission': {
+      id: '/admin/commission'
+      path: '/commission'
+      fullPath: '/admin/commission'
+      preLoaderRoute: typeof AdminCommissionRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/documents': {
+      id: '/admin/documents'
+      path: '/documents'
+      fullPath: '/admin/documents'
+      preLoaderRoute: typeof AdminDocumentsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/network': {
+      id: '/admin/network'
+      path: '/network'
+      fullPath: '/admin/network'
+      preLoaderRoute: typeof AdminNetworkRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/offers': {
+      id: '/admin/offers'
+      path: '/offers'
+      fullPath: '/admin/offers'
+      preLoaderRoute: typeof AdminOffersRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/settings': {
+      id: '/admin/settings'
+      path: '/settings'
+      fullPath: '/admin/settings'
+      preLoaderRoute: typeof AdminSettingsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/users': {
+      id: '/admin/users'
+      path: '/users'
+      fullPath: '/admin/users'
+      preLoaderRoute: typeof AdminUsersRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/app/': {
+      id: '/app/'
+      path: '/'
+      fullPath: '/app/'
+      preLoaderRoute: typeof AppIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/activation': {
+      id: '/app/activation'
+      path: '/activation'
+      fullPath: '/app/activation'
+      preLoaderRoute: typeof AppActivationRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/bookings': {
+      id: '/app/bookings'
+      path: '/bookings'
+      fullPath: '/app/bookings'
+      preLoaderRoute: typeof AppBookingsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/commission': {
+      id: '/app/commission'
+      path: '/commission'
+      fullPath: '/app/commission'
+      preLoaderRoute: typeof AppCommissionRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/documents': {
+      id: '/app/documents'
+      path: '/documents'
+      fullPath: '/app/documents'
+      preLoaderRoute: typeof AppDocumentsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/network': {
+      id: '/app/network'
+      path: '/network'
+      fullPath: '/app/network'
+      preLoaderRoute: typeof AppNetworkRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/onboarding': {
+      id: '/app/onboarding'
+      path: '/onboarding'
+      fullPath: '/app/onboarding'
+      preLoaderRoute: typeof AppOnboardingRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/qualification': {
+      id: '/app/qualification'
+      path: '/qualification'
+      fullPath: '/app/qualification'
+      preLoaderRoute: typeof AppQualificationRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/settings': {
+      id: '/app/settings'
+      path: '/settings'
+      fullPath: '/app/settings'
+      preLoaderRoute: typeof AppSettingsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/transactions': {
+      id: '/app/transactions'
+      path: '/transactions'
+      fullPath: '/app/transactions'
+      preLoaderRoute: typeof AppTransactionsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/properties/': {
+      id: '/properties/'
+      path: '/'
+      fullPath: '/properties/'
+      preLoaderRoute: typeof PropertiesIndexRouteImport
+      parentRoute: typeof PropertiesRoute
     }
     '/properties/$slug': {
       id: '/properties/$slug'
@@ -151,15 +629,99 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/app/book/$slug': {
+      id: '/app/book/$slug'
+      path: '/book/$slug'
+      fullPath: '/app/book/$slug'
+      preLoaderRoute: typeof AppBookSlugRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/bookings/$id': {
+      id: '/app/bookings/$id'
+      path: '/$id'
+      fullPath: '/app/bookings/$id'
+      preLoaderRoute: typeof AppBookingsIdRouteImport
+      parentRoute: typeof AppBookingsRoute
+    }
   }
 }
 
+interface AdminRouteChildren {
+  AdminActivationRoute: typeof AdminActivationRoute
+  AdminBookingsRoute: typeof AdminBookingsRoute
+  AdminCommissionRoute: typeof AdminCommissionRoute
+  AdminDocumentsRoute: typeof AdminDocumentsRoute
+  AdminNetworkRoute: typeof AdminNetworkRoute
+  AdminOffersRoute: typeof AdminOffersRoute
+  AdminSettingsRoute: typeof AdminSettingsRoute
+  AdminUsersRoute: typeof AdminUsersRoute
+  AdminIndexRoute: typeof AdminIndexRoute
+}
+
+const AdminRouteChildren: AdminRouteChildren = {
+  AdminActivationRoute: AdminActivationRoute,
+  AdminBookingsRoute: AdminBookingsRoute,
+  AdminCommissionRoute: AdminCommissionRoute,
+  AdminDocumentsRoute: AdminDocumentsRoute,
+  AdminNetworkRoute: AdminNetworkRoute,
+  AdminOffersRoute: AdminOffersRoute,
+  AdminSettingsRoute: AdminSettingsRoute,
+  AdminUsersRoute: AdminUsersRoute,
+  AdminIndexRoute: AdminIndexRoute,
+}
+
+const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
+
+interface AppBookingsRouteChildren {
+  AppBookingsIdRoute: typeof AppBookingsIdRoute
+}
+
+const AppBookingsRouteChildren: AppBookingsRouteChildren = {
+  AppBookingsIdRoute: AppBookingsIdRoute,
+}
+
+const AppBookingsRouteWithChildren = AppBookingsRoute._addFileChildren(
+  AppBookingsRouteChildren,
+)
+
+interface AppRouteChildren {
+  AppActivationRoute: typeof AppActivationRoute
+  AppBookingsRoute: typeof AppBookingsRouteWithChildren
+  AppCommissionRoute: typeof AppCommissionRoute
+  AppDocumentsRoute: typeof AppDocumentsRoute
+  AppNetworkRoute: typeof AppNetworkRoute
+  AppOnboardingRoute: typeof AppOnboardingRoute
+  AppQualificationRoute: typeof AppQualificationRoute
+  AppSettingsRoute: typeof AppSettingsRoute
+  AppTransactionsRoute: typeof AppTransactionsRoute
+  AppIndexRoute: typeof AppIndexRoute
+  AppBookSlugRoute: typeof AppBookSlugRoute
+}
+
+const AppRouteChildren: AppRouteChildren = {
+  AppActivationRoute: AppActivationRoute,
+  AppBookingsRoute: AppBookingsRouteWithChildren,
+  AppCommissionRoute: AppCommissionRoute,
+  AppDocumentsRoute: AppDocumentsRoute,
+  AppNetworkRoute: AppNetworkRoute,
+  AppOnboardingRoute: AppOnboardingRoute,
+  AppQualificationRoute: AppQualificationRoute,
+  AppSettingsRoute: AppSettingsRoute,
+  AppTransactionsRoute: AppTransactionsRoute,
+  AppIndexRoute: AppIndexRoute,
+  AppBookSlugRoute: AppBookSlugRoute,
+}
+
+const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
+
 interface PropertiesRouteChildren {
   PropertiesSlugRoute: typeof PropertiesSlugRoute
+  PropertiesIndexRoute: typeof PropertiesIndexRoute
 }
 
 const PropertiesRouteChildren: PropertiesRouteChildren = {
   PropertiesSlugRoute: PropertiesSlugRoute,
+  PropertiesIndexRoute: PropertiesIndexRoute,
 }
 
 const PropertiesRouteWithChildren = PropertiesRoute._addFileChildren(
@@ -169,8 +731,12 @@ const PropertiesRouteWithChildren = PropertiesRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AccountRoute: AccountRoute,
+  AdminRoute: AdminRouteWithChildren,
+  AppRoute: AppRouteWithChildren,
+  ForgotPasswordRoute: ForgotPasswordRoute,
   LoginRoute: LoginRoute,
   PropertiesRoute: PropertiesRouteWithChildren,
+  ResetPasswordRoute: ResetPasswordRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
 }
 export const routeTree = rootRouteImport

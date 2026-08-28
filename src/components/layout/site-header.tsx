@@ -3,7 +3,7 @@ import { Menu, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { BrandMark } from "@/components/brand-mark";
 import { Button } from "@/components/ui/button";
-import { SignedIn, SignedOut, UserButton } from "@/lib/auth/gates";
+import { SignedOut } from "@/lib/auth/gates";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { cn } from "@/lib/utils";
 
@@ -22,30 +22,23 @@ function AuthSlot({ inverted }: { inverted: boolean }) {
   }
   if (user) {
     return (
-      <div className="flex items-center gap-2">
-        <Button asChild variant={inverted ? "invertGhost" : "ghost"} size="sm">
-          <Link to="/account">Account</Link>
-        </Button>
-        <UserButton />
-      </div>
+      <Button asChild variant={inverted ? "invertGhost" : "ghost"} size="sm">
+        <Link to="/app">Dashboard</Link>
+      </Button>
     );
   }
   return (
-    <div className="flex items-center gap-2">
-      <SignedOut>
-        <Button asChild variant={inverted ? "invertGhost" : "ghost"} size="md">
-          <Link to="/login">Sign in</Link>
-        </Button>
-      </SignedOut>
-      <SignedIn>
-        <UserButton />
-      </SignedIn>
-    </div>
+    <SignedOut>
+      <Button asChild variant={inverted ? "invertGhost" : "ghost"} size="md">
+        <Link to="/login">Sign in</Link>
+      </Button>
+    </SignedOut>
   );
 }
 
 export function SiteHeader() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const { user, isPending } = useCurrentUserState();
   const isHome = pathname === "/";
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
@@ -100,9 +93,7 @@ export function SiteHeader() {
               }}
               className={cn(
                 "text-[13px] font-medium tracking-wide transition-colors duration-150",
-                inverted
-                  ? "text-cream/80 hover:text-cream"
-                  : "text-ink/70 hover:text-ink",
+                inverted ? "text-cream/80 hover:text-cream" : "text-ink/70 hover:text-ink",
               )}
             >
               {item.label}
@@ -154,11 +145,21 @@ export function SiteHeader() {
               </Link>
             ))}
             <div className="mt-3 flex flex-col gap-2 border-t border-line pt-4">
-              <Button asChild variant="secondary" className="w-full">
-                <Link to="/login" onClick={() => setOpen(false)}>
-                  Sign in
-                </Link>
-              </Button>
+              {isPending ? (
+                <div className="h-11 animate-pulse rounded-lg bg-ink/8" />
+              ) : user ? (
+                <Button asChild variant="secondary" className="w-full">
+                  <Link to="/app" onClick={() => setOpen(false)}>
+                    Dashboard
+                  </Link>
+                </Button>
+              ) : (
+                <Button asChild variant="secondary" className="w-full">
+                  <Link to="/login" onClick={() => setOpen(false)}>
+                    Sign in
+                  </Link>
+                </Button>
+              )}
               <Button asChild className="w-full">
                 <Link to="/properties" onClick={() => setOpen(false)}>
                   Explore properties

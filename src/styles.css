@@ -14,6 +14,9 @@
   --color-pine-fg: #f4f0e8;
   --color-line: #e4dfd4;
   --color-mist: #ece7dc;
+  --color-clay: #8a4336;
+  --color-clay-fg: #fbfaf6;
+  --color-gold: #8a6a3b;
 
   --radius-xs: 4px;
   --radius-sm: 8px;
@@ -71,6 +74,12 @@
     background: color-mix(in oklab, var(--color-pine) 22%, transparent);
     color: var(--color-ink);
   }
+
+  input,
+  textarea,
+  select {
+    font: inherit;
+  }
 }
 
 @utility font-display {
@@ -98,6 +107,31 @@
   .section-y {
     padding-block: 6.5rem;
   }
+}
+
+@utility field-control {
+  height: 2.75rem;
+  width: 100%;
+  border-radius: var(--radius-sm);
+  background: var(--color-cream);
+  padding-inline: 0.75rem;
+  font-size: 0.875rem;
+  color: var(--color-ink);
+  box-shadow: 0 0 0 1px rgb(26 25 22 / 0.12);
+  outline: none;
+  transition: box-shadow 150ms ease;
+}
+
+.field-control::placeholder {
+  color: var(--color-subtle);
+}
+
+.field-control:focus {
+  box-shadow: 0 0 0 2px var(--color-pine);
+}
+
+.field-control:disabled {
+  opacity: 0.55;
 }
 
 @media (prefers-reduced-motion: reduce) {
