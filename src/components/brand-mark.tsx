@@ -14,11 +14,11 @@ export function BrandMark({
       <img
         src={inverted ? "/brand/darmelk-lockup-light.png" : "/brand/darmelk-lockup.png"}
         alt="Darmelk — Your Property Gateway"
-        width={436}
-        height={160}
+        width={528}
+        height={180}
         className={cn(
-          "h-9 w-auto object-contain object-left sm:h-10",
-          compact && "h-8 sm:h-9",
+          "h-10 w-auto object-contain object-left sm:h-11",
+          compact && "h-9 sm:h-10",
         )}
       />
     </span>
