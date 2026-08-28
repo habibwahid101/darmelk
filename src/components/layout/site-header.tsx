@@ -1,0 +1,173 @@
+import { Link, useRouterState } from "@tanstack/react-router";
+import { Menu, X } from "lucide-react";
+import { useEffect, useState } from "react";
+import { BrandMark } from "@/components/brand-mark";
+import { Button } from "@/components/ui/button";
+import { SignedIn, SignedOut, UserButton } from "@/lib/auth/gates";
+import { useCurrentUserState } from "@/lib/auth/use-current-user";
+import { cn } from "@/lib/utils";
+
+const NAV = [
+  { label: "Properties", to: "/", hash: "opportunities" },
+  { label: "How It Works", to: "/", hash: "how-it-works" },
+  { label: "Benefits", to: "/", hash: "benefits" },
+  { label: "Commission", to: "/", hash: "commission" },
+  { label: "FAQ", to: "/", hash: "faq" },
+] as const;
+
+function AuthSlot({ inverted }: { inverted: boolean }) {
+  const { user, isPending } = useCurrentUserState();
+  if (isPending) {
+    return <div className="h-11 w-24 animate-pulse rounded-lg bg-ink/10" />;
+  }
+  if (user) {
+    return (
+      <div className="flex items-center gap-2">
+        <Button asChild variant={inverted ? "invertGhost" : "ghost"} size="sm">
+          <Link to="/account">Account</Link>
+        </Button>
+        <UserButton />
+      </div>
+    );
+  }
+  return (
+    <div className="flex items-center gap-2">
+      <SignedOut>
+        <Button asChild variant={inverted ? "invertGhost" : "ghost"} size="md">
+          <Link to="/login">Sign in</Link>
+        </Button>
+      </SignedOut>
+      <SignedIn>
+        <UserButton />
+      </SignedIn>
+    </div>
+  );
+}
+
+export function SiteHeader() {
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const isHome = pathname === "/";
+  const [scrolled, setScrolled] = useState(false);
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 24);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  useEffect(() => {
+    setOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    document.body.style.overflow = open ? "hidden" : "";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [open]);
+
+  const inverted = isHome && !scrolled && !open;
+
+  return (
+    <header
+      className={cn(
+        "fixed inset-x-0 top-0 z-50 transition-[background-color,box-shadow,backdrop-filter] duration-200",
+        inverted
+          ? "bg-gradient-to-b from-ink/50 to-transparent"
+          : "border-b border-line/80 bg-paper/92 shadow-[0_1px_0_rgb(26_25_22/0.04)] backdrop-blur-md",
+      )}
+    >
+      <div className="container-pg flex h-16 items-center justify-between gap-4 md:h-[4.25rem]">
+        <Link to="/" aria-label="Property Gateway home" className="shrink-0">
+          <BrandMark inverted={inverted} />
+        </Link>
+
+        <nav className="hidden items-center gap-7 lg:flex" aria-label="Primary">
+          {NAV.map((item) => (
+            <Link
+              key={item.label}
+              to={item.to}
+              hash={item.hash}
+              onClick={() => {
+                window.setTimeout(() => {
+                  document.getElementById(item.hash)?.scrollIntoView({
+                    behavior: "smooth",
+                    block: "start",
+                  });
+                }, 80);
+              }}
+              className={cn(
+                "text-[13px] font-medium tracking-wide transition-colors duration-150",
+                inverted
+                  ? "text-cream/80 hover:text-cream"
+                  : "text-ink/70 hover:text-ink",
+              )}
+            >
+              {item.label}
+            </Link>
+          ))}
+        </nav>
+
+        <div className="hidden items-center gap-2 lg:flex">
+          <AuthSlot inverted={inverted} />
+          <Button asChild variant={inverted ? "invert" : "primary"} size="md">
+            <Link to="/properties">Explore properties</Link>
+          </Button>
+        </div>
+
+        <button
+          type="button"
+          className={cn(
+            "relative inline-flex size-11 items-center justify-center rounded-lg lg:hidden",
+            inverted ? "text-cream" : "text-ink",
+          )}
+          aria-label={open ? "Close menu" : "Open menu"}
+          aria-expanded={open}
+          onClick={() => setOpen((v) => !v)}
+        >
+          {open ? <X className="size-5" /> : <Menu className="size-5" />}
+        </button>
+      </div>
+
+      {open ? (
+        <div className="border-t border-line bg-paper lg:hidden">
+          <nav className="container-pg flex flex-col gap-1 py-4" aria-label="Mobile">
+            {NAV.map((item) => (
+              <Link
+                key={item.label}
+                to={item.to}
+                hash={item.hash}
+                onClick={() => {
+                  setOpen(false);
+                  window.setTimeout(() => {
+                    document.getElementById(item.hash)?.scrollIntoView({
+                      behavior: "smooth",
+                      block: "start",
+                    });
+                  }, 80);
+                }}
+                className="rounded-lg px-3 py-3 text-[15px] font-medium text-ink hover:bg-ink/5"
+              >
+                {item.label}
+              </Link>
+            ))}
+            <div className="mt-3 flex flex-col gap-2 border-t border-line pt-4">
+              <Button asChild variant="secondary" className="w-full">
+                <Link to="/login" onClick={() => setOpen(false)}>
+                  Sign in
+                </Link>
+              </Button>
+              <Button asChild className="w-full">
+                <Link to="/properties" onClick={() => setOpen(false)}>
+                  Explore properties
+                </Link>
+              </Button>
+            </div>
+          </nav>
+        </div>
+      ) : null}
+    </header>
+  );
+}
