@@ -28,8 +28,14 @@ export function getPool(): Pool {
   if (!pool) {
     const connectionString = process.env.DATABASE_URL;
     if (!connectionString) throw new Error("DATABASE_URL is not set");
+    // node-postgres replaces the explicit `ssl` object when TLS query params
+    // are present in DATABASE_URL. Remove them so our private-VPC setting wins.
+    const databaseUrl = new URL(connectionString);
+    for (const key of ["sslmode", "sslcert", "sslkey", "sslrootcert"]) {
+      databaseUrl.searchParams.delete(key);
+    }
     pool = new Pool({
-      connectionString,
+      connectionString: databaseUrl.toString(),
       max: 3, // Lambda: one execution env, a handful of concurrent queries at most
       idleTimeoutMillis: 30_000,
       ssl: sslOption(),
