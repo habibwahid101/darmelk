@@ -10,6 +10,20 @@ types.setTypeParser(OID_NUMERIC, (v) => Number(v));
 
 let pool: Pool | undefined;
 
+/**
+ * SSL is on by default (production RDS). Set DATABASE_SSL=false only for
+ * local/CI Postgres that has no TLS. Anything other than the string "false"
+ * (including unset) keeps SSL enabled.
+ */
+function sslOption(): false | { rejectUnauthorized: boolean } {
+  if (process.env.DATABASE_SSL === "false") return false;
+  // TLS required for RDS. Chain validation is relaxed: Node's default trust
+  // store doesn't include Amazon's RDS CA, and this connection never leaves
+  // the private VPC (Lambda and RDS share the same subnets, RDS ingress is
+  // locked to the Lambda security group only). Traffic is still encrypted.
+  return { rejectUnauthorized: false };
+}
+
 export function getPool(): Pool {
   if (!pool) {
     const connectionString = process.env.DATABASE_URL;
@@ -18,14 +32,7 @@ export function getPool(): Pool {
       connectionString,
       max: 3, // Lambda: one execution env, a handful of concurrent queries at most
       idleTimeoutMillis: 30_000,
-      // TLS is required (RDS + sslmode=require), but chain validation is
-      // relaxed: Node's default trust store doesn't include Amazon's RDS CA,
-      // and this connection never leaves the private VPC (Lambda and RDS
-      // share the same subnets, RDS ingress is locked to the Lambda security
-      // group only). Traffic is still encrypted in transit either way.
-      // Hardening option: embed https://truststore.pki.rds.amazonaws.com and
-      // set rejectUnauthorized: true with that CA.
-      ssl: { rejectUnauthorized: false },
+      ssl: sslOption(),
     });
   }
   return pool;

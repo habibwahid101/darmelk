@@ -58,6 +58,7 @@ jobs:
           --health-retries 10
     env:
       DATABASE_URL: postgres://postgres:postgres@localhost:5432/darmelk_ci
+      DATABASE_SSL: "false"
       BETTER_AUTH_SECRET: ci-test-secret-not-used-in-production-0123456789ab
       TRUSTED_ORIGINS: http://localhost:8080
     steps:
