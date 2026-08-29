@@ -4,13 +4,9 @@ import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { useMemberSession } from "@/components/layout/use-member";
 import { COMMISSION_LEVELS, FLAGSHIP, formatBdt, TOTAL_POSITIONS } from "@/lib/offers";
-import {
-  getLevelCounts,
-  isQualified,
-  ownQualificationOffer,
-  PERSONAL_SPONSOR_TARGET,
-  usePlatform,
-} from "@/lib/platform";
+import { PERSONAL_SPONSOR_TARGET } from "@/lib/platform";
+import { api } from "@/lib/api-client";
+import { useAsync } from "@/lib/use-async";
 
 export const Route = createFileRoute("/app/qualification")({
   component: QualificationPage,
@@ -18,15 +14,14 @@ export const Route = createFileRoute("/app/qualification")({
 
 function QualificationPage() {
   const { member } = useMemberSession();
-  const members = usePlatform((s) => s.members);
-  const bookings = usePlatform((s) => s.bookings);
+  const { data } = useAsync(() => api.myQualification(), [member?.user_id], { enabled: Boolean(member) });
   if (!member) return null;
 
-  const counts = getLevelCounts(members, bookings, member.userId);
-  const qualified = isQualified(members, bookings, member.userId);
-  const own = ownQualificationOffer(bookings, member.userId);
+  const counts = data?.levelCounts ?? { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+  const qualified = data?.qualified ?? false;
+  const own = data?.ownBooking ?? null;
   const l5 = COMMISSION_LEVELS[4];
-  const remainingDirects = Math.max(0, PERSONAL_SPONSOR_TARGET - (counts[1] ?? 0));
+  const remainingDirects = Math.max(0, PERSONAL_SPONSOR_TARGET - (data?.sponsorCount ?? 0));
   const remainingL5 = Math.max(0, l5.positions - (counts[5] ?? 0));
 
   return (
@@ -41,7 +36,7 @@ function QualificationPage() {
       <div className="grid gap-4 sm:grid-cols-2">
         <StatCard
           label="Personal sponsors"
-          value={`${counts[1] ?? 0} / ${PERSONAL_SPONSOR_TARGET}`}
+          value={`${data?.sponsorCount ?? 0} / ${PERSONAL_SPONSOR_TARGET}`}
           hint={remainingDirects ? `${remainingDirects} remaining` : "Requirement met"}
         />
         <StatCard
@@ -55,9 +50,9 @@ function QualificationPage() {
         <h2 className="font-display text-xl font-semibold">Attached benefit</h2>
         {own ? (
           <>
-            <p className="mt-2 font-medium">{own.offerTitle}</p>
+            <p className="mt-2 font-medium">{own.offer_title ?? own.offer_slug}</p>
             <p className="mt-1 whitespace-nowrap font-display text-3xl font-semibold tabular-nums">
-              {formatBdt(own.qualificationBenefit)}
+              {formatBdt(own.qualification_benefit)}
             </p>
             <p className="mt-2 text-sm text-muted">
               This amount belongs to the offer you booked. It is not a universal Property Gateway figure.

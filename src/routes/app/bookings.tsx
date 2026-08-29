@@ -5,14 +5,17 @@ import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { useMemberSession } from "@/components/layout/use-member";
 import { FLAGSHIP, formatBdt } from "@/lib/offers";
-import { formatWhen, usePlatform } from "@/lib/platform";
+import { formatWhen } from "@/lib/platform";
+import { api } from "@/lib/api-client";
+import { useAsync } from "@/lib/use-async";
 
 export const Route = createFileRoute("/app/bookings")({ component: BookingsPage });
 
 function BookingsPage() {
   const { member } = useMemberSession();
-  const bookings = usePlatform((s) => s.bookings.filter((b) => b.userId === member?.userId));
+  const { data } = useAsync(() => api.myBookings(), [member?.user_id], { enabled: Boolean(member) });
   if (!member) return null;
+  const bookings = data?.bookings ?? [];
 
   return (
     <div className="space-y-8">
@@ -49,11 +52,15 @@ function BookingsPage() {
                 params={{ id: b.id }}
                 className="grid gap-4 rounded-2xl bg-cream p-4 shadow-[var(--shadow-card)] sm:grid-cols-[7.5rem_1fr_auto] sm:items-center"
               >
-                <img src={b.image} alt="" className="aspect-[16/11] rounded-xl object-cover sm:h-20 sm:w-full sm:aspect-auto" />
+                <img
+                  src={b.image ?? "/images/hero-hotel.jpg"}
+                  alt=""
+                  className="aspect-[16/11] rounded-xl object-cover sm:h-20 sm:w-full sm:aspect-auto"
+                />
                 <div className="min-w-0">
-                  <p className="font-display text-xl font-semibold">{b.offerTitle}</p>
+                  <p className="font-display text-xl font-semibold">{b.offer_title ?? b.offer_slug}</p>
                   <p className="mt-1 text-sm text-muted">
-                    Booked {formatBdt(b.bookingAmount)} · {formatWhen(b.createdAt)}
+                    Booked {formatBdt(b.booking_amount)} · {formatWhen(b.created_at)}
                   </p>
                 </div>
                 <StatusBadge status={b.status} />

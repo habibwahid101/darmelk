@@ -3,9 +3,10 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { AmountRow, PageHeader, SuccessBanner, Surface } from "@/components/states";
 import { useMemberSession } from "@/components/layout/use-member";
-import { ACTIVATION_FEE } from "@/lib/platform";
 import { formatBdt, getOffer } from "@/lib/offers";
-import { usePlatform } from "@/lib/platform";
+import { api, ApiError } from "@/lib/api-client";
+
+const ACTIVATION_FEE = 1000;
 
 export const Route = createFileRoute("/app/book/$slug")({
   loader: ({ params }) => {
@@ -19,20 +20,25 @@ export const Route = createFileRoute("/app/book/$slug")({
 function BookOfferPage() {
   const { offer } = Route.useLoaderData();
   const { member } = useMemberSession();
-  const submitBooking = usePlatform((s) => s.submitBooking);
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [bookingId, setBookingId] = useState<string | null>(null);
 
   if (!member) return null;
-  const userId = member.userId;
 
-  function submit() {
+  async function submit() {
     setPending(true);
-    const booking = submitBooking(userId, offer);
-    setBookingId(booking.id);
-    setPending(false);
-    setStep(3);
+    setError(null);
+    try {
+      const { booking } = await api.createBooking(offer.slug, crypto.randomUUID());
+      setBookingId(booking.id);
+      setStep(3);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Could not submit booking request.");
+    } finally {
+      setPending(false);
+    }
   }
 
   if (step === 3 && bookingId) {
@@ -112,6 +118,7 @@ function BookOfferPage() {
               booking.
             </li>
           </ul>
+          {error ? <p className="mt-3 text-sm text-clay">{error}</p> : null}
         </Surface>
       ) : null}
 
@@ -127,10 +134,10 @@ function BookOfferPage() {
           </>
         ) : (
           <>
-            <Button onClick={submit} disabled={pending}>
+            <Button onClick={() => void submit()} disabled={pending}>
               {pending ? "Submitting…" : "Submit booking request"}
             </Button>
-            <Button variant="ghost" onClick={() => setStep(1)}>
+            <Button variant="ghost" onClick={() => setStep(1)} disabled={pending}>
               Back
             </Button>
           </>

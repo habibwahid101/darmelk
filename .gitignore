@@ -19,3 +19,9 @@ AGENTS.project.md
 .project_id
 .node_modules.lock
 .preview.pid
+node_modules/
+backend/node_modules/
+backend/dist/
+backend/lambda.zip
+backend/*.tsbuildinfo
+

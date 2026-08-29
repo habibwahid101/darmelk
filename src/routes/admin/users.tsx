@@ -2,13 +2,14 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Users } from "lucide-react";
 import { EmptyState, PageHeader, Surface } from "@/components/states";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { isQualified, memberById, primaryBooking, usePlatform } from "@/lib/platform";
+import { api } from "@/lib/api-client";
+import { useAsync } from "@/lib/use-async";
 
 export const Route = createFileRoute("/admin/users")({ component: AdminUsers });
 
 function AdminUsers() {
-  const members = usePlatform((s) => s.members);
-  const bookings = usePlatform((s) => s.bookings);
+  const { data } = useAsync(() => api.admin.users(), []);
+  const members = data?.members ?? [];
 
   return (
     <div className="space-y-8">
@@ -22,25 +23,19 @@ function AdminUsers() {
       ) : (
         <Surface className="p-0 sm:p-0">
           <ul className="divide-y divide-line">
-            {members.map((m) => {
-              const booking = primaryBooking(bookings, m.userId);
-              const sponsor = memberById(members, m.sponsorUserId);
-              return (
-                <li key={m.userId} className="space-y-2 px-5 py-4">
-                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
-                    <p className="font-medium">{m.name}</p>
-                    <StatusBadge status={m.role} />
-                    <StatusBadge status={m.activationStatus} />
-                    <StatusBadge status={isQualified(members, bookings, m.userId) ? "qualified" : "not-qualified"} />
-                  </div>
-                  <p className="text-sm text-muted">{m.email || "No email"}</p>
-                  <p className="text-xs text-subtle">
-                    Code {m.referralCode} · Sponsor {sponsor?.name ?? "none"} · Booking{" "}
-                    {booking ? `${booking.offerTitle} (${booking.status})` : "none"}
-                  </p>
-                </li>
-              );
-            })}
+            {members.map((m) => (
+              <li key={m.user_id} className="space-y-2 px-5 py-4">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+                  <p className="font-medium">{m.name}</p>
+                  <StatusBadge status={m.role} />
+                  <StatusBadge status={m.activation_status} />
+                </div>
+                <p className="text-sm text-muted">{m.email || "No email"}</p>
+                <p className="text-xs text-subtle">
+                  Code {m.referral_code} · Sponsor {m.sponsor_user_id ? "assigned" : "none"}
+                </p>
+              </li>
+            ))}
           </ul>
         </Surface>
       )}
