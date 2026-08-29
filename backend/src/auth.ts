@@ -11,6 +11,7 @@
 // domain is wired up yet.
 import { betterAuth } from "better-auth";
 import { Pool } from "pg";
+import { sslOption } from "./db.js";
 
 function env(key: string): string | undefined {
   const v = process.env[key]?.trim();
@@ -19,6 +20,8 @@ function env(key: string): string | undefined {
 
 const databaseUrl = env("DATABASE_URL");
 if (!databaseUrl) throw new Error("DATABASE_URL is not set");
+const authSecret = env("BETTER_AUTH_SECRET");
+if (!authSecret) throw new Error("BETTER_AUTH_SECRET is not set");
 
 const baseURL = env("BETTER_AUTH_URL"); // e.g. https://api.darmelk.com
 const cookieDomain = env("COOKIE_DOMAIN"); // e.g. .darmelk.com
@@ -30,8 +33,8 @@ const trustedOrigins = (env("TRUSTED_ORIGINS") ?? "https://darmelk.com,https://w
 
 export const auth = betterAuth({
   ...(baseURL ? { baseURL } : {}),
-  secret: env("BETTER_AUTH_SECRET"),
-  database: new Pool({ connectionString: databaseUrl }),
+  secret: authSecret,
+  database: new Pool({ connectionString: databaseUrl, ssl: sslOption() }),
   trustedOrigins,
   emailAndPassword: {
     enabled: true,

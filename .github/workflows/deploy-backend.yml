@@ -151,7 +151,7 @@ jobs:
             aws lambda update-function-configuration \
               --function-name "$FUNCTION_NAME" \
               --environment "$ENV_JSON" \
-              --timeout 15 --memory-size 512
+              --timeout 60 --memory-size 512
             aws lambda wait function-updated --function-name "$FUNCTION_NAME"
           else
             echo "Function does not exist — creating it."
@@ -163,7 +163,7 @@ jobs:
               --role "$LAMBDA_EXEC_ROLE_ARN" \
               --handler index.handler \
               --zip-file fileb://backend/lambda.zip \
-              --timeout 15 --memory-size 512 \
+              --timeout 60 --memory-size 512 \
               --vpc-config "SubnetIds=${SUBNETS[0]},${SUBNETS[1]},SecurityGroupIds=$LAMBDA_SG_ID" \
               --environment "$ENV_JSON" \
               --tags Project=Darmelk,Environment=Production

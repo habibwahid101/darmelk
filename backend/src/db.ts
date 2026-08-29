@@ -15,7 +15,7 @@ let pool: Pool | undefined;
  * local/CI Postgres that has no TLS. Anything other than the string "false"
  * (including unset) keeps SSL enabled.
  */
-function sslOption(): false | { rejectUnauthorized: boolean } {
+export function sslOption(): false | { rejectUnauthorized: boolean } {
   if (process.env.DATABASE_SSL === "false") return false;
   // TLS required for RDS. Chain validation is relaxed: Node's default trust
   // store doesn't include Amazon's RDS CA, and this connection never leaves
