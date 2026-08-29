@@ -1,10 +1,19 @@
 name: Deploy Darmelk backend
 
-# Test on every push/PR touching the backend or its schema; deploy to AWS
-# only on push to main, after tests pass. No long-lived AWS credentials are
-# used anywhere — the deploy job authenticates via GitHub's OIDC token
-# federated to an AWS IAM role (see backend/README.md and the trust policy on
-# linkmate-prod-github-deploy).
+# Test on every push/PR touching the backend or its schema. The deploy job
+# only runs on a push event to `main` (see the job-level `if:` below), so
+# pushing to any other branch — including the `claude/darmelk-backend-v1`
+# review branch — only ever runs the test job. No long-lived AWS credentials
+# are used anywhere: the deploy job authenticates via GitHub's OIDC token
+# federated to a dedicated Darmelk-only AWS IAM role
+# (darmelk-prod-github-deploy — trust policy scoped to
+# repo:habibwahid101/darmelk:ref:refs/heads/main; not shared with, and not
+# derived from, any Link Mate role).
+#
+# Every resource referenced below (VPC, subnets, security groups, RDS
+# instance, Lambda, Lambda exec role, deploy role, Secrets Manager secret,
+# API Gateway) is a dedicated Darmelk resource in its own private VPC —
+# nothing here is shared with or reused from Link Mate.
 on:
   push:
     branches: [main]
@@ -24,10 +33,10 @@ permissions:
 env:
   AWS_REGION: ap-south-1
   FUNCTION_NAME: darmelk-prod-api
-  DEPLOY_ROLE_ARN: arn:aws:iam::364410974458:role/linkmate-prod-github-deploy
+  DEPLOY_ROLE_ARN: arn:aws:iam::364410974458:role/darmelk-prod-github-deploy
   LAMBDA_EXEC_ROLE_ARN: arn:aws:iam::364410974458:role/darmelk-prod-lambda-exec
-  LAMBDA_SUBNET_IDS: subnet-0c8fc1c1af20f330b,subnet-0d3d9e03c7319af4d
-  LAMBDA_SG_ID: sg-013dc486edd9a8784
+  LAMBDA_SUBNET_IDS: subnet-03a8f092b3d87546a,subnet-0e921de3a0d8ef10c
+  LAMBDA_SG_ID: sg-049842094a2d14958
   API_GATEWAY_ID: bc968txxph
 
 jobs:
