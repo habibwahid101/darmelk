@@ -85,7 +85,7 @@ export function AdminShell() {
   }
 
   if (!user || !member) return <RedirectToSignIn />;
-  if (!member.onboardingComplete) return <Navigate to="/app/onboarding" />;
+  if (!member.onboarding_complete) return <Navigate to="/app/onboarding" />;
 
   if (member.role !== "admin") {
     return (

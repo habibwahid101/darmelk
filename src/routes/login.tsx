@@ -4,12 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { PasswordField } from "@/components/ui/password-field";
-import {
-  GROK_PROVIDERS,
-  authClient,
-  authEnabled,
-  signIn,
-} from "@/lib/auth/client";
+import { authClient, authEnabled } from "@/lib/auth/client";
 import { FLAGSHIP, formatBdt, getOffer } from "@/lib/offers";
 import { cn } from "@/lib/utils";
 
@@ -118,32 +113,11 @@ function Login() {
             </div>
           ) : null}
 
-          {authEnabled ? (
-            <div className="mt-6 space-y-3">
-              {GROK_PROVIDERS.map((p) => (
-                <Button
-                  key={p.providerId}
-                  type="button"
-                  variant="secondary"
-                  className="w-full"
-                  onClick={() => signIn(p.providerId, { callbackURL: afterAuth })}
-                >
-                  Continue with {p.label}
-                </Button>
-              ))}
-            </div>
-          ) : (
+          {!authEnabled ? (
             <p className="mt-6 text-sm text-muted">Sign-in is disabled.</p>
-          )}
+          ) : null}
 
-          <div className="relative my-6">
-            <div className="h-px bg-line" />
-            <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-cream px-3 text-[11px] uppercase tracking-wide text-subtle">
-              Email
-            </span>
-          </div>
-
-          <form onSubmit={onSubmit} className="space-y-3">
+          <form onSubmit={onSubmit} className="mt-6 space-y-3">
             {create ? (
               <Field label="Full name">
                 <Input

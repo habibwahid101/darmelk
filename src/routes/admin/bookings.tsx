@@ -1,24 +1,32 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { FileText } from "lucide-react";
+import { useState } from "react";
 import { EmptyState, PageHeader, Surface } from "@/components/states";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { formatBdt } from "@/lib/offers";
-import {
-  formatWhen,
-  memberById,
-  usePlatform,
-  type BookingStatus,
-} from "@/lib/platform";
+import { formatWhen } from "@/lib/platform";
+import { api } from "@/lib/api-client";
+import { useAsync } from "@/lib/use-async";
 
 export const Route = createFileRoute("/admin/bookings")({
   component: AdminBookings,
 });
 
 function AdminBookings() {
-  const bookings = usePlatform((s) => s.bookings);
-  const members = usePlatform((s) => s.members);
-  const adminSetBookingStatus = usePlatform((s) => s.adminSetBookingStatus);
+  const { data, reload } = useAsync(() => api.admin.bookings(), []);
+  const bookings = data?.bookings ?? [];
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  async function run(id: string, fn: () => Promise<unknown>) {
+    setBusyId(id);
+    try {
+      await fn();
+      reload();
+    } finally {
+      setBusyId(null);
+    }
+  }
 
   return (
     <div className="space-y-8">
@@ -37,36 +45,62 @@ function AdminBookings() {
       ) : (
         <Surface className="p-0 sm:p-0">
           <ul className="divide-y divide-line">
-            {bookings.map((b) => {
-              const user = memberById(members, b.userId);
-              return (
-                <li key={b.id} className="space-y-3 px-5 py-4">
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                    <div>
-                      <p className="font-medium">{b.offerTitle}</p>
-                      <p className="text-sm text-muted">
-                        {user?.name ?? "Member"} · {formatBdt(b.bookingAmount)} · {formatWhen(b.createdAt)}
-                      </p>
-                    </div>
-                    <StatusBadge status={b.status} />
+            {bookings.map((b) => (
+              <li key={b.id} className="space-y-3 px-5 py-4">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <p className="font-medium">{b.offer_title ?? b.offer_slug}</p>
+                    <p className="text-sm text-muted">
+                      {formatBdt(b.booking_amount)} · {formatWhen(b.created_at)}
+                    </p>
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    {(["pending", "confirmed", "activated", "cancelled", "reversed"] as BookingStatus[]).map(
-                      (status) => (
-                        <Button
-                          key={status}
-                          size="sm"
-                          variant={b.status === status ? "primary" : "secondary"}
-                          onClick={() => adminSetBookingStatus(b.id, status)}
-                        >
-                          {status}
-                        </Button>
-                      ),
-                    )}
-                  </div>
-                </li>
-              );
-            })}
+                  <StatusBadge status={b.status} />
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {b.status === "pending" ? (
+                    <Button
+                      size="sm"
+                      disabled={busyId === b.id}
+                      onClick={() => void run(b.id, () => api.admin.confirmBooking(b.id))}
+                    >
+                      Confirm
+                    </Button>
+                  ) : null}
+                  {b.status === "confirmed" ? (
+                    <Button
+                      size="sm"
+                      disabled={busyId === b.id}
+                      onClick={() => void run(b.id, () => api.admin.activateBooking(b.id))}
+                    >
+                      Activate
+                    </Button>
+                  ) : null}
+                  {b.status === "pending" || b.status === "confirmed" ? (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      disabled={busyId === b.id}
+                      onClick={() => void run(b.id, () => api.admin.cancelBooking(b.id))}
+                    >
+                      Cancel
+                    </Button>
+                  ) : null}
+                  {b.status === "confirmed" || b.status === "activated" ? (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      disabled={busyId === b.id}
+                      onClick={() => {
+                        const reason = window.prompt("Reason for reversal");
+                        if (reason) void run(b.id, () => api.admin.reverseBooking(b.id, reason));
+                      }}
+                    >
+                      Reverse
+                    </Button>
+                  ) : null}
+                </div>
+              </li>
+            ))}
           </ul>
         </Surface>
       )}

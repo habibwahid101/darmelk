@@ -2,22 +2,29 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { PageHeader, StatCard, Surface } from "@/components/states";
 import { Button } from "@/components/ui/button";
 import { CATEGORIES, formatBdt, OFFERS } from "@/lib/offers";
-import { isQualified, usePlatform } from "@/lib/platform";
+import { api } from "@/lib/api-client";
+import { useAsync } from "@/lib/use-async";
 
 export const Route = createFileRoute("/admin/")({ component: AdminOverview });
 
 function AdminOverview() {
-  const members = usePlatform((s) => s.members);
-  const bookings = usePlatform((s) => s.bookings);
-  const commissions = usePlatform((s) => s.commissions);
+  const { data: usersData } = useAsync(() => api.admin.users(), []);
+  const { data: bookingsData } = useAsync(() => api.admin.bookings(), []);
+  const { data: commissionsData } = useAsync(() => api.admin.commissions(), []);
+  const { data: withdrawalsData } = useAsync(() => api.admin.withdrawals(), []);
+
+  const members = usersData?.members ?? [];
+  const bookings = bookingsData?.bookings ?? [];
+  const commissions = commissionsData?.commissions ?? [];
+  const withdrawals = withdrawalsData?.withdrawals ?? [];
 
   const published = OFFERS.filter((o) => o.status === "available").length;
   const confirmed = bookings.filter((b) => b.status === "confirmed" || b.status === "activated").length;
   const pending = bookings.filter((b) => b.status === "pending").length;
-  const active = members.filter((m) => m.activationStatus === "active").length;
-  const qualified = members.filter((m) => isQualified(members, bookings, m.userId)).length;
+  const active = members.filter((m) => m.activation_status === "active").length;
   const commPending = commissions.filter((c) => c.status === "pending").reduce((n, c) => n + c.amount, 0);
   const commAvailable = commissions.filter((c) => c.status === "available").reduce((n, c) => n + c.amount, 0);
+  const withdrawalsPending = withdrawals.filter((w) => w.status === "requested").length;
 
   return (
     <div className="space-y-8">
@@ -29,9 +36,13 @@ function AdminOverview() {
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label="Members" value={String(members.length)} hint={`${active} with active annual activation`} />
-        <StatCard label="Published offers" value={String(published)} hint={`${CATEGORIES.filter((c) => !c.available).length} categories coming soon`} />
+        <StatCard
+          label="Published offers"
+          value={String(published)}
+          hint={`${CATEGORIES.filter((c) => !c.available).length} categories coming soon`}
+        />
         <StatCard label="Bookings" value={String(bookings.length)} hint={`${confirmed} confirmed · ${pending} pending`} />
-        <StatCard label="Qualified members" value={String(qualified)} hint="3 personal eligible sponsors + complete Level 5" />
+        <StatCard label="Withdrawals pending" value={String(withdrawalsPending)} hint="Awaiting approval" />
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">

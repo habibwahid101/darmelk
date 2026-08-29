@@ -3,26 +3,20 @@ import { GitFork } from "lucide-react";
 import { EmptyState, PageHeader, StatCard, Surface } from "@/components/states";
 import { useMemberSession } from "@/components/layout/use-member";
 import { COMMISSION_LEVELS, TOTAL_POSITIONS } from "@/lib/offers";
-import {
-  getDirects,
-  getLevelCounts,
-  memberById,
-  networkFilled,
-  PERSONAL_SPONSOR_TARGET,
-  usePlatform,
-} from "@/lib/platform";
+import { PERSONAL_SPONSOR_TARGET } from "@/lib/platform";
+import { api } from "@/lib/api-client";
+import { useAsync } from "@/lib/use-async";
 
 export const Route = createFileRoute("/app/network")({ component: NetworkPage });
 
 function NetworkPage() {
   const { member } = useMemberSession();
-  const members = usePlatform((s) => s.members);
-  const bookings = usePlatform((s) => s.bookings);
+  const { data } = useAsync(() => api.myNetwork(), [member?.user_id], { enabled: Boolean(member) });
   if (!member) return null;
 
-  const directs = getDirects(members, bookings, member.userId);
-  const counts = getLevelCounts(members, bookings, member.userId);
-  const filled = networkFilled(counts);
+  const directs = data?.directs ?? [];
+  const counts = data?.levelCounts ?? { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+  const filled = Object.values(counts).reduce((a, b) => a + b, 0);
 
   return (
     <div className="space-y-8">
@@ -45,7 +39,7 @@ function NetworkPage() {
         />
         <StatCard
           label="Your referral code"
-          value={member.referralCode}
+          value={member.referral_code}
           hint="Share this code. Cross-offer sponsorship is supported."
           compact
         />
@@ -55,7 +49,7 @@ function NetworkPage() {
         <h2 className="font-display text-xl font-semibold">Level summary</h2>
         <ul className="mt-4 space-y-3">
           {COMMISSION_LEVELS.map((level) => {
-            const filledAt = counts[level.level] ?? 0;
+            const filledAt = counts[level.level as 1 | 2 | 3 | 4 | 5] ?? 0;
             const pct = Math.min(100, Math.round((filledAt / level.positions) * 100));
             return (
               <li key={level.level}>
@@ -88,14 +82,12 @@ function NetworkPage() {
           <h2 className="font-display text-xl font-semibold">Direct sponsors</h2>
           <ul className="mt-4 divide-y divide-line">
             {directs.map((d) => (
-              <li key={d.userId} className="flex items-center justify-between gap-3 py-3">
+              <li key={d.user_id} className="flex items-center justify-between gap-3 py-3">
                 <div>
                   <p className="text-sm font-medium">{d.name}</p>
-                  <p className="text-xs text-muted">
-                    Sponsor {memberById(members, d.sponsorUserId)?.name ?? "—"}
-                  </p>
+                  <p className="text-xs capitalize text-muted">{d.activation_status}</p>
                 </div>
-                <p className="text-xs text-muted">{d.referralCode}</p>
+                <p className="text-xs text-muted">{d.referral_code}</p>
               </li>
             ))}
           </ul>

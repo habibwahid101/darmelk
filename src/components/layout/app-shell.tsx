@@ -90,7 +90,7 @@ export function AppShell() {
   }
 
   if (!user || !member) return <RedirectToSignIn />;
-  if (!member.onboardingComplete && pathname !== "/app/onboarding") {
+  if (!member.onboarding_complete && pathname !== "/app/onboarding") {
     return <Navigate to="/app/onboarding" />;
   }
 
@@ -133,8 +133,8 @@ export function AppShell() {
           ) : null}
         </nav>
         <div className="border-t border-line p-4">
-          <p className="truncate text-sm font-medium">{member.name}</p>
-          <p className="truncate text-xs text-muted">{member.email || "Member"}</p>
+          <p className="truncate text-sm font-medium">{user.displayName ?? "Member"}</p>
+          <p className="truncate text-xs text-muted">{user.primaryEmail || "Member"}</p>
           <button
             type="button"
             onClick={() => void onSignOut()}
@@ -210,7 +210,7 @@ export function AppShell() {
             <Button asChild size="sm" variant="secondary">
               <Link to="/properties">Explore properties</Link>
             </Button>
-            <span className="text-sm font-medium">{member.name}</span>
+            <span className="text-sm font-medium">{user.displayName ?? "Member"}</span>
           </div>
         </div>
         <main className="px-5 py-6 pb-28 md:px-8 md:py-8 lg:pb-12">

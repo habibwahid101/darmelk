@@ -5,46 +5,44 @@ import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { PageHeader, Surface } from "@/components/states";
 import { useMemberSession } from "@/components/layout/use-member";
-import { ACTIVATION_FEE, memberByCode, usePlatform } from "@/lib/platform";
 import { formatBdt } from "@/lib/offers";
+import { api, ApiError } from "@/lib/api-client";
+
+const ACTIVATION_FEE = 1000;
 
 export const Route = createFileRoute("/app/onboarding")({
   component: OnboardingPage,
 });
 
 function OnboardingPage() {
-  const { member } = useMemberSession();
-  const members = usePlatform((s) => s.members);
-  const completeOnboarding = usePlatform((s) => s.completeOnboarding);
+  const { member, reload } = useMemberSession();
   const navigate = useNavigate();
-  const [name, setName] = useState(member?.name ?? "");
+  const [name, setName] = useState("");
   const [phone, setPhone] = useState(member?.phone ?? "");
   const [sponsor, setSponsor] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
 
   if (!member) return null;
-  const userId = member.userId;
-  const myCode = member.referralCode;
+  const myCode = member.referral_code;
 
-  function submit(e: React.FormEvent) {
+  async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim()) {
       setError("Enter the name that should appear on your member record.");
       return;
     }
-    if (sponsor.trim()) {
-      const found = memberByCode(members, sponsor);
-      if (!found) {
-        setError("That referral code does not match a member in this environment.");
-        return;
-      }
-      if (found.userId === userId) {
-        setError("You cannot sponsor yourself.");
-        return;
-      }
+    setPending(true);
+    setError(null);
+    try {
+      await api.onboarding({ name: name.trim(), phone: phone.trim(), sponsorCode: sponsor.trim() || undefined });
+      reload();
+      await navigate({ to: "/app" });
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Something went wrong");
+    } finally {
+      setPending(false);
     }
-    completeOnboarding(userId, { name, phone, sponsorCode: sponsor });
-    void navigate({ to: "/app" });
   }
 
   return (
@@ -83,8 +81,8 @@ function OnboardingPage() {
             Annual activation is {formatBdt(ACTIVATION_FEE)} and does not purchase a property.
             Your code after setup: <span className="font-medium text-ink">{myCode}</span>
           </div>
-          <Button type="submit" className="w-full">
-            Continue to overview
+          <Button type="submit" className="w-full" disabled={pending}>
+            {pending ? "Saving…" : "Continue to overview"}
           </Button>
         </form>
       </Surface>

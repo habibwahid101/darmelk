@@ -4,7 +4,9 @@ import { EmptyState, PageHeader, StatCard, Surface } from "@/components/states";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { useMemberSession } from "@/components/layout/use-member";
 import { formatBdt } from "@/lib/offers";
-import { commissionTotals, formatWhen, usePlatform } from "@/lib/platform";
+import { formatWhen } from "@/lib/platform";
+import { api } from "@/lib/api-client";
+import { useAsync } from "@/lib/use-async";
 
 export const Route = createFileRoute("/app/commission")({
   component: CommissionPage,
@@ -12,9 +14,11 @@ export const Route = createFileRoute("/app/commission")({
 
 function CommissionPage() {
   const { member } = useMemberSession();
-  const commissions = usePlatform((s) => s.commissions);
+  const { data } = useAsync(() => api.myCommissions(), [member?.user_id], { enabled: Boolean(member) });
   if (!member) return null;
-  const wallet = commissionTotals(commissions, member.userId);
+
+  const wallet = data?.totals ?? { available: 0, pending: 0, paid: 0, reversed: 0, rejected: 0 };
+  const rows = data?.commissions ?? [];
 
   return (
     <div className="space-y-8">
@@ -31,7 +35,7 @@ function CommissionPage() {
         <StatCard label="Reversed" value={formatBdt(wallet.reversed)} hint="History is kept." />
       </div>
 
-      {wallet.all.length === 0 ? (
+      {rows.length === 0 ? (
         <EmptyState
           icon={Wallet}
           title="No commissions yet"
@@ -51,13 +55,13 @@ function CommissionPage() {
                 </tr>
               </thead>
               <tbody>
-                {wallet.all.map((c) => (
+                {rows.map((c) => (
                   <tr key={c.id} className="border-b border-line last:border-0">
-                    <td className="px-5 py-3">{formatWhen(c.createdAt)}</td>
-                    <td className="px-5 py-3">{c.sourceOfferTitle}</td>
+                    <td className="px-5 py-3">{formatWhen(c.created_at)}</td>
+                    <td className="px-5 py-3">{c.source_offer_title ?? "—"}</td>
                     <td className="px-5 py-3">L{c.level}</td>
                     <td className="px-5 py-3 tabular-nums">{Math.round(c.rate * 100)}%</td>
-                    <td className="px-5 py-3 tabular-nums">{formatBdt(c.bookingAmount)}</td>
+                    <td className="px-5 py-3 tabular-nums">{formatBdt(c.source_booking_amount)}</td>
                     <td className="px-5 py-3 tabular-nums font-medium">{formatBdt(c.amount)}</td>
                     <td className="px-5 py-3">
                       <StatusBadge status={c.status} />
@@ -68,17 +72,17 @@ function CommissionPage() {
             </table>
           </div>
           <ul className="divide-y divide-line md:hidden">
-            {wallet.all.map((c) => (
+            {rows.map((c) => (
               <li key={c.id} className="space-y-2 px-5 py-4">
                 <div className="flex items-start justify-between gap-3">
-                  <p className="font-medium">{c.sourceOfferTitle}</p>
+                  <p className="font-medium">{c.source_offer_title ?? "—"}</p>
                   <StatusBadge status={c.status} />
                 </div>
                 <p className="text-sm text-muted">
-                  L{c.level} · {Math.round(c.rate * 100)}% of {formatBdt(c.bookingAmount)}
+                  L{c.level} · {Math.round(c.rate * 100)}% of {formatBdt(c.source_booking_amount)}
                 </p>
                 <p className="text-sm font-semibold tabular-nums">{formatBdt(c.amount)}</p>
-                <p className="text-xs text-subtle">{formatWhen(c.createdAt)}</p>
+                <p className="text-xs text-subtle">{formatWhen(c.created_at)}</p>
               </li>
             ))}
           </ul>

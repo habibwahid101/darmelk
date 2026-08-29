@@ -1,0 +1,127 @@
+import type { PoolClient } from "pg";
+import { badRequest, conflict, forbidden } from "../errors.js";
+import { referralCodeFrom, uid } from "../ids.js";
+import { findOpenMatrixSlot } from "./network.js";
+
+function adminEmails(): Set<string> {
+  return new Set(
+    (process.env.ADMIN_EMAILS ?? "")
+      .split(",")
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean),
+  );
+}
+
+export type Member = {
+  user_id: string;
+  referral_code: string;
+  phone: string;
+  role: "member" | "admin";
+  sponsor_user_id: string | null;
+  network_parent_user_id: string | null;
+  network_slot: number | null;
+  onboarding_complete: boolean;
+  activation_status: "inactive" | "pending" | "active" | "expired";
+  activation_expires_at: string | null;
+  created_at: string;
+};
+
+/**
+ * Auto-provision the `members` row for a Better Auth user on first contact
+ * (mirrors the prototype's `ensureMember`, but persisted). The very first
+ * member ever created, and anyone whose email is in ADMIN_EMAILS, is granted
+ * the admin role — everyone else starts as a plain member.
+ */
+export async function ensureMember(
+  client: PoolClient,
+  user: { id: string; email: string },
+): Promise<Member> {
+  const existing = await client.query<Member>(`select * from members where user_id = $1`, [user.id]);
+  if (existing.rows[0]) return existing.rows[0];
+
+  const { rows: countRows } = await client.query<{ count: string }>(`select count(*)::text as count from members`);
+  const isFirst = Number(countRows[0]?.count ?? 0) === 0;
+  const isAdminEmail = adminEmails().has(user.email.toLowerCase());
+
+  const inserted = await client.query<Member>(
+    `insert into members (user_id, referral_code, role)
+     values ($1, $2, $3)
+     on conflict (user_id) do nothing
+     returning *`,
+    [user.id, referralCodeFrom(user.id), isFirst || isAdminEmail ? "admin" : "member"],
+  );
+  if (inserted.rows[0]) return inserted.rows[0];
+  // Lost the insert race — someone else provisioned it concurrently.
+  const row = await client.query<Member>(`select * from members where user_id = $1`, [user.id]);
+  if (!row.rows[0]) throw new Error("member provisioning failed");
+  return row.rows[0];
+}
+
+/**
+ * Complete onboarding: records the sponsor relationship from a referral code
+ * and places the member into the unified 3x5 matrix (spillover under the
+ * sponsor if the sponsor's own 3 slots are full). A member with no valid
+ * sponsor code becomes a new matrix root (no network_parent).
+ */
+export async function completeOnboarding(
+  client: PoolClient,
+  userId: string,
+  data: { phone: string; sponsorCode: string },
+): Promise<Member> {
+  const code = data.sponsorCode.trim().toUpperCase();
+  let sponsor: Member | undefined;
+  if (code) {
+    const { rows } = await client.query<Member>(`select * from members where referral_code = $1`, [code]);
+    sponsor = rows[0];
+    if (!sponsor) throw badRequest("Sponsor code not found", "sponsor_not_found");
+    if (sponsor.user_id === userId) throw badRequest("You cannot sponsor yourself", "self_sponsor");
+  }
+
+  let networkParentId: string | null = null;
+  let networkSlot: number | null = null;
+  if (sponsor) {
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      try {
+        const slot = await findOpenMatrixSlot(client, sponsor.user_id);
+        networkParentId = slot.parentUserId;
+        networkSlot = slot.slot;
+        break;
+      } catch (err) {
+        if (attempt === 4) throw err;
+      }
+    }
+  }
+
+  const { rows } = await client.query<Member>(
+    `update members set
+        phone = $2,
+        sponsor_user_id = $3,
+        network_parent_user_id = $4,
+        network_slot = $5,
+        onboarding_complete = true,
+        updated_at = now()
+      where user_id = $1
+      returning *`,
+    [userId, data.phone.trim(), sponsor?.user_id ?? null, networkParentId, networkSlot],
+  );
+  if (!rows[0]) throw conflict("Member not found");
+  return rows[0];
+}
+
+export async function requireAdmin(client: PoolClient, userId: string): Promise<Member> {
+  const { rows } = await client.query<Member>(`select * from members where user_id = $1`, [userId]);
+  const member = rows[0];
+  if (!member || member.role !== "admin") throw forbidden("Admin role required");
+  return member;
+}
+
+export async function logAdminAction(
+  client: PoolClient,
+  opts: { adminUserId: string; actionType: string; targetType: string; targetId: string; payload?: unknown },
+): Promise<void> {
+  await client.query(
+    `insert into admin_actions (id, admin_user_id, action_type, target_type, target_id, payload)
+     values ($1, $2, $3, $4, $5, $6)`,
+    [uid("aa"), opts.adminUserId, opts.actionType, opts.targetType, opts.targetId, JSON.stringify(opts.payload ?? {})],
+  );
+}

@@ -6,29 +6,30 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { Input } from "@/components/ui/input";
 import { useMemberSession } from "@/components/layout/use-member";
 import { formatBdt } from "@/lib/offers";
-import { formatWhen, usePlatform, type TxType } from "@/lib/platform";
+import { formatWhen } from "@/lib/platform";
+import { api, type Transaction } from "@/lib/api-client";
+import { useAsync } from "@/lib/use-async";
 
 export const Route = createFileRoute("/app/transactions")({
   component: TransactionsPage,
 });
 
-const TYPES: Array<TxType | "all"> = ["all", "booking", "commission", "activation"];
+const TYPES: Array<Transaction["type"] | "all"> = ["all", "booking", "commission", "activation", "withdrawal"];
 
 function TransactionsPage() {
   const { member } = useMemberSession();
-  const transactions = usePlatform((s) => s.transactions);
+  const { data } = useAsync(() => api.myTransactions(), [member?.user_id], { enabled: Boolean(member) });
   const [q, setQ] = useState("");
-  const [type, setType] = useState<TxType | "all">("all");
+  const [type, setType] = useState<Transaction["type"] | "all">("all");
   const rows = useMemo(() => {
-    if (!member) return [];
-    return transactions
-      .filter((t) => t.userId === member.userId)
+    const all = data?.transactions ?? [];
+    return all
       .filter((t) => type === "all" || t.type === type)
       .filter((t) => {
         const hay = `${t.reference} ${t.type} ${t.status}`.toLowerCase();
         return hay.includes(q.trim().toLowerCase());
       });
-  }, [transactions, member, q, type]);
+  }, [data, q, type]);
 
   if (!member) return null;
 
@@ -75,11 +76,11 @@ function TransactionsPage() {
         <Surface className="p-0 sm:p-0">
           <ul className="divide-y divide-line">
             {rows.map((t) => (
-              <li key={t.id} className="flex flex-col gap-2 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+              <li key={`${t.type}-${t.id}`} className="flex flex-col gap-2 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="min-w-0">
                   <p className="text-sm font-medium capitalize">{t.type}</p>
                   <p className="truncate text-xs text-muted">{t.reference}</p>
-                  <p className="text-xs text-subtle">{formatWhen(t.createdAt)}</p>
+                  <p className="text-xs text-subtle">{formatWhen(t.created_at)}</p>
                 </div>
                 <div className="flex items-center gap-3">
                   <p className="whitespace-nowrap text-sm font-semibold tabular-nums">{formatBdt(t.amount)}</p>
