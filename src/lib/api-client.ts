@@ -150,7 +150,7 @@ export type Transaction = {
 
 export const api = {
   me: () => request<{ member: Member }>("/api/me"),
-  onboarding: (data: { name?: string; phone: string; sponsorCode?: string }) =>
+  onboarding: (data: { name?: string; phone?: string; sponsorCode?: string }) =>
     post<{ member: Member }>("/api/me/onboarding", data),
 
   offers: () => request<{ offers: Offer[] }>("/api/offers"),

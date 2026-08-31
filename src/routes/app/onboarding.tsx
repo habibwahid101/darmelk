@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
@@ -15,8 +15,7 @@ export const Route = createFileRoute("/app/onboarding")({
 });
 
 function OnboardingPage() {
-  const { member, reload } = useMemberSession();
-  const navigate = useNavigate();
+  const { member } = useMemberSession();
   const [name, setName] = useState("");
   const [phone, setPhone] = useState(member?.phone ?? "");
   const [sponsor, setSponsor] = useState("");
@@ -36,8 +35,10 @@ function OnboardingPage() {
     setError(null);
     try {
       await api.onboarding({ name: name.trim(), phone: phone.trim(), sponsorCode: sponsor.trim() || undefined });
-      reload();
-      await navigate({ to: "/app" });
+      // Load the member console from a fresh /api/me response. Navigating
+      // against the stale pre-save member object can redirect straight back
+      // to onboarding before the asynchronous profile reload finishes.
+      window.location.assign("/app");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Something went wrong");
     } finally {

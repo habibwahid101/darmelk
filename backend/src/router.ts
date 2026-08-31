@@ -116,7 +116,6 @@ app.get("/api/me", async (c) => {
 app.post("/api/me/onboarding", async (c) => {
   const userId = c.get("userId");
   const body = await jsonBody<{ name?: string; phone?: string; sponsorCode?: string }>(c);
-  if (!body.phone) throw badRequest("phone is required");
   const member = await withTransaction(async (client) => {
     await ensureMember(client, { id: userId, email: c.get("userEmail") });
     if (body.name?.trim()) {

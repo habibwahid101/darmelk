@@ -36,6 +36,25 @@ async function main() {
   const adminMe = await json(adminMeRes);
   record("admin /api/me provisions member with role=admin", adminMe.member?.role === "admin", adminMe);
 
+  const rootSignUp = await app.request("/api/auth/sign-up/email", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ email: "root-no-sponsor@example.com", password: "password123", name: "Root Member" }),
+  });
+  const rootCookie = extractCookie(rootSignUp);
+  await app.request("/api/me", { headers: { cookie: rootCookie } });
+  const rootOnboarding = await json(await app.request("/api/me/onboarding", {
+    method: "POST",
+    headers: { cookie: rootCookie, "content-type": "application/json" },
+    body: JSON.stringify({ name: "Root Member", phone: "", sponsorCode: "" }),
+  }));
+  record(
+    "root member completes onboarding with optional phone and no sponsor",
+    rootOnboarding.member?.onboarding_complete === true && rootOnboarding.member?.sponsor_user_id === null &&
+      rootOnboarding.member?.network_parent_user_id === null && Boolean(rootOnboarding.member?.referral_code),
+    rootOnboarding.member,
+  );
+
   const adminActivationRequest = await json(await app.request("/api/activation/request", {
     method: "POST",
     headers: { cookie: adminCookie },
