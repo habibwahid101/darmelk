@@ -65,6 +65,9 @@ export function appNameFromHost(hostHeader) {
     .trim()
     .split(":")[0]
     .toLowerCase();
+  if (host === "darmelk.com" || host === "www.darmelk.com") {
+    return "Darmelk";
+  }
   if (!host.endsWith(".grok.me")) {
     return DEFAULT_APP_NAME;
   }

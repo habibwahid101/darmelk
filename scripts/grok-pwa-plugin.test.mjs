@@ -452,6 +452,8 @@ test("names the install page from host slug", () => {
   assert.equal(appNameFromHost("localhost:8080"), "Grok App");
   assert.equal(appNameFromHost("172.17.154.217:8080"), "Grok App");
   assert.equal(appNameFromHost("wild-race.grok.me"), "Wild Race");
+  assert.equal(appNameFromHost("darmelk.com"), "Darmelk");
+  assert.equal(appNameFromHost("www.darmelk.com"), "Darmelk");
 });
 
 test("rejects hosts that are not plain slugs", () => {
@@ -478,6 +480,10 @@ test("renders the manifest with the per-app name", () => {
   assert.equal(manifest.name, "Wild Race");
   assert.equal(manifest.short_name, "Wild Race");
   assert.equal(manifest.icons[0].src, "/__grok/icon-180.png");
+
+  const darmelkManifest = JSON.parse(renderWebManifest("www.darmelk.com"));
+  assert.equal(darmelkManifest.name, "Darmelk");
+  assert.equal(darmelkManifest.short_name, "Darmelk");
 });
 
 // Tripwires: the deployed-app path only works if Nitro scans server/ — an
