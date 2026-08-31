@@ -9,12 +9,15 @@ import { useAsync } from "@/lib/use-async";
  */
 export function useMemberSession(): { user: AppUser | null; member: Member | undefined; isPending: boolean; reload: () => void } {
   const { user, isPending: sessionPending } = useCurrentUserState();
-  const { data, loading, reload } = useAsync(() => api.me(), [user?.id], { enabled: Boolean(user) });
+  const { data, error, reload } = useAsync(() => api.me(), [user?.id], { enabled: Boolean(user) });
 
   return {
     user,
     member: data?.member,
-    isPending: sessionPending || (Boolean(user) && loading && !data),
+    // When auth resolves on a hard load, useAsync's enabling effect has not
+    // started yet during that render. Keep the route gated until /api/me has
+    // either returned or failed, otherwise a valid session flashes to /login.
+    isPending: sessionPending || (Boolean(user) && !data && !error),
     reload,
   };
 }
