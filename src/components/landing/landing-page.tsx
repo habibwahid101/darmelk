@@ -275,8 +275,8 @@ function TrustStrip() {
 
 function Flagship() {
   return (
-    <section id="properties" className="section-y scroll-mt-24">
-      <div className="container-pg">
+    <section className="section-y">
+      <div id="properties" className="container-pg scroll-mt-24">
         <Eyebrow>Flagship offer</Eyebrow>
         <div className="mt-6 md:mt-8">
           <FeaturedOffer offer={FLAGSHIP} />
@@ -328,8 +328,8 @@ function Categories() {
 
 function Opportunities() {
   return (
-    <section id="opportunities" className="section-y scroll-mt-24">
-      <div className="container-pg">
+    <section className="section-y">
+      <div id="opportunities" className="container-pg scroll-mt-24">
         <SectionHeading
           eyebrow="Marketplace"
           title="Available property opportunities"
@@ -356,8 +356,8 @@ function Opportunities() {
 
 function HowItWorks() {
   return (
-    <section id="how-it-works" className="border-y border-line bg-cream section-y scroll-mt-24">
-      <div className="container-pg">
+    <section className="border-y border-line bg-cream section-y">
+      <div id="how-it-works" className="container-pg scroll-mt-24">
         <SectionHeading
           eyebrow="Journey"
           title="How Darmelk works"
@@ -446,8 +446,8 @@ function Qualification() {
 
 function Commission({ exampleTotal }: { exampleTotal: number }) {
   return (
-    <section id="commission" className="border-y border-line bg-ink section-y scroll-mt-24">
-      <div className="container-pg">
+    <section className="border-y border-line bg-ink section-y">
+      <div id="commission" className="container-pg scroll-mt-24">
         <SectionHeading
           light
           eyebrow="Earnings"
@@ -496,8 +496,8 @@ function Commission({ exampleTotal }: { exampleTotal: number }) {
 
 function Benefit() {
   return (
-    <section id="benefits" className="section-y scroll-mt-24">
-      <div className="container-pg grid items-center gap-10 lg:grid-cols-2">
+    <section className="section-y">
+      <div id="benefits" className="container-pg scroll-mt-24 grid items-center gap-10 lg:grid-cols-2">
         <div>
           <Eyebrow>Property benefit</Eyebrow>
           <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight md:text-4xl">
@@ -662,8 +662,8 @@ function DashCell({
 
 function Faq() {
   return (
-    <section id="faq" className="border-y border-line bg-cream section-y scroll-mt-24">
-      <div className="container-pg">
+    <section className="border-y border-line bg-cream section-y">
+      <div id="faq" className="container-pg scroll-mt-24">
         <SectionHeading eyebrow="Questions" title="FAQ" />
         <Accordion.Root
           type="single"
