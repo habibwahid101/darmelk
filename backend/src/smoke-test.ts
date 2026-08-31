@@ -1,14 +1,14 @@
 // Local-only smoke test: exercises the real Hono app in-process (no network)
 // against the local Postgres started for validation. Not part of the deploy
 // bundle — run via `node dist/smoke-test.mjs` after `node esbuild-smoke.mjs`.
-import { app } from "./router.js";
-
 function extractCookie(res: Response): string {
   const setCookie = res.headers.get("set-cookie") ?? "";
   return setCookie.split(";")[0] ?? "";
 }
 
 async function main() {
+  process.env.ADMIN_EMAILS = "admin@example.com";
+  const { app } = await import("./router.js");
   const json = async (res: Response): Promise<any> => res.json();
   const results: Array<{ step: string; ok: boolean; detail?: unknown }> = [];
   const record = (step: string, ok: boolean, detail?: unknown) => {
@@ -16,7 +16,7 @@ async function main() {
     console.log(ok ? "PASS" : "FAIL", step, detail ?? "");
   };
 
-  // --- sign up admin (first user -> auto admin) ---
+  // --- sign up explicitly configured admin ---
   const adminEmail = "admin@example.com";
   const signUpAdmin = await app.request("/api/auth/sign-up/email", {
     method: "POST",

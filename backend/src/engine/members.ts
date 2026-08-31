@@ -28,9 +28,9 @@ export type Member = {
 
 /**
  * Auto-provision the `members` row for a Better Auth user on first contact
- * (mirrors the prototype's `ensureMember`, but persisted). The very first
- * member ever created, and anyone whose email is in ADMIN_EMAILS, is granted
- * the admin role — everyone else starts as a plain member.
+ * (mirrors the prototype's `ensureMember`, but persisted). Only identities
+ * explicitly listed in ADMIN_EMAILS are granted the admin role; every other
+ * account starts as a plain member.
  */
 export async function ensureMember(
   client: PoolClient,
@@ -39,8 +39,6 @@ export async function ensureMember(
   const existing = await client.query<Member>(`select * from members where user_id = $1`, [user.id]);
   if (existing.rows[0]) return existing.rows[0];
 
-  const { rows: countRows } = await client.query<{ count: string }>(`select count(*)::text as count from members`);
-  const isFirst = Number(countRows[0]?.count ?? 0) === 0;
   const isAdminEmail = adminEmails().has(user.email.toLowerCase());
 
   const inserted = await client.query<Member>(
@@ -48,7 +46,7 @@ export async function ensureMember(
      values ($1, $2, $3)
      on conflict (user_id) do nothing
      returning *`,
-    [user.id, referralCodeFrom(user.id), isFirst || isAdminEmail ? "admin" : "member"],
+    [user.id, referralCodeFrom(user.id), isAdminEmail ? "admin" : "member"],
   );
   if (inserted.rows[0]) return inserted.rows[0];
   // Lost the insert race — someone else provisioned it concurrently.
