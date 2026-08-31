@@ -109,7 +109,7 @@ export function AppShell() {
     <div className="min-h-dvh bg-paper">
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-60 flex-col border-r border-line bg-cream lg:flex">
         <div className="px-5 py-5">
-          <Link to="/" aria-label="Property Gateway home">
+          <Link to="/" aria-label="Darmelk home">
             <BrandMark />
           </Link>
         </div>

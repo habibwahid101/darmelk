@@ -55,7 +55,7 @@ function QualificationPage() {
               {formatBdt(own.qualification_benefit)}
             </p>
             <p className="mt-2 text-sm text-muted">
-              This amount belongs to the offer you booked. It is not a universal Property Gateway figure.
+              This amount belongs to the offer you booked. It is not a universal Darmelk figure.
             </p>
           </>
         ) : (

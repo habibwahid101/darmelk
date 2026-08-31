@@ -73,7 +73,7 @@ export function SiteHeader() {
       )}
     >
       <div className="container-pg flex h-16 items-center justify-between gap-4 md:h-[4.25rem]">
-        <Link to="/" aria-label="Property Gateway home" className="shrink-0">
+        <Link to="/" aria-label="Darmelk home" className="shrink-0">
           <BrandMark inverted={inverted} compact />
         </Link>
 

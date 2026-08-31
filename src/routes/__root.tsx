@@ -8,7 +8,7 @@ import { HashScroll } from "@/components/hash-scroll";
 import { Button } from "@/components/ui/button";
 import appCss from "../styles.css?url";
 
-const APP_NAME = "Property Gateway";
+const APP_NAME = "Darmelk";
 
 export const Route = createRootRoute({
   head: () => ({
@@ -79,7 +79,7 @@ function Shell() {
   return (
     <div className="flex min-h-dvh flex-col">
       <SiteHeader />
-      <div className="flex-1">
+      <div className={pathname === "/" ? "flex-1" : "flex-1 pt-16 md:pt-[4.25rem]"}>
         <Outlet />
       </div>
       <SiteFooter />

@@ -6,7 +6,7 @@ export const Route = createFileRoute("/properties")({
 
 function PropertiesLayout() {
   return (
-    <main className="pt-24">
+    <main>
       <Outlet />
     </main>
   );

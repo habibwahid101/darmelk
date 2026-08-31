@@ -13,7 +13,7 @@ export function BrandMark({
     <span className={cn("inline-flex items-center", className)}>
       <img
         src={inverted ? "/brand/darmelk-lockup-light.png" : "/brand/darmelk-lockup.png"}
-        alt="Darmelk — Your Property Gateway"
+        alt="Darmelk"
         width={528}
         height={180}
         className={cn(

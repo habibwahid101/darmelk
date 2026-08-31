@@ -60,12 +60,12 @@ const STEPS = [
   },
   {
     n: "03",
-    title: "Build your 3×5 progress",
+    title: "Build your progress",
     body: "Personally sponsor 3, then complete five levels of progression across 363 positions in total.",
   },
   {
     n: "04",
-    title: "Qualify for your property benefit",
+    title: "Qualify property benefit",
     body: "Qualification unlocks the benefit on your own booked offer — separate from any commission earned.",
   },
 ];
@@ -108,7 +108,7 @@ const PILLARS = [
 
 const FAQS = [
   {
-    q: "What is Property Gateway?",
+    q: "What is Darmelk?",
     a: "A property-first platform where you can explore curated offers, book with a defined amount, and progress toward that offer’s qualification benefit.",
   },
   {
@@ -360,7 +360,7 @@ function HowItWorks() {
       <div className="container-pg">
         <SectionHeading
           eyebrow="Journey"
-          title="How Property Gateway works"
+          title="How Darmelk works"
           body="Four steps. Property first — then booking, progress, and benefit."
         />
         <ol className="mt-12 grid items-stretch gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -552,7 +552,7 @@ function Pillars() {
       <div className="container-pg">
         <SectionHeading
           eyebrow="Trust"
-          title="Why Property Gateway"
+          title="Why Darmelk"
           body="Clear terms. Separate outcomes. Nothing dressed up as urgency."
         />
         <div className="mt-12 grid grid-cols-1 gap-4 md:grid-cols-6">

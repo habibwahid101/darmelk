@@ -76,7 +76,7 @@ export function SiteFooter() {
       </div>
       <div className="border-t border-line">
         <div className="container-pg flex flex-col gap-1 py-4 text-xs text-subtle sm:flex-row sm:items-center sm:justify-between sm:py-5">
-          <p>© {new Date().getFullYear()} Property Gateway. All rights reserved.</p>
+          <p>© {new Date().getFullYear()} Darmelk. All rights reserved.</p>
           <p>Booking, commission, and property benefit are separate.</p>
         </div>
       </div>
