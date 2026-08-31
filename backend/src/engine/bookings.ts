@@ -57,11 +57,6 @@ export async function confirmBooking(client: PoolClient, bookingId: string, admi
     `update bookings set status = 'confirmed', confirmed_at = now(), confirmed_by_admin_id = $2 where id = $1 returning *`,
     [bookingId, adminUserId],
   );
-  await postCommissionsForBooking(client, {
-    id: booking.id,
-    userId: booking.user_id,
-    bookingAmount: booking.booking_amount,
-  });
   return updated[0]!;
 }
 
@@ -97,6 +92,11 @@ export async function activateBooking(client: PoolClient, bookingId: string): Pr
       booking.qualification_benefit,
     ],
   );
+  await postCommissionsForBooking(client, {
+    id: booking.id,
+    userId: booking.user_id,
+    bookingAmount: booking.booking_amount,
+  });
   return updated[0]!;
 }
 

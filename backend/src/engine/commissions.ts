@@ -46,7 +46,12 @@ export async function postCommissionsForBooking(
     const { rowCount } = await client.query(
       `insert into commission_ledger
          (id, beneficiary_user_id, source_booking_id, source_user_id, level, rate, source_booking_amount, amount, status)
-       values ($1, $2, $3, $4, $5, $6, $7, $8, 'available')
+       select $1, $2, $3, $4, $5, $6, $7, $8, 'available'
+        where exists (
+          select 1 from members m
+           where m.user_id = $2 and m.activation_status = 'active'
+             and m.activation_expires_at > now()
+        )
        on conflict (source_booking_id, beneficiary_user_id, level) do nothing`,
       [id, beneficiaryUserId, booking.id, booking.userId, level, rate, booking.bookingAmount, amount],
     );

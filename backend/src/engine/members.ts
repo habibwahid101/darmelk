@@ -73,6 +73,7 @@ export async function completeOnboarding(
     sponsor = rows[0];
     if (!sponsor) throw badRequest("Sponsor code not found", "sponsor_not_found");
     if (sponsor.user_id === userId) throw badRequest("You cannot sponsor yourself", "self_sponsor");
+    await requireActiveMember(client, sponsor.user_id, "Sponsor is not annually active");
   }
 
   let networkParentId: string | null = null;
@@ -104,6 +105,30 @@ export async function completeOnboarding(
   );
   if (!rows[0]) throw conflict("Member not found");
   return rows[0];
+}
+
+/** Refresh a stale active row at the point of use, then enforce the annual
+ * activation privilege gate without deleting or rewriting history. */
+export async function requireActiveMember(
+  client: PoolClient,
+  userId: string,
+  message = "Annual activation is required",
+): Promise<Member> {
+  await client.query(
+    `update members set activation_status = 'expired', updated_at = now()
+      where user_id = $1 and activation_status = 'active'
+        and activation_expires_at is not null and activation_expires_at <= now()`,
+    [userId],
+  );
+  await client.query(
+    `update annual_activations set status = 'expired'
+      where user_id = $1 and status = 'active' and period_end <= now()`,
+    [userId],
+  );
+  const { rows } = await client.query<Member>(`select * from members where user_id = $1`, [userId]);
+  const member = rows[0];
+  if (!member || member.activation_status !== "active") throw forbidden(message);
+  return member;
 }
 
 export async function requireAdmin(client: PoolClient, userId: string): Promise<Member> {

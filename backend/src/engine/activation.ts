@@ -21,6 +21,17 @@ export type AnnualActivation = {
 };
 
 export async function requestActivation(client: PoolClient, userId: string): Promise<AnnualActivation> {
+  await client.query(
+    `update members set activation_status = 'expired', updated_at = now()
+      where user_id = $1 and activation_status = 'active'
+        and activation_expires_at is not null and activation_expires_at <= now()`,
+    [userId],
+  );
+  await client.query(
+    `update annual_activations set status = 'expired'
+      where user_id = $1 and status = 'active' and period_end <= now()`,
+    [userId],
+  );
   const { rows: memberRows } = await client.query<{ activation_status: string }>(
     `select activation_status from members where user_id = $1 for update`,
     [userId],

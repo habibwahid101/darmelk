@@ -34,7 +34,8 @@ export async function findOpenMatrixSlot(
 ): Promise<{ parentUserId: string; slot: 1 | 2 | 3 }> {
   let frontier = [rootUserId];
   const visited = new Set<string>();
-  while (frontier.length > 0) {
+  let parentDepth = 0;
+  while (frontier.length > 0 && parentDepth < MAX_LEVEL) {
     const { rows } = await client.query<{ user_id: string; taken_slots: number[] }>(
       `select m.user_id,
               coalesce(array_agg(c.network_slot) filter (where c.network_slot is not null), '{}') as taken_slots
@@ -66,8 +67,9 @@ export async function findOpenMatrixSlot(
     );
     for (const r of childRows) nextFrontier.push(r.user_id);
     frontier = nextFrontier;
+    parentDepth += 1;
   }
-  throw conflict("Network matrix is full under this sponsor (should not happen before level 5+1)");
+  throw conflict("Network matrix is full under this sponsor (maximum level 5 reached)");
 }
 
 export type LevelCounts = Record<1 | 2 | 3 | 4 | 5, number>;
@@ -83,7 +85,10 @@ export async function getLevelCounts(client: PoolClient, userId: string): Promis
          join tree on m.network_parent_user_id = tree.user_id
         where tree.level < 5
      )
-     select level, count(*)::text as count from tree group by level`,
+     select tree.level, count(*) filter (
+       where exists (select 1 from bookings b where b.user_id = tree.user_id and b.status = 'activated')
+     )::text as count
+       from tree group by tree.level`,
     [userId],
   );
   const counts: LevelCounts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };

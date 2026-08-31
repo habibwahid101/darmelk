@@ -30,6 +30,16 @@ async function main() {
   const adminMe = await json(adminMeRes);
   record("admin /api/me provisions member with role=admin", adminMe.member?.role === "admin", adminMe);
 
+  const adminActivationRequest = await json(await app.request("/api/activation/request", {
+    method: "POST",
+    headers: { cookie: adminCookie },
+  }));
+  const adminActivation = await json(await app.request(`/api/admin/activations/${adminActivationRequest.activation.id}/approve`, {
+    method: "POST",
+    headers: { cookie: adminCookie },
+  }));
+  record("admin QA identity is annually active before earning or sponsoring", adminActivation.activation?.status === "active");
+
   // --- sign up member, onboard with admin's referral code ---
   const memberEmail = "member1@example.com";
   const signUpMember = await app.request("/api/auth/sign-up/email", {
@@ -70,13 +80,22 @@ async function main() {
   const bookedRetry = await json(bookRetryRes);
   record("idempotent replay returns the SAME booking id", bookedRetry.booking?.id === booked.booking?.id, bookedRetry.booking?.id);
 
-  // --- admin confirms the booking -> should post a L1 commission (10% of 50000 = 5000) to admin ---
+  // --- admin confirms payment; commission is withheld until booking activation ---
   const confirmRes = await app.request(`/api/admin/bookings/${booked.booking.id}/confirm`, {
     method: "POST",
     headers: { cookie: adminCookie },
   });
   const confirmed = await json(confirmRes);
   record("admin confirms booking", confirmed.booking?.status === "confirmed", confirmed);
+
+  const beforeActivation = await json(await app.request("/api/me/commissions", { headers: { cookie: adminCookie } }));
+  record("confirmed-only booking does not release commission", beforeActivation.commissions?.length === 0, beforeActivation);
+
+  const activated = await json(await app.request(`/api/admin/bookings/${booked.booking.id}/activate`, {
+    method: "POST",
+    headers: { cookie: adminCookie },
+  }));
+  record("admin activates booking and freezes its snapshot", activated.booking?.status === "activated", activated);
 
   const adminCommissionsRes = await app.request("/api/me/commissions", { headers: { cookie: adminCookie } });
   const adminCommissions = await json(adminCommissionsRes);
@@ -165,6 +184,7 @@ async function main() {
   });
   const book2 = await json(book2Res);
   await app.request(`/api/admin/bookings/${book2.booking.id}/confirm`, { method: "POST", headers: { cookie: adminCookie } });
+  await app.request(`/api/admin/bookings/${book2.booking.id}/activate`, { method: "POST", headers: { cookie: adminCookie } });
 
   const withdrawRes = await app.request("/api/withdrawals", {
     method: "POST",

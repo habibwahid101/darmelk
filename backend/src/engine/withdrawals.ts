@@ -6,6 +6,7 @@ import type { PoolClient } from "pg";
 import { badRequest, conflict, notFound } from "../errors.js";
 import { uid } from "../ids.js";
 import { getCommissionTotals } from "./commissions.js";
+import { requireActiveMember } from "./members.js";
 
 export type Withdrawal = {
   id: string;
@@ -21,6 +22,7 @@ export type Withdrawal = {
 
 export async function requestWithdrawal(client: PoolClient, userId: string, amount: number): Promise<Withdrawal> {
   if (!Number.isFinite(amount) || amount <= 0) throw badRequest("Invalid amount", "invalid_amount");
+  await requireActiveMember(client, userId, "Annual activation is required to withdraw earnings");
   const totals = await getCommissionTotals(client, userId);
   const { rows: pendingWithdrawals } = await client.query<{ total: string }>(
     `select coalesce(sum(amount), 0)::text as total from withdrawals
