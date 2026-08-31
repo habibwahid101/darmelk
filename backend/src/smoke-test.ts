@@ -9,6 +9,12 @@ function extractCookie(res: Response): string {
 async function main() {
   process.env.ADMIN_EMAILS = "admin@example.com";
   const { app } = await import("./router.js");
+  const { query, withTransaction } = await import("./db.js");
+  const { approveActivation, requestActivation } = await import("./engine/activation.js");
+  const { activateBooking, confirmBooking, createBooking, reverseBooking } = await import("./engine/bookings.js");
+  const { postCommissionsForBooking } = await import("./engine/commissions.js");
+  const { completeOnboarding, ensureMember } = await import("./engine/members.js");
+  const { getQualificationStatus } = await import("./engine/network.js");
   const json = async (res: Response): Promise<any> => res.json();
   const results: Array<{ step: string; ok: boolean; detail?: unknown }> = [];
   const record = (step: string, ok: boolean, detail?: unknown) => {
@@ -216,6 +222,223 @@ async function main() {
   const commissionsAfterPay = await json(await app.request("/api/me/commissions", { headers: { cookie: adminCookie } }));
   const paidCommission = commissionsAfterPay.commissions.find((cm: { source_booking_id: string }) => cm.source_booking_id === book2.booking.id);
   record("the commission backing the paid withdrawal flipped to status=paid (not deleted)", paidCommission?.status === "paid", paidCommission);
+
+  // --- deterministic production-equivalent 3x5 fixture -----------------
+  // Uses the same PostgreSQL schema and engine functions as Lambda. Only the
+  // identity rows are seeded directly; placement, bookings, commissions,
+  // snapshots, qualification and reversals all execute real business logic.
+  const matrixRootId = "darmelk_qa_matrix_root";
+  const matrixRootEmail = "darmelk-qa-matrix-root@example.com";
+  await withTransaction(async (client) => {
+    await client.query(
+      `insert into "user" (id,name,email,"emailVerified","createdAt","updatedAt")
+       values ($1,'Darmelk QA Matrix Root',$2,true,now(),now())`,
+      [matrixRootId, matrixRootEmail],
+    );
+    await ensureMember(client, { id: matrixRootId, email: matrixRootEmail });
+    await client.query(
+      `update members set activation_status='active', activation_expires_at=now()+interval '365 days' where user_id=$1`,
+      [matrixRootId],
+    );
+  });
+  const matrixRoot = (await query<any>(`select * from members where user_id=$1`, [matrixRootId]))[0];
+
+  let firstQaBooking: any;
+  let sponsor3WithoutLevel5: any;
+  for (let n = 1; n <= 363; n += 1) {
+    const suffix = String(n).padStart(3, "0");
+    const userId = `darmelk_qa_matrix_${suffix}`;
+    const email = `darmelk-qa-matrix-${suffix}@example.com`;
+    await withTransaction(async (client) => {
+      await client.query(
+        `insert into "user" (id,name,email,"emailVerified","createdAt","updatedAt")
+         values ($1,$2,$3,true,now(),now())`,
+        [userId, `Darmelk QA Matrix ${suffix}`, email],
+      );
+      await ensureMember(client, { id: userId, email });
+      await completeOnboarding(client, userId, { phone: `+88017${suffix.padStart(8, "0")}`, sponsorCode: matrixRoot.referral_code });
+      await client.query(
+        `update members set activation_status='active', activation_expires_at=now()+interval '365 days' where user_id=$1`,
+        [userId],
+      );
+    });
+
+    if (n === 1) {
+      const beforeBooking = await withTransaction((client) => getQualificationStatus(client, matrixRootId));
+      record("network position is not counted before an activated booking", beforeBooking.levelCounts[1] === 0, beforeBooking);
+    }
+
+    const booking = await withTransaction(async (client) => {
+      const created = await createBooking(client, userId, "five-star-hotel-share");
+      await confirmBooking(client, created.id, adminMe.member.user_id);
+      return created;
+    });
+    if (n === 1) {
+      firstQaBooking = booking;
+      const premature = await query<any>(`select * from commission_ledger where source_booking_id=$1`, [booking.id]);
+      record("confirmed booking releases no premature commission", premature.length === 0, premature);
+    }
+    await withTransaction((client) => activateBooking(client, booking.id));
+    if (n === 3) sponsor3WithoutLevel5 = await withTransaction((client) => getQualificationStatus(client, matrixRootId));
+  }
+
+  record(
+    "sponsor 3 without completed Level 5 is insufficient",
+    sponsor3WithoutLevel5.sponsorCount === 3 && sponsor3WithoutLevel5.level5Complete === false && sponsor3WithoutLevel5.qualified === false,
+    sponsor3WithoutLevel5,
+  );
+
+  const fullMatrix = await withTransaction((client) => getQualificationStatus(client, matrixRootId));
+  record(
+    "complete 3x5 matrix is exactly 3/9/27/81/243 and qualifies with sponsor 3",
+    fullMatrix.levelCounts[1] === 3 && fullMatrix.levelCounts[2] === 9 && fullMatrix.levelCounts[3] === 27 &&
+      fullMatrix.levelCounts[4] === 81 && fullMatrix.levelCounts[5] === 243 && fullMatrix.qualified === true,
+    fullMatrix,
+  );
+
+  const noLevel6 = await withTransaction(async (client) => {
+    const userId = "darmelk_qa_matrix_364";
+    const email = "darmelk-qa-matrix-364@example.com";
+    await client.query(
+      `insert into "user" (id,name,email,"emailVerified","createdAt","updatedAt") values ($1,'Darmelk QA Matrix 364',$2,true,now(),now())`,
+      [userId, email],
+    );
+    await ensureMember(client, { id: userId, email });
+    try {
+      await completeOnboarding(client, userId, { phone: "+8801700000364", sponsorCode: matrixRoot.referral_code });
+      return false;
+    } catch {
+      return true;
+    }
+  });
+  record("matrix refuses an unintended Level 6 position", noLevel6 === true);
+
+  const deepest = (await query<any>(
+    `with recursive tree as (
+       select user_id,1 level from members where network_parent_user_id=$1
+       union all select m.user_id,tree.level+1 from members m join tree on m.network_parent_user_id=tree.user_id where tree.level<5
+     ) select t.user_id,b.id,b.booking_amount from tree t join bookings b on b.user_id=t.user_id
+        where t.level=5 and b.status='activated' order by t.user_id desc limit 1`,
+    [matrixRootId],
+  ))[0];
+  const commissionChain = await query<any>(
+    `select level,rate,source_booking_amount,amount,status from commission_ledger where source_booking_id=$1 order by level`,
+    [deepest.id],
+  );
+  record(
+    "L1-L5 commissions use the actual BDT 50,000 booking amount at 10/8/6/4/2 percent",
+    JSON.stringify(commissionChain.map((r:any) => [r.level, Number(r.rate), r.source_booking_amount, r.amount])) ===
+      JSON.stringify([[1,0.1,50000,5000],[2,0.08,50000,4000],[3,0.06,50000,3000],[4,0.04,50000,2000],[5,0.02,50000,1000]]),
+    commissionChain,
+  );
+  const duplicatePosted = await withTransaction((client) => postCommissionsForBooking(client, {
+    id: deepest.id, userId: deepest.user_id, bookingAmount: deepest.booking_amount,
+  }));
+  record("commission posting is idempotent", duplicatePosted.length === 0);
+
+  const level5WithoutSponsor3 = await withTransaction(async (client) => {
+    await client.query(`update members set sponsor_user_id=null where user_id like 'darmelk_qa_matrix_%'`);
+    const status = await getQualificationStatus(client, matrixRootId);
+    await client.query(`update members set sponsor_user_id=$1 where user_id like 'darmelk_qa_matrix_%' and user_id <> 'darmelk_qa_matrix_364'`, [matrixRootId]);
+    return status;
+  });
+  record(
+    "completed Level 5 without sponsor 3 is insufficient",
+    level5WithoutSponsor3.level5Complete === true && level5WithoutSponsor3.sponsorCount === 0 && level5WithoutSponsor3.qualified === false,
+    level5WithoutSponsor3,
+  );
+
+  const reversedQa = await withTransaction(async (client) => {
+    const created = await createBooking(client, deepest.user_id, "five-star-hotel-share");
+    await confirmBooking(client, created.id, adminMe.member.user_id);
+    await activateBooking(client, created.id);
+    return reverseBooking(client, created.id, { reason: "isolated QA reversal", adminUserId: adminMe.member.user_id });
+  });
+  const reversedLedger = await query<any>(
+    `select c.status,r.reversed_amount from commission_ledger c join reversal_entries r on r.commission_ledger_id=c.id
+      where c.source_booking_id=$1`,
+    [reversedQa.booking.id],
+  );
+  record(
+    "reversal preserves five ledger rows and appends five immutable reversal entries",
+    reversedQa.commissionsReversed === 5 && reversedLedger.length === 5 && reversedLedger.every((r:any) => r.status === "reversed"),
+    reversedLedger,
+  );
+
+  const ownQaBooking = await withTransaction(async (client) => {
+    const created = await createBooking(client, matrixRootId, "five-star-hotel-share");
+    await confirmBooking(client, created.id, adminMe.member.user_id);
+    await activateBooking(client, created.id);
+    return created;
+  });
+  const frozenQa = (await query<any>(`select * from booking_snapshots where booking_id=$1`, [ownQaBooking.id]))[0];
+  record(
+    "qualified member benefit remains the immutable booked-offer snapshot",
+    frozenQa.retail_value === 650000 && frozenQa.booking_amount === 50000 && frozenQa.qualification_benefit === 600000,
+    frozenQa,
+  );
+
+  await query(`update members set activation_status='active', activation_expires_at=now()-interval '1 minute' where user_id=$1`, [matrixRootId]);
+  const expiredReleaseBooking = await withTransaction(async (client) => {
+    const created = await createBooking(client, deepest.user_id, "five-star-hotel-share");
+    await confirmBooking(client, created.id, adminMe.member.user_id);
+    await activateBooking(client, created.id);
+    return created;
+  });
+  const expiredRootCommission = await query<any>(
+    `select * from commission_ledger where source_booking_id=$1 and beneficiary_user_id=$2`,
+    [expiredReleaseBooking.id, matrixRootId],
+  );
+  record("expired member receives no new commission release", expiredRootCommission.length === 0);
+
+  const expiredSponsorshipBlocked = await withTransaction(async (client) => {
+    const id = "darmelk_qa_expired_sponsor_probe";
+    const email = "darmelk-qa-expired-sponsor-probe@example.com";
+    await client.query(
+      `insert into "user" (id,name,email,"emailVerified","createdAt","updatedAt") values ($1,'Darmelk QA Expired Sponsor Probe',$2,true,now(),now())`,
+      [id, email],
+    );
+    await ensureMember(client, { id, email });
+    try {
+      await completeOnboarding(client, id, { phone: "+8801700000999", sponsorCode: matrixRoot.referral_code });
+      return false;
+    } catch {
+      return true;
+    }
+  });
+  record("expired member cannot sponsor a new network placement", expiredSponsorshipBlocked === true);
+
+  const rootRenewal = await withTransaction(async (client) => {
+    const activation = await requestActivation(client, matrixRootId);
+    return approveActivation(client, activation.id, adminMe.member.user_id);
+  });
+  const restoredReleaseBooking = await withTransaction(async (client) => {
+    const created = await createBooking(client, deepest.user_id, "five-star-hotel-share");
+    await confirmBooking(client, created.id, adminMe.member.user_id);
+    await activateBooking(client, created.id);
+    return created;
+  });
+  const restoredRootCommission = await query<any>(
+    `select * from commission_ledger where source_booking_id=$1 and beneficiary_user_id=$2`,
+    [restoredReleaseBooking.id, matrixRootId],
+  );
+  record(
+    "BDT 1,000 renewal restores sponsorship and commission privileges",
+    rootRenewal.amount === 1000 && rootRenewal.status === "active" && restoredRootCommission.length === 1,
+  );
+
+  await query(`update members set activation_status='active', activation_expires_at=now()-interval '1 minute' where user_id=$1`, [adminMe.member.user_id]);
+  await query(`update annual_activations set period_end=now()-interval '1 minute' where user_id=$1 and status='active'`, [adminMe.member.user_id]);
+  const expiredWithdrawal = await app.request("/api/withdrawals", {
+    method: "POST", headers: { cookie: adminCookie, "content-type": "application/json" }, body: JSON.stringify({ amount: 1 }),
+  });
+  record("expired member is blocked from withdrawal", expiredWithdrawal.status === 403);
+  const renewalReq = await json(await app.request("/api/activation/request", { method: "POST", headers: { cookie: adminCookie } }));
+  const renewed = await json(await app.request(`/api/admin/activations/${renewalReq.activation.id}/approve`, { method: "POST", headers: { cookie: adminCookie } }));
+  record("BDT 1,000 renewal restores active status", renewalReq.activation?.amount === 1000 && renewed.activation?.status === "active", renewed);
+
+  const reconnectState = await query<any>(`select count(*)::int count from members where user_id like 'darmelk_qa_matrix_%' and onboarding_complete=true`);
+  record("fixture persists across independent transactions/reconnect queries", reconnectState[0]?.count === 363, reconnectState[0]);
 
   const failed = results.filter((r) => !r.ok);
   console.log(`\n${results.length - failed.length}/${results.length} checks passed`);
