@@ -10,8 +10,7 @@
 // browser must be willing to send a cross-site cookie) when no custom API
 // domain is wired up yet.
 import { betterAuth } from "better-auth";
-import { Pool } from "pg";
-import { sslOption } from "./db.js";
+import { getPool } from "./db.js";
 
 function env(key: string): string | undefined {
   const v = process.env[key]?.trim();
@@ -34,7 +33,9 @@ const trustedOrigins = (env("TRUSTED_ORIGINS") ?? "https://darmelk.com,https://w
 export const auth = betterAuth({
   ...(baseURL ? { baseURL } : {}),
   secret: authSecret,
-  database: new Pool({ connectionString: databaseUrl, ssl: sslOption() }),
+  // Reuse the backend's normalized pool so DATABASE_URL TLS query parameters
+  // cannot override the private-VPC SSL policy used by every other endpoint.
+  database: getPool(),
   trustedOrigins,
   emailAndPassword: {
     enabled: true,
