@@ -30,15 +30,13 @@ export function SiteFooter() {
                 </Link>
               </li>
               <li>
-                <Link to="/" hash="commission" className="inline-flex min-h-8 items-center text-ink/80 hover:text-ink">
-                  Commission
-                </Link>
-              </li>
-              <li>
-                <Link to="/" hash="faq" className="inline-flex min-h-8 items-center text-ink/80 hover:text-ink">
+                <Link to="/faq" className="inline-flex min-h-8 items-center text-ink/80 hover:text-ink">
                   FAQ
                 </Link>
               </li>
+              <li><Link to="/program-rules" className="inline-flex min-h-8 items-center text-ink/80 hover:text-ink">Program Rules</Link></li>
+              <li><Link to="/terms" className="inline-flex min-h-8 items-center text-ink/80 hover:text-ink">Terms</Link></li>
+              <li><Link to="/privacy" className="inline-flex min-h-8 items-center text-ink/80 hover:text-ink">Privacy</Link></li>
             </ul>
           </div>
           <div>

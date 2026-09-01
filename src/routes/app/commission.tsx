@@ -22,37 +22,41 @@ function CommissionPage() {
   const { data } = useAsync(() => api.myCommissions(), [member?.user_id], { enabled: Boolean(member) });
   const { data: payoutData } = useAsync(() => api.payoutMethods(), [member?.user_id], { enabled: Boolean(member) });
   const { data: withdrawalData, reload: reloadWithdrawals } = useAsync(() => api.myWithdrawals(), [member?.user_id], { enabled: Boolean(member) });
+  const { data: bookingData } = useAsync(() => api.myBookings(), [member?.user_id], { enabled: Boolean(member) });
   const [amount,setAmount]=useState(1000); const [methodId,setMethodId]=useState(""); const [pending,setPending]=useState(false); const [error,setError]=useState<string|null>(null);
   if (!member) return null;
 
   const wallet = data?.totals ?? { available: 0, pending: 0, paid: 0, reversed: 0, rejected: 0 };
   const rows = data?.commissions ?? [];
   const fee = Math.round((Number.isFinite(amount)?amount:0)*0.025);
+  const hasOwnBooking=(bookingData?.bookings??[]).some(b=>b.status==="confirmed"||b.status==="activated");
+  const eligible=member.activation_status==="active"&&hasOwnBooking&&wallet.available>=1000;
   async function withdraw(e:React.FormEvent){e.preventDefault();setPending(true);setError(null);try{await api.requestWithdrawal(amount,methodId,crypto.randomUUID());reloadWithdrawals();}catch(err){setError(err instanceof ApiError?err.message:"Could not request withdrawal.");}finally{setPending(false)}}
 
   return (
     <div className="space-y-8">
       <PageHeader
         kicker="Commission"
-        title="Commission wallet"
-        description="Rates: L1 10% · L2 8% · L3 6% · L4 4% · L5 2%. Each line uses that source booking’s actual confirmed amount — never a universal booking figure."
+        title="Commission Statement"
+        description="A record of commission calculated from actual eligible confirmed booking amounts."
       />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label="Available" value={formatBdt(wallet.available)} />
         <StatCard label="Pending" value={formatBdt(wallet.pending)} />
-        <StatCard label="Paid" value={formatBdt(wallet.paid)} />
+        <StatCard label="Withdrawn" value={formatBdt(wallet.paid)} />
         <StatCard label="Reversed" value={formatBdt(wallet.reversed)} hint="History is kept." />
       </div>
 
       <Surface>
         <h2 className="font-display text-xl font-semibold">Withdraw earnings</h2>
         <p className="mt-2 text-sm text-muted">Requires current annual activation, an own confirmed booking, minimum BDT 1,000, and a saved payout method.</p>
+        <ul className="mt-4 grid gap-2 text-sm sm:grid-cols-2"><li>{member.activation_status==="active"?"✓":"✕"} Active ID</li><li>{hasOwnBooking?"✓":"✕"} Own confirmed booking</li><li>{wallet.available>=1000?"✓":"✕"} Minimum available balance</li><li>{(payoutData?.methods??[]).length?"✓":"✕"} Saved payout method</li></ul>
         <form onSubmit={withdraw} className="mt-5 grid gap-4 sm:grid-cols-2">
           <Field label="Saved payout method"><select className="h-11 w-full rounded-xl border border-line bg-paper px-3 text-sm" value={methodId} onChange={(e)=>setMethodId(e.target.value)} required><option value="">Select method</option>{(payoutData?.methods??[]).map((m)=><option key={m.id} value={m.id}>{m.method_type.toUpperCase()} · {m.details.accountNumber}</option>)}</select></Field>
           <Field label="Requested amount"><Input type="number" min={1000} step={1} value={amount} onChange={(e)=>setAmount(Number(e.target.value))} required/></Field>
           <dl className="rounded-xl bg-mist p-4 text-sm sm:col-span-2"><Row label="Requested" value={formatBdt(amount||0)}/><Row label="Fee (2.5%)" value={formatBdt(fee)}/><Row label="Net payable" value={formatBdt(Math.max(0,(amount||0)-fee))}/></dl>
-          {error?<p className="text-sm text-clay sm:col-span-2">{error}</p>:null}<Button type="submit" disabled={pending || member.activation_status!=="active" || !methodId}>{pending?"Submitting…":"Confirm withdrawal request"}</Button>
+          {error?<p className="text-sm text-clay sm:col-span-2">{error}</p>:null}<Button type="submit" disabled={pending || !eligible || !methodId}>{pending?"Submitting…":"Confirm withdrawal request"}</Button>
         </form>
         {(withdrawalData?.withdrawals??[]).length?<ul className="mt-6 divide-y divide-line border-t border-line">{withdrawalData!.withdrawals.map((w)=><li key={w.id} className="flex items-center justify-between gap-3 py-3 text-sm"><span>{formatBdt(w.amount)} · net {formatBdt(w.net_amount)}</span><StatusBadge status={w.status}/></li>)}</ul>:null}
       </Surface>
@@ -80,7 +84,7 @@ function CommissionPage() {
                 {rows.map((c) => (
                   <tr key={c.id} className="border-b border-line last:border-0">
                     <td className="px-5 py-3">{formatWhen(c.created_at)}</td>
-                    <td className="px-5 py-3">{c.source_offer_title ?? "—"}</td>
+                    <td className="px-5 py-3">{c.source_member_name ?? c.source_offer_title ?? "—"}</td>
                     <td className="px-5 py-3">L{c.level}</td>
                     <td className="px-5 py-3 tabular-nums">{Math.round(c.rate * 100)}%</td>
                     <td className="px-5 py-3 tabular-nums">{formatBdt(c.source_booking_amount)}</td>
@@ -97,7 +101,7 @@ function CommissionPage() {
             {rows.map((c) => (
               <li key={c.id} className="space-y-2 px-5 py-4">
                 <div className="flex items-start justify-between gap-3">
-                  <p className="font-medium">{c.source_offer_title ?? "—"}</p>
+                  <p className="font-medium">{c.source_member_name ?? c.source_offer_title ?? "—"}</p>
                   <StatusBadge status={c.status} />
                 </div>
                 <p className="text-sm text-muted">

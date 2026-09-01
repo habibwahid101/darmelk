@@ -104,6 +104,7 @@ export type Commission = {
   status: "pending" | "available" | "paid" | "reversed" | "rejected";
   created_at: string;
   source_offer_title?: string;
+  source_member_name?: string;
   beneficiary_name?: string;
   beneficiary_email?: string;
 };
@@ -144,6 +145,8 @@ export type Withdrawal = {
   admin_payment_reference: string | null;
   user_name?: string;
   user_email?: string;
+  member_active?: boolean;
+  own_booking_eligible?: boolean;
 };
 
 export type PaymentDestination = { method: "bkash" | "nagad" | "bank"; label: string; account: string; accountType?: string; bankName?: string; accountName?: string; branch?: string; routingNumber?: string | null };

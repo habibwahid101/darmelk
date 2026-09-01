@@ -22,18 +22,18 @@ function NetworkPage() {
     <div className="space-y-8">
       <PageHeader
         kicker="Network"
-        title="3×5 progress"
-        description={`Personally sponsor ${PERSONAL_SPONSOR_TARGET}. Structure: L1 ${COMMISSION_LEVELS[0].positions} · L2 ${COMMISSION_LEVELS[1].positions} · L3 ${COMMISSION_LEVELS[2].positions} · L4 ${COMMISSION_LEVELS[3].positions} · L5 ${COMMISSION_LEVELS[4].positions}. Total positions ${TOTAL_POSITIONS}.`}
+        title="Your Network"
+        description="Review personal sponsors, confirmed members, and progress through five levels."
       />
 
       <div className="grid gap-4 sm:grid-cols-3">
         <StatCard
-          label="Direct sponsors"
+          label="Personal Sponsors"
           value={`${directs.length} / ${PERSONAL_SPONSOR_TARGET}`}
           hint="Eligible after the referred member’s booking is confirmed."
         />
         <StatCard
-          label="Filled positions"
+          label="Confirmed Members"
           value={`${filled} / ${TOTAL_POSITIONS}`}
           hint={`${TOTAL_POSITIONS} is the total across five levels, not Level 5.`}
         />
@@ -46,7 +46,7 @@ function NetworkPage() {
       </div>
 
       <Surface>
-        <h2 className="font-display text-xl font-semibold">Level summary</h2>
+        <h2 className="font-display text-xl font-semibold">Level Progress</h2>
         <ul className="mt-4 space-y-3">
           {COMMISSION_LEVELS.map((level) => {
             const filledAt = counts[level.level as 1 | 2 | 3 | 4 | 5] ?? 0;
@@ -79,7 +79,7 @@ function NetworkPage() {
         />
       ) : (
         <Surface>
-          <h2 className="font-display text-xl font-semibold">Direct sponsors</h2>
+          <h2 className="font-display text-xl font-semibold">Personal Sponsors</h2>
           <ul className="mt-4 divide-y divide-line">
             {directs.map((d) => (
               <li key={d.user_id} className="flex items-center justify-between gap-3 py-3">

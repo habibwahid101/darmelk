@@ -8,11 +8,9 @@ import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { cn } from "@/lib/utils";
 
 const NAV = [
-  { label: "Properties", to: "/", hash: "opportunities" },
+  { label: "Properties", to: "/properties", hash: "" },
   { label: "How It Works", to: "/", hash: "how-it-works" },
-  { label: "Benefits", to: "/", hash: "benefits" },
-  { label: "Commission", to: "/", hash: "commission" },
-  { label: "FAQ", to: "/", hash: "faq" },
+  { label: "FAQ", to: "/faq", hash: "" },
 ] as const;
 
 function AuthSlot({ inverted }: { inverted: boolean }) {
@@ -82,10 +80,10 @@ export function SiteHeader() {
             <Link
               key={item.label}
               to={item.to}
-              hash={item.hash}
+              hash={item.hash || undefined}
               onClick={() => {
                 window.setTimeout(() => {
-                  document.getElementById(item.hash)?.scrollIntoView({
+                  if (item.hash) document.getElementById(item.hash)?.scrollIntoView({
                     behavior: "smooth",
                     block: "start",
                   });
@@ -104,7 +102,7 @@ export function SiteHeader() {
         <div className="hidden items-center gap-2 lg:flex">
           <AuthSlot inverted={inverted} />
           <Button asChild variant={inverted ? "invert" : "primary"} size="lg">
-            <Link to="/properties">Explore properties</Link>
+            <Link to="/login" search={{mode:"create"}}>Create Account</Link>
           </Button>
         </div>
 
@@ -129,11 +127,11 @@ export function SiteHeader() {
               <Link
                 key={item.label}
                 to={item.to}
-                hash={item.hash}
+                hash={item.hash || undefined}
                 onClick={() => {
                   setOpen(false);
                   window.setTimeout(() => {
-                    document.getElementById(item.hash)?.scrollIntoView({
+                    if (item.hash) document.getElementById(item.hash)?.scrollIntoView({
                       behavior: "smooth",
                       block: "start",
                     });
@@ -161,8 +159,8 @@ export function SiteHeader() {
                 </Button>
               )}
               <Button asChild className="w-full">
-                <Link to="/properties" onClick={() => setOpen(false)}>
-                  Explore properties
+                <Link to="/login" search={{mode:"create"}} onClick={() => setOpen(false)}>
+                  Create account
                 </Link>
               </Button>
             </div>

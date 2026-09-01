@@ -13,10 +13,14 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AccountRouteImport } from './routes/account'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AppRouteImport } from './routes/app'
+import { Route as FaqRouteImport } from './routes/faq'
 import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as PrivacyRouteImport } from './routes/privacy'
+import { Route as ProgramRulesRouteImport } from './routes/program-rules'
 import { Route as PropertiesRouteImport } from './routes/properties'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
+import { Route as TermsRouteImport } from './routes/terms'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as AdminActivationRouteImport } from './routes/admin/activation'
 import { Route as AdminBookingsRouteImport } from './routes/admin/bookings'
@@ -64,6 +68,11 @@ const AppRoute = AppRouteImport.update({
   path: '/app',
   getParentRoute: () => rootRouteImport,
 } as any)
+const FaqRoute = FaqRouteImport.update({
+  id: '/faq',
+  path: '/faq',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
   id: '/forgot-password',
   path: '/forgot-password',
@@ -74,6 +83,16 @@ const LoginRoute = LoginRouteImport.update({
   path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProgramRulesRoute = ProgramRulesRouteImport.update({
+  id: '/program-rules',
+  path: '/program-rules',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PropertiesRoute = PropertiesRouteImport.update({
   id: '/properties',
   path: '/properties',
@@ -82,6 +101,11 @@ const PropertiesRoute = PropertiesRouteImport.update({
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
   id: '/reset-password',
   path: '/reset-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TermsRoute = TermsRouteImport.update({
+  id: '/terms',
+  path: '/terms',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminIndexRoute = AdminIndexRouteImport.update({
@@ -220,10 +244,14 @@ export interface FileRoutesByFullPath {
   '/account': typeof AccountRoute
   '/admin': typeof AdminRouteWithChildren
   '/app': typeof AppRouteWithChildren
+  '/faq': typeof FaqRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
+  '/privacy': typeof PrivacyRoute
+  '/program-rules': typeof ProgramRulesRoute
   '/properties': typeof PropertiesRouteWithChildren
   '/reset-password': typeof ResetPasswordRoute
+  '/terms': typeof TermsRoute
   '/admin/activation': typeof AdminActivationRoute
   '/admin/bookings': typeof AdminBookingsRoute
   '/admin/commission': typeof AdminCommissionRoute
@@ -254,9 +282,13 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/account': typeof AccountRoute
+  '/faq': typeof FaqRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
+  '/privacy': typeof PrivacyRoute
+  '/program-rules': typeof ProgramRulesRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/terms': typeof TermsRoute
   '/admin/activation': typeof AdminActivationRoute
   '/admin/bookings': typeof AdminBookingsRoute
   '/admin/commission': typeof AdminCommissionRoute
@@ -290,10 +322,14 @@ export interface FileRoutesById {
   '/account': typeof AccountRoute
   '/admin': typeof AdminRouteWithChildren
   '/app': typeof AppRouteWithChildren
+  '/faq': typeof FaqRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
+  '/privacy': typeof PrivacyRoute
+  '/program-rules': typeof ProgramRulesRoute
   '/properties': typeof PropertiesRouteWithChildren
   '/reset-password': typeof ResetPasswordRoute
+  '/terms': typeof TermsRoute
   '/admin/activation': typeof AdminActivationRoute
   '/admin/bookings': typeof AdminBookingsRoute
   '/admin/commission': typeof AdminCommissionRoute
@@ -328,10 +364,14 @@ export interface FileRouteTypes {
     | '/account'
     | '/admin'
     | '/app'
+    | '/faq'
     | '/forgot-password'
     | '/login'
+    | '/privacy'
+    | '/program-rules'
     | '/properties'
     | '/reset-password'
+    | '/terms'
     | '/admin/activation'
     | '/admin/bookings'
     | '/admin/commission'
@@ -362,9 +402,13 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/account'
+    | '/faq'
     | '/forgot-password'
     | '/login'
+    | '/privacy'
+    | '/program-rules'
     | '/reset-password'
+    | '/terms'
     | '/admin/activation'
     | '/admin/bookings'
     | '/admin/commission'
@@ -397,10 +441,14 @@ export interface FileRouteTypes {
     | '/account'
     | '/admin'
     | '/app'
+    | '/faq'
     | '/forgot-password'
     | '/login'
+    | '/privacy'
+    | '/program-rules'
     | '/properties'
     | '/reset-password'
+    | '/terms'
     | '/admin/activation'
     | '/admin/bookings'
     | '/admin/commission'
@@ -434,10 +482,14 @@ export interface RootRouteChildren {
   AccountRoute: typeof AccountRoute
   AdminRoute: typeof AdminRouteWithChildren
   AppRoute: typeof AppRouteWithChildren
+  FaqRoute: typeof FaqRoute
   ForgotPasswordRoute: typeof ForgotPasswordRoute
   LoginRoute: typeof LoginRoute
+  PrivacyRoute: typeof PrivacyRoute
+  ProgramRulesRoute: typeof ProgramRulesRoute
   PropertiesRoute: typeof PropertiesRouteWithChildren
   ResetPasswordRoute: typeof ResetPasswordRoute
+  TermsRoute: typeof TermsRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
 }
 
@@ -471,6 +523,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/faq': {
+      id: '/faq'
+      path: '/faq'
+      fullPath: '/faq'
+      preLoaderRoute: typeof FaqRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/forgot-password': {
       id: '/forgot-password'
       path: '/forgot-password'
@@ -485,6 +544,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/program-rules': {
+      id: '/program-rules'
+      path: '/program-rules'
+      fullPath: '/program-rules'
+      preLoaderRoute: typeof ProgramRulesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/properties': {
       id: '/properties'
       path: '/properties'
@@ -497,6 +570,13 @@ declare module '@tanstack/react-router' {
       path: '/reset-password'
       fullPath: '/reset-password'
       preLoaderRoute: typeof ResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/terms': {
+      id: '/terms'
+      path: '/terms'
+      fullPath: '/terms'
+      preLoaderRoute: typeof TermsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/': {
@@ -775,10 +855,14 @@ const rootRouteChildren: RootRouteChildren = {
   AccountRoute: AccountRoute,
   AdminRoute: AdminRouteWithChildren,
   AppRoute: AppRouteWithChildren,
+  FaqRoute: FaqRoute,
   ForgotPasswordRoute: ForgotPasswordRoute,
   LoginRoute: LoginRoute,
+  PrivacyRoute: PrivacyRoute,
+  ProgramRulesRoute: ProgramRulesRoute,
   PropertiesRoute: PropertiesRouteWithChildren,
   ResetPasswordRoute: ResetPasswordRoute,
+  TermsRoute: TermsRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
 }
 export const routeTree = rootRouteImport

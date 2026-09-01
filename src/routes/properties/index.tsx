@@ -22,14 +22,13 @@ function PropertiesPage() {
     <>
       <section className="container-pg pb-8 pt-10 md:pt-14">
         <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-pine">
-          Marketplace
+          Properties
         </p>
         <h1 className="mt-3 font-display text-4xl font-semibold tracking-tight md:text-5xl">
           Property opportunities
         </h1>
         <p className="mt-4 max-w-xl text-[15px] leading-relaxed text-muted">
-          Only published offers are listed. Coming-soon categories are marked
-          clearly — we do not invent inventory.
+          Review the currently published property opportunity and its approved terms.
         </p>
       </section>
 
@@ -40,7 +39,7 @@ function PropertiesPage() {
               <FilterChip to="/properties" active={!category}>
                 All available
               </FilterChip>
-              {CATEGORIES.map((c) => (
+              {CATEGORIES.filter((c) => c.available).map((c) => (
                 <FilterChip
                   key={c.slug}
                   to="/properties"

@@ -1,89 +1,20 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
-import { MapPin } from "lucide-react";
+import { FileText, MapPin } from "lucide-react";
 import { AmountRow } from "@/components/states";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { getOffer } from "@/lib/offers";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
+import { api } from "@/lib/api-client";
+import { useAsync } from "@/lib/use-async";
 
-export const Route = createFileRoute("/properties/$slug")({
-  loader: ({ params }) => {
-    const offer = getOffer(params.slug);
-    if (!offer) throw notFound();
-    return { offer };
-  },
-  component: PropertyDetail,
-});
+export const Route = createFileRoute("/properties/$slug")({ loader:({params})=>{const offer=getOffer(params.slug);if(!offer)throw notFound();return{offer}}, component:PropertyDetail });
 
-function PropertyDetail() {
-  const { offer } = Route.useLoaderData();
-  const { user, isPending } = useCurrentUserState();
-  const canBook = offer.status === "available";
+function PropertyDetail(){const{offer}=Route.useLoaderData();const{user,isPending}=useCurrentUserState();const{data:me}=useAsync(()=>api.me(),[user?.id],{enabled:Boolean(user)});const active=me?.member.activation_status==="active";return <main className="pb-16 pt-20 md:pt-24">
+  <section className="container-pg grid gap-8 py-8 lg:grid-cols-[1.2fr_.8fr] lg:py-12"><div><img src={offer.heroImage??offer.image} alt={offer.title} className="aspect-[16/10] w-full rounded-2xl object-cover"/><div className="mt-4 grid grid-cols-2 gap-4"><img src={offer.image} alt={`${offer.title} interior`} className="aspect-[4/3] w-full rounded-xl object-cover"/><div className="flex aspect-[4/3] items-center justify-center rounded-xl bg-cream p-5 text-center text-sm text-muted">Approved property imagery</div></div></div><div className="lg:sticky lg:top-24 lg:self-start"><div className="flex flex-wrap gap-2"><Badge>{offer.category}</Badge>{offer.flagship?<Badge tone="pine">Flagship</Badge>:null}<Badge tone="pine">Available</Badge></div><h1 className="mt-4 font-display text-4xl font-semibold">{offer.title}</h1>{offer.location?<p className="mt-2 flex items-center gap-2 text-sm text-muted"><MapPin className="size-4"/>{offer.location}</p>:null}<p className="mt-5 leading-relaxed text-muted">{offer.summary}</p><dl className="mt-6 rounded-2xl bg-cream p-6 shadow-[var(--shadow-card)]"><AmountRow label="Property/share value" value={offer.retailValue}/><AmountRow label="Booking amount" value={offer.bookingAmount}/><AmountRow label="Qualification benefit" value={offer.qualificationBenefit}/></dl><StateCta pending={isPending} user={Boolean(user)} active={active} slug={offer.slug}/></div></section>
+  <section className="border-y border-line bg-cream section-y"><div className="container-pg grid gap-5 md:grid-cols-2"><Info title="What is being acquired?">This offer is presented as a Five-Star Hotel Share. Darmelk does not add ownership, deed, stay, rental-return, or operator-right claims beyond approved offer materials.</Info><Info title="Benefits">The approved qualification benefit for this booked offer is BDT 600,000 after the program qualification conditions are met. It is separate from commission.</Info><Info title="Documents" icon><span>Property and booking records are connected to the member’s booking. Sensitive files, when available, are shown in the authenticated Documents area.</span></Info><Info title="Qualification">Personally sponsor 3 eligible members and complete through Level 5. <Link to="/program-rules" className="font-medium text-pine hover:underline">Read full rules</Link>.</Info></div></section>
+  <section className="section-y"><div className="container-pg grid gap-8 lg:grid-cols-2"><div><p className="text-xs font-medium uppercase tracking-[.18em] text-pine">Booking process</p><h2 className="mt-3 font-display text-3xl font-semibold">From active ID to confirmed booking</h2><ol className="mt-6 space-y-3">{["Active ID","Start Booking","Manual Payment","Proof Submission","Admin Verification","Confirmed Booking"].map((s,i)=><li key={s} className="flex items-center gap-4 rounded-xl bg-cream p-4"><span className="font-display text-xl text-pine">{String(i+1).padStart(2,"0")}</span><span className="font-medium">{s}</span></li>)}</ol></div><div><p className="text-xs font-medium uppercase tracking-[.18em] text-pine">Payment, cancellation and terms</p><h2 className="mt-3 font-display text-3xl font-semibold">Review before you book</h2><div className="mt-6 rounded-2xl bg-cream p-6 text-sm leading-relaxed text-muted"><p>Booking payment is manual and does not become approved when submitted. An admin verifies the transaction reference and payment proof.</p><p className="mt-4">Booking values are frozen from this offer. Cancellation, rejection, reversal, payment, and audit records remain recorded according to current program behavior.</p><div className="mt-5 flex gap-4"><Link to="/terms" className="font-medium text-pine hover:underline">Terms</Link><Link to="/program-rules" className="font-medium text-pine hover:underline">Program Rules</Link></div></div></div></div></section>
+</main>}
 
-  return (
-    <div className="container-pg grid gap-8 py-10 lg:grid-cols-[1.25fr_1fr] lg:py-14">
-        <div className="overflow-hidden rounded-2xl bg-mist">
-          <img
-            src={offer.heroImage ?? offer.image}
-            alt={offer.title}
-            className="aspect-[16/11] w-full object-cover"
-          />
-        </div>
-        <div className="lg:sticky lg:top-24 lg:self-start">
-          <div className="flex flex-wrap gap-2">
-            <Badge>{offer.category}</Badge>
-            {offer.flagship ? <Badge tone="pine">Flagship</Badge> : null}
-            <Badge tone="pine">
-              {offer.status === "available" ? "Available" : "Coming soon"}
-            </Badge>
-          </div>
-          <h1 className="mt-4 font-display text-3xl font-semibold tracking-tight md:text-4xl">
-            {offer.title}
-          </h1>
-          {offer.location ? (
-            <p className="mt-2 flex items-center gap-1.5 text-sm text-muted">
-              <MapPin className="size-3.5" />
-              {offer.location}
-            </p>
-          ) : null}
-          <p className="mt-4 text-[15px] leading-relaxed text-muted">{offer.summary}</p>
-          <p className="mt-3 text-sm text-muted">Figures below are specific to this offer.</p>
-          <dl className="mt-6 rounded-2xl bg-cream p-5 shadow-[var(--shadow-card)] sm:p-6">
-            <AmountRow label="Retail value" value={offer.retailValue} />
-            <AmountRow label="Booking amount" value={offer.bookingAmount} />
-            <AmountRow label="Qualification benefit" value={offer.qualificationBenefit} />
-          </dl>
-          <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-            {canBook ? (
-              isPending ? (
-                <Button className="sm:flex-1" disabled>
-                  Start booking
-                </Button>
-              ) : user ? (
-                <Button asChild className="sm:flex-1">
-                  <Link to="/app/book/$slug" params={{ slug: offer.slug }}>
-                    Start booking
-                  </Link>
-                </Button>
-              ) : (
-                <Button asChild className="sm:flex-1">
-                  <Link to="/login" search={{ intent: "book", offer: offer.slug }}>
-                    Start booking
-                  </Link>
-                </Button>
-              )
-            ) : (
-              <Button className="sm:flex-1" disabled>
-                Coming soon
-              </Button>
-            )}
-            <Button asChild variant="ghost" className="sm:flex-1">
-              <Link to="/" hash="how-it-works">
-                How it works
-              </Link>
-            </Button>
-          </div>
-        </div>
-    </div>
-  );
-}
+function StateCta({pending,user,active,slug}:{pending:boolean;user:boolean;active:boolean;slug:string}){if(pending)return <Button className="mt-6 w-full" disabled>Checking account…</Button>;if(!user)return <Button asChild className="mt-6 w-full"><Link to="/login" search={{intent:"book",offer:slug,mode:"create"}}>Create Account to Continue</Link></Button>;if(!active)return <Button asChild className="mt-6 w-full"><Link to="/app/activation">Activate Your ID</Link></Button>;return <Button asChild className="mt-6 w-full"><Link to="/app/book/$slug" params={{slug}}>Start Booking</Link></Button>}
+function Info({title,children,icon=false}:{title:string;children:React.ReactNode;icon?:boolean}){return <article className="rounded-2xl bg-paper p-6">{icon?<FileText className="mb-4 size-5 text-pine"/>:null}<h2 className="font-display text-xl font-semibold">{title}</h2><p className="mt-3 text-sm leading-relaxed text-muted">{children}</p></article>}

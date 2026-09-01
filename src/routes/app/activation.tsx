@@ -51,13 +51,13 @@ function ActivationPage() {
     <div className="mx-auto max-w-2xl space-y-8">
       <PageHeader
         kicker="Annual activation"
-        title="Account activation"
-        description="Activation keeps the member record current. It is not a property purchase, commission, or qualification benefit."
+        title="Activate Your Darmelk ID"
+        description="Sign up → member profile → payment submission → admin review → active for one year."
         action={<StatusBadge status={member.activation_status} />}
       />
 
       <AlertBanner tone="neutral" title={`Fee: ${formatBdt(ACTIVATION_FEE)} per year`}>
-        Visually and conceptually separate from booking amount, commission, and hospitality yield.
+        Activation is separate from property booking, commission, and qualification benefit.
       </AlertBanner>
 
       <Surface>

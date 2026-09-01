@@ -1,0 +1,11 @@
+import { createFileRoute } from "@tanstack/react-router";
+export const Route = createFileRoute("/program-rules")({ component: ProgramRules });
+const sections = [
+  ["Activation", "Darmelk ID activation is BDT 1,000 per year. Payment evidence requires admin approval. Expiry preserves account history and recorded balances while pausing applicable active-member privileges until renewal."],
+  ["Booking and payment", "An active member may start a booking. Offer economics are frozen from the selected offer. Manual payment submission requires admin verification before the booking is confirmed and activated."],
+  ["Network and qualification", "Placement follows the existing 3×5 rules. Qualification requires 3 personal eligible sponsors and completion through Level 5: 3, 9, 27, 81, and 243 positions."],
+  ["Commission and reversals", "Rates are L1 10%, L2 8%, L3 6%, L4 4%, and L5 2%, calculated from actual eligible confirmed booking amounts. Reversals and ledger history remain recorded; entries are not silently deleted."],
+  ["Property qualification benefit", "The qualification benefit is separate from commission and remains attached to the immutable economics snapshot of the member’s own booked offer."],
+  ["Withdrawals", "Withdrawal requires an active ID, an own confirmed or activated booking, a saved payout method, and sufficient available balance. Minimum withdrawal is BDT 1,000. Fee is 2.5%. Each request freezes its payout details; an admin pays manually and records the payment reference."],
+];
+function ProgramRules(){return <main className="container-pg py-28 md:py-32"><div className="mx-auto max-w-3xl"><p className="text-xs font-medium uppercase tracking-[.18em] text-pine">Authoritative rules</p><h1 className="mt-3 font-display text-4xl font-semibold">Darmelk Program Rules</h1><p className="mt-4 text-muted">These rules summarize the current product behavior. Property, booking, commission, and qualification benefit remain separate records.</p><div className="mt-9 space-y-4">{sections.map(([title,body])=><section key={title} className="rounded-2xl bg-cream p-6"><h2 className="font-display text-xl font-semibold">{title}</h2><p className="mt-2 text-sm leading-relaxed text-muted">{body}</p></section>)}</div></div></main>}

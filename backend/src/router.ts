@@ -173,9 +173,10 @@ app.get("/api/me/commissions", async (c) => {
   const [totals, rows] = await Promise.all([
     withTransaction((client) => getCommissionTotals(client, userId)),
     query(
-      `select cl.*, o.title as source_offer_title from commission_ledger cl
+      `select cl.*, o.title as source_offer_title, u.name as source_member_name from commission_ledger cl
          join bookings b on b.id = cl.source_booking_id
          join offers o on o.slug = b.offer_slug
+         join "user" u on u.id = cl.source_user_id
         where cl.beneficiary_user_id = $1 order by cl.created_at desc`,
       [userId],
     ),
@@ -438,8 +439,10 @@ app.get("/api/admin/withdrawals", async (c) => {
   const adminId = c.get("userId");
   await withTransaction((client) => requireAdmin(client, adminId));
   const rows = await query(
-    `select w.*, u.name as user_name, u.email as user_email
-       from withdrawals w join "user" u on u.id = w.user_id
+    `select w.*, u.name as user_name, u.email as user_email,
+       (m.activation_status='active' and m.activation_expires_at > now()) as member_active,
+       exists(select 1 from bookings b where b.user_id=w.user_id and b.status in ('confirmed','activated')) as own_booking_eligible
+       from withdrawals w join "user" u on u.id = w.user_id join members m on m.user_id=w.user_id
       order by w.requested_at desc`,
   );
   return c.json({ withdrawals: rows });
