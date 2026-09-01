@@ -70,8 +70,8 @@ export function SiteHeader() {
           : "border-b border-line/80 bg-paper/92 shadow-[0_1px_0_rgb(40_33_30/0.04)] backdrop-blur-md",
       )}
     >
-      <div className="container-pg flex h-16 items-center justify-between gap-4 md:h-[4.25rem]">
-        <Link to="/" aria-label="Darmelk home" className="shrink-0">
+      <div className="container-pg flex h-16 items-center justify-between gap-4 md:h-[4.25rem] lg:grid lg:grid-cols-[1fr_auto_1fr]">
+        <Link to="/" aria-label="Darmelk home" className="shrink-0 lg:justify-self-start">
           <BrandMark inverted={inverted} compact />
         </Link>
 
@@ -99,7 +99,7 @@ export function SiteHeader() {
           ))}
         </nav>
 
-        <div className="hidden items-center gap-2 lg:flex">
+        <div className="hidden items-center gap-2 lg:flex lg:justify-self-end">
           <AuthSlot inverted={inverted} />
           <Button asChild variant={inverted ? "invert" : "primary"} size="lg">
             <Link to="/login" search={{mode:"create"}}>Create Account</Link>
