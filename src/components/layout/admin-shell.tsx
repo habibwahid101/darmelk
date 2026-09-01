@@ -9,6 +9,7 @@ import {
   Settings,
   Users,
   Wallet,
+  CreditCard,
   X,
 } from "lucide-react";
 import { useEffect, useState, type ComponentType } from "react";
@@ -29,7 +30,9 @@ type AdminPath =
   | "/admin/commission"
   | "/admin/activation"
   | "/admin/documents"
-  | "/admin/settings";
+  | "/admin/settings"
+  | "/admin/payments"
+  | "/admin/withdrawals";
 
 type NavItem = {
   to: AdminPath;
@@ -41,6 +44,8 @@ const NAV: NavItem[] = [
   { to: "/admin", label: "Overview", icon: LayoutDashboard },
   { to: "/admin/offers", label: "Offers", icon: Building2 },
   { to: "/admin/bookings", label: "Bookings", icon: FileText },
+  { to: "/admin/payments", label: "Payments", icon: CreditCard },
+  { to: "/admin/withdrawals", label: "Withdrawals", icon: Wallet },
   { to: "/admin/users", label: "Users", icon: Users },
   { to: "/admin/network", label: "Network", icon: GitFork },
   { to: "/admin/commission", label: "Commission", icon: Wallet },

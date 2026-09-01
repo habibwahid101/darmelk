@@ -20,6 +20,8 @@ import { getCommissionTotals } from "./engine/commissions.js";
 import { completeOnboarding, ensureMember, logAdminAction, requireAdmin } from "./engine/members.js";
 import { getQualificationStatus, PERSONAL_SPONSOR_TARGET, TOTAL_POSITIONS } from "./engine/network.js";
 import { decideWithdrawal, markWithdrawalPaid, requestWithdrawal } from "./engine/withdrawals.js";
+import { createPaymentSubmission, finalizePayment, getPaymentProof, markPaymentUnderReview, PAYMENT_DESTINATIONS, type PaymentMethod, type PaymentTarget } from "./engine/payments.js";
+import { uid } from "./ids.js";
 
 type Vars = { userId: string; userEmail: string };
 const app = new Hono<{ Variables: Vars }>();
@@ -39,6 +41,7 @@ app.use(
 );
 
 app.get("/api/health", (c) => c.json({ ok: true, service: "darmelk-backend", time: new Date().toISOString() }));
+app.get("/api/payment-destinations", (c) => c.json({ destinations: Object.values(PAYMENT_DESTINATIONS) }));
 
 // Better Auth mounts its whole surface (sign-up, sign-in, sign-out,
 // get-session, forget-password, reset-password, ...) here, handling the raw
@@ -82,6 +85,12 @@ app.use("/api/withdrawals/*", async (c, next) => {
   await next();
 });
 app.use("/api/activation/*", async (c, next) => {
+  const user = await requireUser(c);
+  c.set("userId", user.id);
+  c.set("userEmail", user.email);
+  await next();
+});
+app.use("/api/payments/*", async (c, next) => {
   const user = await requireUser(c);
   c.set("userId", user.id);
   c.set("userEmail", user.email);
@@ -211,6 +220,43 @@ app.get("/api/me/withdrawals", async (c) => {
   return c.json({ withdrawals: rows });
 });
 
+app.get("/api/me/payments", async (c) => {
+  const rows = await query(
+    `select id,target_type,target_id,user_id,amount,payment_method,destination_snapshot,reference_id,
+       proof_filename,proof_mime,notes,status,submitted_at,reviewed_at,reviewed_by_admin_id,rejection_reason
+       from payment_submissions where user_id = $1 order by submitted_at desc`, [c.get("userId")],
+  );
+  return c.json({ payments: rows });
+});
+
+app.get("/api/me/payout-methods", async (c) => {
+  const rows = await query(`select id,method_type,details,created_at,updated_at from payout_methods where user_id=$1 order by created_at`, [c.get("userId")]);
+  return c.json({ methods: rows });
+});
+
+app.post("/api/me/payout-methods", async (c) => {
+  const userId = c.get("userId");
+  const body = await jsonBody<{ methodType?: string; details?: Record<string, unknown> }>(c);
+  if (body.methodType !== "bkash" && body.methodType !== "nagad" && body.methodType !== "bank") throw badRequest("Unsupported payout method");
+  const details = body.details ?? {};
+  const required = body.methodType === "bank" ? ["accountName", "accountNumber", "bankName", "branch"] : ["accountName", "accountNumber"];
+  for (const field of required) {
+    if (typeof details[field] !== "string" || !String(details[field]).trim()) throw badRequest(`${field} is required`);
+    details[field] = String(details[field]).trim().slice(0, 160);
+  }
+  if (typeof details.routingNumber === "string") details.routingNumber = details.routingNumber.trim().slice(0, 80);
+  const method = await withTransaction(async (client) => {
+    const { rows } = await client.query(
+      `insert into payout_methods (id,user_id,method_type,details) values ($1,$2,$3,$4)
+       on conflict (user_id,method_type) do update set details=excluded.details,updated_at=now()
+       returning id,method_type,details,created_at,updated_at`,
+      [uid("pm"), userId, body.methodType, JSON.stringify(details)],
+    );
+    return rows[0];
+  });
+  return c.json({ method });
+});
+
 // ---- bookings -------------------------------------------------------------
 app.post("/api/bookings", async (c) => {
   const userId = c.get("userId");
@@ -242,6 +288,29 @@ app.get("/api/bookings/:id", async (c) => {
   return c.json({ booking });
 });
 
+app.post("/api/payments", async (c) => {
+  const userId = c.get("userId");
+  const body = await jsonBody<{ targetType?: PaymentTarget; targetId?: string; paymentMethod?: PaymentMethod; referenceId?: string; proofFilename?: string; proofMime?: string; proofBase64?: string; notes?: string }>(c);
+  const result = await withTransaction((client) => withIdempotency(
+    client,
+    { key: c.req.header("Idempotency-Key"), endpoint: "POST /api/payments", userId, requestBody: body },
+    async () => ({ status: 201, body: { payment: await createPaymentSubmission(client, userId, {
+      targetType: body.targetType as PaymentTarget, targetId: body.targetId ?? "", paymentMethod: body.paymentMethod as PaymentMethod,
+      referenceId: body.referenceId, proofFilename: body.proofFilename, proofMime: body.proofMime,
+      proofBase64: body.proofBase64, notes: body.notes,
+    }) } }),
+  ));
+  return c.json(result.body, result.status as 200 | 201);
+});
+
+app.get("/api/payments/:id/proof", async (c) => {
+  const proof = await withTransaction((client) => getPaymentProof(client, c.req.param("id"), c.get("userId")));
+  return new Response(proof.proof_data, { headers: {
+    "content-type": proof.proof_mime,
+    "content-disposition": `inline; filename="${proof.proof_filename.replace(/[\"\\]/g, "_")}"`,
+  } });
+});
+
 // ---- annual activation ------------------------------------------------
 app.post("/api/activation/request", async (c) => {
   const userId = c.get("userId");
@@ -265,11 +334,11 @@ app.get("/api/me/activation", async (c) => {
 // ---- withdrawals --------------------------------------------------------
 app.post("/api/withdrawals", async (c) => {
   const userId = c.get("userId");
-  const body = await jsonBody<{ amount?: number }>(c);
+  const body = await jsonBody<{ amount?: number; payoutMethodId?: string }>(c);
   const idempotencyKey = c.req.header("Idempotency-Key");
   const result = await withTransaction((client) =>
     withIdempotency(client, { key: idempotencyKey, endpoint: "POST /api/withdrawals", userId, requestBody: body }, async () => {
-      const withdrawal = await requestWithdrawal(client, userId, Number(body.amount));
+      const withdrawal = await requestWithdrawal(client, userId, Number(body.amount), String(body.payoutMethodId ?? ""));
       return { status: 201, body: { withdrawal } };
     }),
   );
@@ -301,6 +370,8 @@ app.post("/api/admin/bookings/:id/confirm", async (c) => {
   const bookingId = c.req.param("id");
   const booking = await withTransaction(async (client) => {
     await requireAdmin(client, adminId);
+    const paid = await client.query(`select 1 from payment_submissions where target_type='booking' and target_id=$1 and status='approved'`, [bookingId]);
+    if (!paid.rows[0]) throw badRequest("Approved booking payment is required");
     const result = await confirmBooking(client, bookingId, adminId);
     await logAdminAction(client, { adminUserId: adminId, actionType: "booking.confirm", targetType: "booking", targetId: bookingId });
     return result;
@@ -381,10 +452,14 @@ app.post("/api/admin/withdrawals/:id/:decision", async (c) => {
     throw notFound();
   }
   const withdrawalId = c.req.param("id");
+  const body = await jsonBody<{ paymentReference?: string }>(c);
   const withdrawal = await withTransaction(async (client) => {
     await requireAdmin(client, adminId);
-    if (decisionParam === "mark-paid") return markWithdrawalPaid(client, withdrawalId);
-    return decideWithdrawal(client, withdrawalId, decisionParam === "approve" ? "approved" : "rejected", adminId);
+    const result = decisionParam === "mark-paid"
+      ? await markWithdrawalPaid(client, withdrawalId, adminId, body.paymentReference ?? "")
+      : await decideWithdrawal(client, withdrawalId, decisionParam === "approve" ? "approved" : "rejected", adminId);
+    await logAdminAction(client, { adminUserId: adminId, actionType: `withdrawal.${decisionParam}`, targetType: "withdrawal", targetId: withdrawalId, payload: decisionParam === "mark-paid" ? { paymentReference: body.paymentReference } : {} });
+    return result;
   });
   return c.json({ withdrawal });
 });
@@ -407,6 +482,10 @@ app.post("/api/admin/activations/:id/:decision", async (c) => {
   const activationId = c.req.param("id");
   const activation = await withTransaction(async (client) => {
     await requireAdmin(client, adminId);
+    if (decisionParam === "approve") {
+      const paid = await client.query(`select 1 from payment_submissions where target_type='activation' and target_id=$1 and status='approved'`, [activationId]);
+      if (!paid.rows[0]) throw badRequest("Approved activation payment is required");
+    }
     const result =
       decisionParam === "approve"
         ? await approveActivation(client, activationId, adminId)
@@ -420,6 +499,50 @@ app.post("/api/admin/activations/:id/:decision", async (c) => {
     return result;
   });
   return c.json({ activation });
+});
+
+app.get("/api/admin/payments", async (c) => {
+  await withTransaction((client) => requireAdmin(client, c.get("userId")));
+  const rows = await query(
+    `select p.id,p.target_type,p.target_id,p.user_id,p.amount,p.payment_method,p.destination_snapshot,
+       p.reference_id,p.proof_filename,p.proof_mime,p.notes,p.status,p.submitted_at,p.reviewed_at,
+       p.reviewed_by_admin_id,p.rejection_reason,u.name as user_name,u.email as user_email
+       from payment_submissions p join "user" u on u.id=p.user_id order by p.submitted_at desc`,
+  );
+  return c.json({ payments: rows });
+});
+
+app.post("/api/admin/payments/:id/review", async (c) => {
+  const adminId = c.get("userId");
+  const payment = await withTransaction(async (client) => {
+    await requireAdmin(client, adminId);
+    const result = await markPaymentUnderReview(client, c.req.param("id"), adminId);
+    await logAdminAction(client, { adminUserId: adminId, actionType: "payment.review", targetType: "payment", targetId: result.id });
+    return result;
+  });
+  return c.json({ payment });
+});
+
+app.post("/api/admin/payments/:id/:decision", async (c) => {
+  const adminId = c.get("userId");
+  const decision = c.req.param("decision");
+  if (decision !== "approve" && decision !== "reject") throw notFound();
+  const body = await jsonBody<{ reason?: string }>(c);
+  const payment = await withTransaction(async (client) => {
+    await requireAdmin(client, adminId);
+    const result = await finalizePayment(client, c.req.param("id"), decision === "approve" ? "approved" : "rejected", adminId, body.reason);
+    if (decision === "approve") {
+      if (result.target_type === "activation") await approveActivation(client, result.target_id, adminId);
+      else {
+        await confirmBooking(client, result.target_id, adminId);
+        await activateBooking(client, result.target_id);
+      }
+    } else if (result.target_type === "activation") await rejectActivation(client, result.target_id, adminId);
+    else await cancelBooking(client, result.target_id);
+    await logAdminAction(client, { adminUserId: adminId, actionType: `payment.${decision}`, targetType: "payment", targetId: result.id, payload: { targetType: result.target_type, targetId: result.target_id, reason: body.reason } });
+    return result;
+  });
+  return c.json({ payment });
 });
 
 app.get("/api/admin/users", async (c) => {
@@ -482,7 +605,6 @@ app.post("/api/admin/offers", async (c) => {
   });
   return c.json({ offer });
 });
-
 app.onError((err, c) => {
   if (err instanceof ApiError) {
     return c.json({ error: { code: err.code, message: err.message } }, err.status as 400 | 401 | 403 | 404 | 409);

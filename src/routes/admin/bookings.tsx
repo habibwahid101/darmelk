@@ -57,15 +57,7 @@ function AdminBookings() {
                   <StatusBadge status={b.status} />
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  {b.status === "pending" ? (
-                    <Button
-                      size="sm"
-                      disabled={busyId === b.id}
-                      onClick={() => void run(b.id, () => api.admin.confirmBooking(b.id))}
-                    >
-                      Confirm
-                    </Button>
-                  ) : null}
+                  {b.status === "pending" ? <p className="text-sm text-muted">Awaiting payment review.</p> : null}
                   {b.status === "confirmed" ? (
                     <Button
                       size="sm"

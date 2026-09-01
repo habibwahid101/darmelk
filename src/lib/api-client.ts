@@ -137,7 +137,18 @@ export type Withdrawal = {
   requested_at: string;
   decided_at: string | null;
   paid_at: string | null;
+  fee_amount: number;
+  net_amount: number;
+  payout_method_id: string;
+  payout_method_snapshot: { methodType: string; details: Record<string, string> };
+  admin_payment_reference: string | null;
+  user_name?: string;
+  user_email?: string;
 };
+
+export type PaymentDestination = { method: "bkash" | "nagad" | "bank"; label: string; account: string; accountType?: string; bankName?: string; accountName?: string; branch?: string; routingNumber?: string | null };
+export type PaymentSubmission = { id: string; target_type: "activation" | "booking"; target_id: string; user_id: string; amount: number; payment_method: "bkash" | "nagad" | "bank"; destination_snapshot: PaymentDestination; reference_id: string; proof_filename: string; proof_mime: string; notes: string | null; status: "submitted" | "under_review" | "approved" | "rejected"; submitted_at: string; reviewed_at: string | null; rejection_reason: string | null; user_name?: string; user_email?: string };
+export type PayoutMethod = { id: string; method_type: "bkash" | "nagad" | "bank"; details: Record<string, string>; created_at: string; updated_at: string };
 
 export type Transaction = {
   id: string;
@@ -149,6 +160,7 @@ export type Transaction = {
 };
 
 export const api = {
+  paymentDestinations: () => request<{ destinations: PaymentDestination[] }>("/api/payment-destinations"),
   me: () => request<{ member: Member }>("/api/me"),
   onboarding: (data: { name?: string; phone?: string; sponsorCode?: string }) =>
     post<{ member: Member }>("/api/me/onboarding", data),
@@ -170,14 +182,20 @@ export const api = {
   myBookings: () => request<{ bookings: Booking[] }>("/api/me/bookings"),
   myActivations: () => request<{ activations: AnnualActivation[] }>("/api/me/activation"),
   myWithdrawals: () => request<{ withdrawals: Withdrawal[] }>("/api/me/withdrawals"),
+  myPayments: () => request<{ payments: PaymentSubmission[] }>("/api/me/payments"),
+  payoutMethods: () => request<{ methods: PayoutMethod[] }>("/api/me/payout-methods"),
+  savePayoutMethod: (methodType: PayoutMethod["method_type"], details: Record<string, string>) =>
+    post<{ method: PayoutMethod }>("/api/me/payout-methods", { methodType, details }),
 
   booking: (id: string) => request<{ booking: Booking }>(`/api/bookings/${id}`),
   createBooking: (offerSlug: string, idempotencyKey: string) =>
     post<{ booking: Booking }>("/api/bookings", { offerSlug }, idempotencyKey),
 
   requestActivation: (idempotencyKey: string) => post<{ activation: AnnualActivation }>("/api/activation/request", {}, idempotencyKey),
-  requestWithdrawal: (amount: number, idempotencyKey: string) =>
-    post<{ withdrawal: Withdrawal }>("/api/withdrawals", { amount }, idempotencyKey),
+  submitPayment: (data: { targetType: "activation" | "booking"; targetId: string; paymentMethod: "bkash" | "nagad" | "bank"; referenceId: string; proofFilename: string; proofMime: string; proofBase64: string; notes?: string }, idempotencyKey: string) =>
+    post<{ payment: PaymentSubmission }>("/api/payments", data, idempotencyKey),
+  requestWithdrawal: (amount: number, payoutMethodId: string, idempotencyKey: string) =>
+    post<{ withdrawal: Withdrawal }>("/api/withdrawals", { amount, payoutMethodId }, idempotencyKey),
 
   admin: {
     bookings: (status?: string) =>
@@ -191,8 +209,12 @@ export const api = {
     commissions: () => request<{ commissions: Commission[] }>("/api/admin/commissions"),
 
     withdrawals: () => request<{ withdrawals: Withdrawal[] }>("/api/admin/withdrawals"),
-    decideWithdrawal: (id: string, decision: "approve" | "reject" | "mark-paid") =>
-      post<{ withdrawal: Withdrawal }>(`/api/admin/withdrawals/${id}/${decision}`),
+    decideWithdrawal: (id: string, decision: "approve" | "reject" | "mark-paid", paymentReference?: string) =>
+      post<{ withdrawal: Withdrawal }>(`/api/admin/withdrawals/${id}/${decision}`, { paymentReference }),
+    payments: () => request<{ payments: PaymentSubmission[] }>("/api/admin/payments"),
+    reviewPayment: (id: string) => post<{ payment: PaymentSubmission }>(`/api/admin/payments/${id}/review`),
+    decidePayment: (id: string, decision: "approve" | "reject", reason?: string) =>
+      post<{ payment: PaymentSubmission }>(`/api/admin/payments/${id}/${decision}`, { reason }),
 
     activations: () => request<{ activations: AnnualActivation[] }>("/api/admin/activations"),
     decideActivation: (id: string, decision: "approve" | "reject") =>

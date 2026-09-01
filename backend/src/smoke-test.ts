@@ -21,6 +21,23 @@ async function main() {
     results.push({ step, ok, detail });
     console.log(ok ? "PASS" : "FAIL", step, detail ?? "");
   };
+  const submitAndApprovePayment = async (cookie: string, targetType: "activation" | "booking", targetId: string, key: string) => {
+    const submitted = await json(await app.request("/api/payments", {
+      method: "POST",
+      headers: { cookie, "content-type": "application/json", "Idempotency-Key": key },
+      body: JSON.stringify({ targetType, targetId, paymentMethod: "bkash", referenceId: `REF-${key}`,
+        proofFilename: "receipt.png", proofMime: "image/png", proofBase64: "iVBORw0KGgo=" }),
+    }));
+    const reviewed = await json(await app.request(`/api/admin/payments/${submitted.payment.id}/review`, {
+      method: "POST", headers: { cookie: adminCookie },
+    }));
+    const approved = await json(await app.request(`/api/admin/payments/${submitted.payment.id}/approve`, {
+      method: "POST", headers: { cookie: adminCookie },
+    }));
+    record(`${targetType} payment follows submitted -> under_review -> approved`,
+      submitted.payment?.status === "submitted" && reviewed.payment?.status === "under_review" && approved.payment?.status === "approved");
+    return approved;
+  };
 
   // --- sign up explicitly configured admin ---
   const adminEmail = "admin@example.com";
@@ -59,11 +76,9 @@ async function main() {
     method: "POST",
     headers: { cookie: adminCookie },
   }));
-  const adminActivation = await json(await app.request(`/api/admin/activations/${adminActivationRequest.activation.id}/approve`, {
-    method: "POST",
-    headers: { cookie: adminCookie },
-  }));
-  record("admin QA identity is annually active before earning or sponsoring", adminActivation.activation?.status === "active");
+  await submitAndApprovePayment(adminCookie, "activation", adminActivationRequest.activation.id, "admin-activation-payment");
+  const adminAfterActivation = await json(await app.request("/api/me", { headers: { cookie: adminCookie } }));
+  record("admin QA identity is annually active before earning or sponsoring", adminAfterActivation.member?.activation_status === "active");
 
   // --- sign up member, onboard with admin's referral code ---
   const memberEmail = "member1@example.com";
@@ -87,6 +102,14 @@ async function main() {
     onboarded,
   );
 
+  const activationReq = await json(await app.request("/api/activation/request", {
+    method: "POST", headers: { cookie: memberCookie },
+  }));
+  record("member requests annual activation (BDT 1000, separate from booking economics)", activationReq.activation?.amount === 1000 && activationReq.activation?.status === "pending", activationReq);
+  await submitAndApprovePayment(memberCookie, "activation", activationReq.activation.id, "member-activation-payment");
+  const memberMeAfterActivation = await json(await app.request("/api/me", { headers: { cookie: memberCookie } }));
+  record("member's activation_status flips to active after verified payment approval", memberMeAfterActivation.member?.activation_status === "active", memberMeAfterActivation.member);
+
   // --- member books the flagship offer ---
   const bookRes = await app.request("/api/bookings", {
     method: "POST",
@@ -105,22 +128,12 @@ async function main() {
   const bookedRetry = await json(bookRetryRes);
   record("idempotent replay returns the SAME booking id", bookedRetry.booking?.id === booked.booking?.id, bookedRetry.booking?.id);
 
-  // --- admin confirms payment; commission is withheld until booking activation ---
-  const confirmRes = await app.request(`/api/admin/bookings/${booked.booking.id}/confirm`, {
-    method: "POST",
-    headers: { cookie: adminCookie },
-  });
-  const confirmed = await json(confirmRes);
-  record("admin confirms booking", confirmed.booking?.status === "confirmed", confirmed);
-
+  // --- commission is withheld until payment approval activates the booking ---
   const beforeActivation = await json(await app.request("/api/me/commissions", { headers: { cookie: adminCookie } }));
-  record("confirmed-only booking does not release commission", beforeActivation.commissions?.length === 0, beforeActivation);
-
-  const activated = await json(await app.request(`/api/admin/bookings/${booked.booking.id}/activate`, {
-    method: "POST",
-    headers: { cookie: adminCookie },
-  }));
-  record("admin activates booking and freezes its snapshot", activated.booking?.status === "activated", activated);
+  record("pending booking does not release commission", beforeActivation.commissions?.length === 0, beforeActivation);
+  await submitAndApprovePayment(memberCookie, "booking", booked.booking.id, "booking-payment-1");
+  const activated = await json(await app.request(`/api/bookings/${booked.booking.id}`, { headers: { cookie: memberCookie } }));
+  record("verified booking payment confirms, activates, and freezes its snapshot", activated.booking?.status === "activated", activated);
 
   const adminCommissionsRes = await app.request("/api/me/commissions", { headers: { cookie: adminCookie } });
   const adminCommissions = await json(adminCommissionsRes);
@@ -150,8 +163,7 @@ async function main() {
   // --- qualification: admin has 1 sponsee so far (needs 3) ---
   const qualRes = await app.request("/api/me/network", { headers: { cookie: adminCookie } });
   const qual = await json(qualRes);
-  record("qualification not yet met (1 of 3 sponsors)", qual.qualification?.sponsorCount === 0 && qual.qualification?.qualified === false, qual.qualification);
-  // Note: sponsorCount counts ACTIVATED sponsees only — member1 isn't activated yet, so 0 is correct here.
+  record("qualification not yet met (1 of 3 sponsors)", qual.qualification?.sponsorCount === 1 && qual.qualification?.qualified === false, qual.qualification);
 
   // --- matrix spillover: sponsor 3 more members directly under admin (fills
   // admin's slots 2, 3, and then a 4th must SPILL to under member1) ---
@@ -179,24 +191,6 @@ async function main() {
     { member2Parent: m2.member.network_parent_user_id, member3Parent: m3.member.network_parent_user_id, member4Parent: m4.member.network_parent_user_id },
   );
 
-  // --- annual activation request + admin approval ---
-  const activationReqRes = await app.request("/api/activation/request", {
-    method: "POST",
-    headers: { cookie: memberCookie },
-  });
-  const activationReq = await json(activationReqRes);
-  record("member requests annual activation (BDT 1000, separate from booking economics)", activationReq.activation?.amount === 1000 && activationReq.activation?.status === "pending", activationReq);
-
-  const approveRes = await app.request(`/api/admin/activations/${activationReq.activation.id}/approve`, {
-    method: "POST",
-    headers: { cookie: adminCookie },
-  });
-  const approved = await json(approveRes);
-  record("admin approves activation -> member becomes active", approved.activation?.status === "active", approved);
-
-  const memberMeAfterActivation = await json(await app.request("/api/me", { headers: { cookie: memberCookie } }));
-  record("member's activation_status flips to active on the member row", memberMeAfterActivation.member?.activation_status === "active", memberMeAfterActivation.member);
-
   // Now admin has 1 ACTIVATED sponsee (member1) — sponsorCount should read 1.
   const qual2 = await json(await app.request("/api/me/network", { headers: { cookie: adminCookie } }));
   record("sponsorCount now reflects the 1 activated sponsee", qual2.qualification?.sponsorCount === 1, qual2.qualification);
@@ -208,13 +202,22 @@ async function main() {
     body: JSON.stringify({ offerSlug: "five-star-hotel-share" }),
   });
   const book2 = await json(book2Res);
-  await app.request(`/api/admin/bookings/${book2.booking.id}/confirm`, { method: "POST", headers: { cookie: adminCookie } });
-  await app.request(`/api/admin/bookings/${book2.booking.id}/activate`, { method: "POST", headers: { cookie: adminCookie } });
+  await submitAndApprovePayment(memberCookie, "booking", book2.booking.id, "booking-payment-2");
+
+  await withTransaction(async (client) => {
+    const own = await createBooking(client, adminMe.member.user_id, "five-star-hotel-share");
+    await confirmBooking(client, own.id, adminMe.member.user_id);
+    await activateBooking(client, own.id);
+  });
+  const payoutMethod = await json(await app.request("/api/me/payout-methods", {
+    method: "POST", headers: { cookie: adminCookie, "content-type": "application/json" },
+    body: JSON.stringify({ methodType: "bkash", details: { accountName: "Darmelk QA Admin", accountNumber: "01800000000" } }),
+  }));
 
   const withdrawRes = await app.request("/api/withdrawals", {
     method: "POST",
     headers: { cookie: adminCookie, "content-type": "application/json" },
-    body: JSON.stringify({ amount: 5000 }),
+    body: JSON.stringify({ amount: 5000, payoutMethodId: payoutMethod.method.id }),
   });
   const withdrawal = await json(withdrawRes);
   record("withdrawal requested against available commission balance", withdrawal.withdrawal?.status === "requested" && withdrawal.withdrawal?.amount === 5000, withdrawal);
@@ -222,7 +225,7 @@ async function main() {
   const overWithdrawRes = await app.request("/api/withdrawals", {
     method: "POST",
     headers: { cookie: adminCookie, "content-type": "application/json" },
-    body: JSON.stringify({ amount: 999999 }),
+    body: JSON.stringify({ amount: 999999, payoutMethodId: payoutMethod.method.id }),
   });
   record("withdrawal exceeding available balance is rejected (409)", overWithdrawRes.status === 409);
 
@@ -233,7 +236,8 @@ async function main() {
   const approveWd = await json(approveWdRes);
   const paidRes = await app.request(`/api/admin/withdrawals/${withdrawal.withdrawal.id}/mark-paid`, {
     method: "POST",
-    headers: { cookie: adminCookie },
+    headers: { cookie: adminCookie, "content-type": "application/json" },
+    body: JSON.stringify({ paymentReference: "QA-PAYOUT-001" }),
   });
   const paid = await json(paidRes);
   record("withdrawal approved then marked paid", approveWd.withdrawal?.status === "approved" && paid.withdrawal?.status === "paid", paid);
@@ -449,12 +453,14 @@ async function main() {
   await query(`update members set activation_status='active', activation_expires_at=now()-interval '1 minute' where user_id=$1`, [adminMe.member.user_id]);
   await query(`update annual_activations set period_end=now()-interval '1 minute' where user_id=$1 and status='active'`, [adminMe.member.user_id]);
   const expiredWithdrawal = await app.request("/api/withdrawals", {
-    method: "POST", headers: { cookie: adminCookie, "content-type": "application/json" }, body: JSON.stringify({ amount: 1 }),
+    method: "POST", headers: { cookie: adminCookie, "content-type": "application/json" },
+    body: JSON.stringify({ amount: 1000, payoutMethodId: payoutMethod.method.id }),
   });
   record("expired member is blocked from withdrawal", expiredWithdrawal.status === 403);
   const renewalReq = await json(await app.request("/api/activation/request", { method: "POST", headers: { cookie: adminCookie } }));
-  const renewed = await json(await app.request(`/api/admin/activations/${renewalReq.activation.id}/approve`, { method: "POST", headers: { cookie: adminCookie } }));
-  record("BDT 1,000 renewal restores active status", renewalReq.activation?.amount === 1000 && renewed.activation?.status === "active", renewed);
+  await submitAndApprovePayment(adminCookie, "activation", renewalReq.activation.id, "admin-renewal-payment");
+  const renewed = await json(await app.request("/api/me", { headers: { cookie: adminCookie } }));
+  record("BDT 1,000 renewal restores active status", renewalReq.activation?.amount === 1000 && renewed.member?.activation_status === "active", renewed);
 
   const reconnectState = await query<any>(`select count(*)::int count from members where user_id like 'darmelk_qa_matrix_%' and onboarding_complete=true`);
   record("fixture persists across independent transactions/reconnect queries", reconnectState[0]?.count === 363, reconnectState[0]);

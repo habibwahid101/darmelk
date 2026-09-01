@@ -20,11 +20,6 @@ function AdminActivation() {
   const activations = data?.activations ?? [];
   const names = new Map((usersData?.members ?? []).map((m) => [m.user_id, m.name]));
 
-  async function decide(id: string, decision: "approve" | "reject") {
-    await api.admin.decideActivation(id, decision);
-    reload();
-  }
-
   return (
     <div className="space-y-8">
       <PageHeader
@@ -54,14 +49,7 @@ function AdminActivation() {
                   <StatusBadge status={a.status} />
                 </div>
                 {a.status === "pending" ? (
-                  <div className="flex flex-wrap gap-2">
-                    <Button size="sm" onClick={() => void decide(a.id, "approve")}>
-                      Approve
-                    </Button>
-                    <Button size="sm" variant="secondary" onClick={() => void decide(a.id, "reject")}>
-                      Reject
-                    </Button>
-                  </div>
+                  <p className="text-sm text-muted">Review the member’s payment evidence in Payment review.</p>
                 ) : null}
               </li>
             ))}

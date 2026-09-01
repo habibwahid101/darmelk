@@ -18,11 +18,30 @@ export type Withdrawal = {
   decided_by_admin_id: string | null;
   paid_at: string | null;
   notes: string | null;
+  fee_amount: number;
+  net_amount: number;
+  payout_method_id: string;
+  payout_method_snapshot: Record<string, unknown>;
+  admin_payment_reference: string | null;
 };
 
-export async function requestWithdrawal(client: PoolClient, userId: string, amount: number): Promise<Withdrawal> {
-  if (!Number.isFinite(amount) || amount <= 0) throw badRequest("Invalid amount", "invalid_amount");
+const MIN_WITHDRAWAL = 1000;
+const FEE_RATE = 0.025;
+
+export async function requestWithdrawal(client: PoolClient, userId: string, amount: number, payoutMethodId: string): Promise<Withdrawal> {
+  if (!Number.isInteger(amount) || amount < MIN_WITHDRAWAL) {
+    throw badRequest(`Minimum withdrawal is BDT ${MIN_WITHDRAWAL}`, "minimum_withdrawal");
+  }
   await requireActiveMember(client, userId, "Annual activation is required to withdraw earnings");
+  const booking = await client.query(
+    `select 1 from bookings where user_id = $1 and status in ('confirmed','activated') limit 1`, [userId],
+  );
+  if (!booking.rows[0]) throw conflict("At least one own confirmed booking is required to withdraw");
+  const { rows: methods } = await client.query<{ id: string; method_type: string; details: Record<string, unknown> }>(
+    `select id, method_type, details from payout_methods where id = $1 and user_id = $2`, [payoutMethodId, userId],
+  );
+  const method = methods[0];
+  if (!method) throw badRequest("Select a saved payout method", "payout_method_required");
   const totals = await getCommissionTotals(client, userId);
   const { rows: pendingWithdrawals } = await client.query<{ total: string }>(
     `select coalesce(sum(amount), 0)::text as total from withdrawals
@@ -34,10 +53,14 @@ export async function requestWithdrawal(client: PoolClient, userId: string, amou
     throw conflict("Requested amount exceeds available commission balance");
   }
 
+  const feeAmount = Math.round(amount * FEE_RATE);
+  const netAmount = amount - feeAmount;
   const id = uid("wd");
   const { rows } = await client.query<Withdrawal>(
-    `insert into withdrawals (id, user_id, amount, status) values ($1, $2, $3, 'requested') returning *`,
-    [id, userId, amount],
+    `insert into withdrawals
+      (id, user_id, amount, fee_amount, net_amount, payout_method_id, payout_method_snapshot, status)
+     values ($1, $2, $3, $4, $5, $6, $7, 'requested') returning *`,
+    [id, userId, amount, feeAmount, netAmount, method.id, JSON.stringify({ methodType: method.method_type, details: method.details })],
   );
   return rows[0]!;
 }
@@ -65,7 +88,8 @@ export async function decideWithdrawal(
 /** Mark an approved withdrawal paid, and mark enough 'available' commission
  * rows as 'paid' (oldest first) to cover it — keeps the ledger consistent
  * with money actually sent out, without ever deleting a row. */
-export async function markWithdrawalPaid(client: PoolClient, withdrawalId: string): Promise<Withdrawal> {
+export async function markWithdrawalPaid(client: PoolClient, withdrawalId: string, adminId: string, paymentReference: string): Promise<Withdrawal> {
+  if (!paymentReference.trim()) throw badRequest("Payment reference is required");
   const { rows } = await client.query<Withdrawal>(`select * from withdrawals where id = $1 for update`, [
     withdrawalId,
   ]);
@@ -74,21 +98,28 @@ export async function markWithdrawalPaid(client: PoolClient, withdrawalId: strin
   if (withdrawal.status !== "approved") throw conflict(`Withdrawal is ${withdrawal.status}, expected approved`);
 
   let remaining = withdrawal.amount;
-  const { rows: available } = await client.query<{ id: string; amount: number }>(
-    `select id, amount from commission_ledger
-      where beneficiary_user_id = $1 and status = 'available'
-      order by created_at asc for update`,
+  const { rows: available } = await client.query<{ id: string; amount: number; allocated: string }>(
+    `select cl.id, cl.amount, coalesce((select sum(cpa.amount) from commission_payout_allocations cpa where cpa.commission_ledger_id=cl.id),0)::text as allocated
+       from commission_ledger cl
+      where cl.beneficiary_user_id = $1 and cl.status = 'available'
+      order by cl.created_at asc for update of cl`,
     [withdrawal.user_id],
   );
   for (const row of available) {
     if (remaining <= 0) break;
-    await client.query(`update commission_ledger set status = 'paid', updated_at = now() where id = $1`, [row.id]);
-    remaining -= row.amount;
+    const room = row.amount - Number(row.allocated);
+    const allocated = Math.min(room, remaining);
+    if (allocated <= 0) continue;
+    await client.query(`insert into commission_payout_allocations (id,withdrawal_id,commission_ledger_id,amount) values ($1,$2,$3,$4)`, [uid("pa"), withdrawalId, row.id, allocated]);
+    if (allocated === room) await client.query(`update commission_ledger set status='paid',updated_at=now() where id=$1`, [row.id]);
+    remaining -= allocated;
   }
+  if (remaining > 0) throw conflict("Available commission changed before payout completion");
 
   const { rows: updated } = await client.query<Withdrawal>(
-    `update withdrawals set status = 'paid', paid_at = now() where id = $1 returning *`,
-    [withdrawalId],
+    `update withdrawals set status = 'paid', paid_at = now(), paid_by_admin_id = $2,
+       admin_payment_reference = $3 where id = $1 returning *`,
+    [withdrawalId, adminId, paymentReference.trim().slice(0, 120)],
   );
   return updated[0]!;
 }

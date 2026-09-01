@@ -5,6 +5,7 @@ import { AmountRow, PageHeader, SuccessBanner, Surface } from "@/components/stat
 import { useMemberSession } from "@/components/layout/use-member";
 import { formatBdt, getOffer } from "@/lib/offers";
 import { api, ApiError } from "@/lib/api-client";
+import { PaymentForm } from "@/components/payment-form";
 
 const ACTIVATION_FEE = 1000;
 
@@ -20,7 +21,7 @@ export const Route = createFileRoute("/app/book/$slug")({
 function BookOfferPage() {
   const { offer } = Route.useLoaderData();
   const { member } = useMemberSession();
-  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [bookingId, setBookingId] = useState<string | null>(null);
@@ -41,12 +42,12 @@ function BookOfferPage() {
     }
   }
 
-  if (step === 3 && bookingId) {
+  if (step === 4 && bookingId) {
     return (
       <div className="mx-auto max-w-xl space-y-6">
         <SuccessBanner
-          title="Booking request submitted"
-          description="This is a pending request. Operations will confirm it. No card payment is collected in this step."
+          title="Payment submitted"
+          description="Your booking payment is under review. It is confirmed and activated only after admin approval."
         />
         <Surface>
           <p className="text-sm text-muted">Reference</p>
@@ -67,6 +68,10 @@ function BookOfferPage() {
       </div>
     );
   }
+
+  if (step === 3 && bookingId) return <div className="mx-auto max-w-2xl space-y-8"><PageHeader kicker="Booking payment" title={offer.title} description="Use an approved manual payment destination and submit proof for review." /><PaymentForm targetType="booking" targetId={bookingId} amount={offer.bookingAmount} onSubmitted={()=>setStep(4)} /></div>;
+
+  if (member.activation_status !== "active") return <div className="mx-auto max-w-xl space-y-6"><PageHeader kicker="Booking" title="Activation required" description="Annual activation approval is required before a property booking can be submitted."/><Surface><p className="text-sm text-muted">Activate your member ID first. The annual fee is separate from the property booking amount.</p><Button asChild className="mt-5"><Link to="/app/activation">Go to activation</Link></Button></Surface></div>;
 
   return (
     <div className="mx-auto max-w-2xl space-y-8">
@@ -106,12 +111,13 @@ function BookOfferPage() {
         <AmountRow label="Qualification benefit (this offer)" value={offer.qualificationBenefit} />
       </dl>
 
-      {step === 2 ? (
+        {step === 2 ? (
         <Surface>
           <p className="text-sm font-medium">What happens next</p>
           <ul className="mt-3 space-y-2 text-sm text-muted">
             <li>You submit a booking request for {formatBdt(offer.bookingAmount)}.</li>
-            <li>Status starts as pending until operations confirm it.</li>
+            <li>After creating the request, submit manual payment proof.</li>
+            <li>Admin approval confirms and activates the booking.</li>
             <li>Qualification benefit stays attached to this offer, not a global figure.</li>
             <li>
               Annual activation is a separate {formatBdt(ACTIVATION_FEE)} fee and is not part of this

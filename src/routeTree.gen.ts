@@ -24,8 +24,10 @@ import { Route as AdminCommissionRouteImport } from './routes/admin/commission'
 import { Route as AdminDocumentsRouteImport } from './routes/admin/documents'
 import { Route as AdminNetworkRouteImport } from './routes/admin/network'
 import { Route as AdminOffersRouteImport } from './routes/admin/offers'
+import { Route as AdminPaymentsRouteImport } from './routes/admin/payments'
 import { Route as AdminSettingsRouteImport } from './routes/admin/settings'
 import { Route as AdminUsersRouteImport } from './routes/admin/users'
+import { Route as AdminWithdrawalsRouteImport } from './routes/admin/withdrawals'
 import { Route as AppIndexRouteImport } from './routes/app/index'
 import { Route as AppActivationRouteImport } from './routes/app/activation'
 import { Route as AppBookingsRouteImport } from './routes/app/bookings'
@@ -117,6 +119,11 @@ const AdminOffersRoute = AdminOffersRouteImport.update({
   path: '/offers',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminPaymentsRoute = AdminPaymentsRouteImport.update({
+  id: '/payments',
+  path: '/payments',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminSettingsRoute = AdminSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
@@ -125,6 +132,11 @@ const AdminSettingsRoute = AdminSettingsRouteImport.update({
 const AdminUsersRoute = AdminUsersRouteImport.update({
   id: '/users',
   path: '/users',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminWithdrawalsRoute = AdminWithdrawalsRouteImport.update({
+  id: '/withdrawals',
+  path: '/withdrawals',
   getParentRoute: () => AdminRoute,
 } as any)
 const AppIndexRoute = AppIndexRouteImport.update({
@@ -218,8 +230,10 @@ export interface FileRoutesByFullPath {
   '/admin/documents': typeof AdminDocumentsRoute
   '/admin/network': typeof AdminNetworkRoute
   '/admin/offers': typeof AdminOffersRoute
+  '/admin/payments': typeof AdminPaymentsRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/users': typeof AdminUsersRoute
+  '/admin/withdrawals': typeof AdminWithdrawalsRoute
   '/app/activation': typeof AppActivationRoute
   '/app/bookings': typeof AppBookingsRouteWithChildren
   '/app/commission': typeof AppCommissionRoute
@@ -249,8 +263,10 @@ export interface FileRoutesByTo {
   '/admin/documents': typeof AdminDocumentsRoute
   '/admin/network': typeof AdminNetworkRoute
   '/admin/offers': typeof AdminOffersRoute
+  '/admin/payments': typeof AdminPaymentsRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/users': typeof AdminUsersRoute
+  '/admin/withdrawals': typeof AdminWithdrawalsRoute
   '/app/activation': typeof AppActivationRoute
   '/app/bookings': typeof AppBookingsRouteWithChildren
   '/app/commission': typeof AppCommissionRoute
@@ -284,8 +300,10 @@ export interface FileRoutesById {
   '/admin/documents': typeof AdminDocumentsRoute
   '/admin/network': typeof AdminNetworkRoute
   '/admin/offers': typeof AdminOffersRoute
+  '/admin/payments': typeof AdminPaymentsRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/users': typeof AdminUsersRoute
+  '/admin/withdrawals': typeof AdminWithdrawalsRoute
   '/app/activation': typeof AppActivationRoute
   '/app/bookings': typeof AppBookingsRouteWithChildren
   '/app/commission': typeof AppCommissionRoute
@@ -320,8 +338,10 @@ export interface FileRouteTypes {
     | '/admin/documents'
     | '/admin/network'
     | '/admin/offers'
+    | '/admin/payments'
     | '/admin/settings'
     | '/admin/users'
+    | '/admin/withdrawals'
     | '/app/activation'
     | '/app/bookings'
     | '/app/commission'
@@ -351,8 +371,10 @@ export interface FileRouteTypes {
     | '/admin/documents'
     | '/admin/network'
     | '/admin/offers'
+    | '/admin/payments'
     | '/admin/settings'
     | '/admin/users'
+    | '/admin/withdrawals'
     | '/app/activation'
     | '/app/bookings'
     | '/app/commission'
@@ -385,8 +407,10 @@ export interface FileRouteTypes {
     | '/admin/documents'
     | '/admin/network'
     | '/admin/offers'
+    | '/admin/payments'
     | '/admin/settings'
     | '/admin/users'
+    | '/admin/withdrawals'
     | '/app/activation'
     | '/app/bookings'
     | '/app/commission'
@@ -524,6 +548,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminOffersRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/payments': {
+      id: '/admin/payments'
+      path: '/payments'
+      fullPath: '/admin/payments'
+      preLoaderRoute: typeof AdminPaymentsRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/settings': {
       id: '/admin/settings'
       path: '/settings'
@@ -536,6 +567,13 @@ declare module '@tanstack/react-router' {
       path: '/users'
       fullPath: '/admin/users'
       preLoaderRoute: typeof AdminUsersRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/withdrawals': {
+      id: '/admin/withdrawals'
+      path: '/withdrawals'
+      fullPath: '/admin/withdrawals'
+      preLoaderRoute: typeof AdminWithdrawalsRouteImport
       parentRoute: typeof AdminRoute
     }
     '/app/': {
@@ -653,8 +691,10 @@ interface AdminRouteChildren {
   AdminDocumentsRoute: typeof AdminDocumentsRoute
   AdminNetworkRoute: typeof AdminNetworkRoute
   AdminOffersRoute: typeof AdminOffersRoute
+  AdminPaymentsRoute: typeof AdminPaymentsRoute
   AdminSettingsRoute: typeof AdminSettingsRoute
   AdminUsersRoute: typeof AdminUsersRoute
+  AdminWithdrawalsRoute: typeof AdminWithdrawalsRoute
   AdminIndexRoute: typeof AdminIndexRoute
 }
 
@@ -665,8 +705,10 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminDocumentsRoute: AdminDocumentsRoute,
   AdminNetworkRoute: AdminNetworkRoute,
   AdminOffersRoute: AdminOffersRoute,
+  AdminPaymentsRoute: AdminPaymentsRoute,
   AdminSettingsRoute: AdminSettingsRoute,
   AdminUsersRoute: AdminUsersRoute,
+  AdminWithdrawalsRoute: AdminWithdrawalsRoute,
   AdminIndexRoute: AdminIndexRoute,
 }
 

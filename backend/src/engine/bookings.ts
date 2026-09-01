@@ -2,6 +2,7 @@ import type { PoolClient } from "pg";
 import { badRequest, conflict, notFound } from "../errors.js";
 import { uid } from "../ids.js";
 import { postCommissionsForBooking, reverseCommissionsForBooking } from "./commissions.js";
+import { requireActiveMember } from "./members.js";
 
 export type Booking = {
   id: string;
@@ -21,6 +22,7 @@ export type Booking = {
  * booking's amounts never move again even if the offer's price changes later
  * (mixed offers, each keeping its own booked terms). */
 export async function createBooking(client: PoolClient, userId: string, offerSlug: string): Promise<Booking> {
+  await requireActiveMember(client, userId, "Annual activation approval is required before booking");
   const { rows: offerRows } = await client.query<{
     slug: string;
     retail_value: number;

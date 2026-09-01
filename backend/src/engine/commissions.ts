@@ -102,5 +102,23 @@ export async function getCommissionTotals(
   for (const r of rows) {
     if (r.status in totals) (totals as Record<string, number>)[r.status] = Number(r.total);
   }
+  const { rows: allocationRows } = await client.query<{ total: string }>(
+    `select coalesce(sum(cpa.amount),0)::text as total from commission_payout_allocations cpa
+      join commission_ledger cl on cl.id=cpa.commission_ledger_id
+      where cl.beneficiary_user_id=$1 and cl.status='available'`, [userId],
+  );
+  const allocatedFromAvailable = Number(allocationRows[0]?.total ?? 0);
+  const { rows: paidRows } = await client.query<{ total: string }>(
+    `select (
+       coalesce((select sum(cpa.amount) from commission_payout_allocations cpa
+         join commission_ledger cl on cl.id=cpa.commission_ledger_id
+         where cl.beneficiary_user_id=$1),0)
+       + coalesce((select sum(cl.amount) from commission_ledger cl
+         where cl.beneficiary_user_id=$1 and cl.status='paid'
+         and not exists (select 1 from commission_payout_allocations cpa where cpa.commission_ledger_id=cl.id)),0)
+     )::text as total`, [userId],
+  );
+  totals.paid = Number(paidRows[0]?.total ?? 0);
+  totals.available = Math.max(0, totals.available - allocatedFromAvailable);
   return totals;
 }

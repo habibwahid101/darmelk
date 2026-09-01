@@ -1,0 +1,13 @@
+import { createFileRoute } from "@tanstack/react-router";
+import { useState } from "react";
+import { Wallet } from "lucide-react";
+import { EmptyState, PageHeader, Surface } from "@/components/states";
+import { Button } from "@/components/ui/button";
+import { StatusBadge } from "@/components/ui/status-badge";
+import { api } from "@/lib/api-client";
+import { useAsync } from "@/lib/use-async";
+import { formatBdt } from "@/lib/offers";
+import { formatWhen } from "@/lib/platform";
+
+export const Route=createFileRoute("/admin/withdrawals")({component:AdminWithdrawals});
+function AdminWithdrawals(){const{data,reload}=useAsync(()=>api.admin.withdrawals(),[]);const[busy,setBusy]=useState<string|null>(null);const rows=data?.withdrawals??[];async function run(id:string,fn:()=>Promise<unknown>){setBusy(id);try{await fn();reload()}finally{setBusy(null)}}return <div className="space-y-8"><PageHeader kicker="Finance" title="Withdrawals" description="Review eligibility and the immutable payout snapshot. Payment is manual and requires a completion reference."/>{rows.length===0?<EmptyState icon={Wallet} title="No withdrawal requests" description="Eligible member requests appear here."/>:<Surface className="p-0 sm:p-0"><ul className="divide-y divide-line">{rows.map((w)=><li key={w.id} className="space-y-3 px-5 py-4"><div className="flex flex-col gap-2 sm:flex-row sm:justify-between"><div><p className="font-medium">{w.user_name??w.user_id}</p><p className="text-sm text-muted">Requested {formatBdt(w.amount)} · fee {formatBdt(w.fee_amount)} · net {formatBdt(w.net_amount)}</p><p className="text-xs text-subtle">{w.payout_method_snapshot?.methodType?.toUpperCase()} · {w.payout_method_snapshot?.details?.accountNumber} · {formatWhen(w.requested_at)}</p></div><StatusBadge status={w.status}/></div><div className="flex flex-wrap gap-2">{w.status==="requested"?<><Button size="sm" disabled={busy===w.id} onClick={()=>void run(w.id,()=>api.admin.decideWithdrawal(w.id,"approve"))}>Approve</Button><Button size="sm" variant="secondary" disabled={busy===w.id} onClick={()=>void run(w.id,()=>api.admin.decideWithdrawal(w.id,"reject"))}>Reject</Button></>:null}{w.status==="approved"?<Button size="sm" disabled={busy===w.id} onClick={()=>{const ref=window.prompt("Manual payout transaction/reference ID");if(ref)void run(w.id,()=>api.admin.decideWithdrawal(w.id,"mark-paid",ref))}}>Mark paid</Button>:null}{w.admin_payment_reference?<p className="text-sm text-muted">Payment ref {w.admin_payment_reference}</p>:null}</div></li>)}</ul></Surface>}</div>}
