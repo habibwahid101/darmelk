@@ -58,15 +58,31 @@ export async function ensureMember(
 /**
  * Complete onboarding: records the sponsor relationship from a referral code
  * and places the member into the unified 3x5 matrix (spillover under the
- * sponsor if the sponsor's own 3 slots are full). A member with no valid
- * sponsor code becomes a new matrix root (no network_parent).
+ * sponsor if the sponsor's own 3 slots are full).
+ *
+ * Normal new members MUST supply a valid sponsor code. The approved
+ * root/owner exception remains: the first onboarded member, and admin-role
+ * accounts, may complete without a sponsor and become a matrix root.
+ * Once a sponsor is bound, it is never replaced.
  */
 export async function completeOnboarding(
   client: PoolClient,
   userId: string,
   data: { phone: string; sponsorCode: string },
 ): Promise<Member> {
+  const { rows: existingRows } = await client.query<Member>(`select * from members where user_id = $1`, [userId]);
+  const existing = existingRows[0];
+  if (!existing) throw conflict("Member not found");
+  if (existing.onboarding_complete) return existing;
+
   const code = data.sponsorCode.trim().toUpperCase();
+  const { rows: countRows } = await client.query<{ n: string }>(
+    `select count(*)::text as n from members where onboarding_complete = true and user_id <> $1`,
+    [userId],
+  );
+  const otherOnboarded = Number(countRows[0]?.n ?? 0);
+  const canSkipSponsor = otherOnboarded === 0 || existing.role === "admin";
+
   let sponsor: Member | undefined;
   if (code) {
     const { rows } = await client.query<Member>(`select * from members where referral_code = $1`, [code]);
@@ -74,6 +90,8 @@ export async function completeOnboarding(
     if (!sponsor) throw badRequest("Sponsor code not found", "sponsor_not_found");
     if (sponsor.user_id === userId) throw badRequest("You cannot sponsor yourself", "self_sponsor");
     await requireActiveMember(client, sponsor.user_id, "Sponsor is not annually active");
+  } else if (!canSkipSponsor) {
+    throw badRequest("Sponsor referral code is required", "sponsor_required");
   }
 
   let networkParentId: string | null = null;
@@ -99,11 +117,15 @@ export async function completeOnboarding(
         network_slot = $5,
         onboarding_complete = true,
         updated_at = now()
-      where user_id = $1
+      where user_id = $1 and onboarding_complete = false
       returning *`,
     [userId, data.phone.trim(), sponsor?.user_id ?? null, networkParentId, networkSlot],
   );
-  if (!rows[0]) throw conflict("Member not found");
+  if (!rows[0]) {
+    const again = await client.query<Member>(`select * from members where user_id = $1`, [userId]);
+    if (again.rows[0]?.onboarding_complete) return again.rows[0];
+    throw conflict("Member not found");
+  }
   return rows[0];
 }
 

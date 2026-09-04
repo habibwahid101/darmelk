@@ -18,6 +18,7 @@ import {
 } from "./engine/activation.js";
 import { getCommissionTotals } from "./engine/commissions.js";
 import { completeOnboarding, ensureMember, logAdminAction, requireAdmin } from "./engine/members.js";
+import { createContactRequest, listContactRequests, updateContactRequestStatus } from "./engine/contact.js";
 import { getQualificationStatus, PERSONAL_SPONSOR_TARGET, TOTAL_POSITIONS } from "./engine/network.js";
 import { decideWithdrawal, markWithdrawalPaid, requestWithdrawal } from "./engine/withdrawals.js";
 import { createPaymentSubmission, finalizePayment, getPaymentProof, markPaymentUnderReview, PAYMENT_DESTINATIONS, type PaymentMethod, type PaymentTarget } from "./engine/payments.js";
@@ -114,6 +115,23 @@ app.get("/api/offers/:slug", async (c) => {
   return c.json({ offer });
 });
 
+app.get("/api/referral/:code", async (c) => {
+  const code = c.req.param("code").trim().toUpperCase();
+  if (!code) throw badRequest("Sponsor referral code is required", "sponsor_required");
+  const row = await queryOne<{ referral_code: string }>(
+    `select referral_code from members where referral_code = $1`,
+    [code],
+  );
+  if (!row) throw notFound("Sponsor code not found");
+  return c.json({ ok: true, referralCode: row.referral_code });
+});
+
+app.post("/api/contact", async (c) => {
+  const body = await jsonBody<{ name?: string; profession?: string; mobile?: string; location?: string }>(c);
+  const request = await withTransaction((client) => createContactRequest(client, body));
+  return c.json({ request }, 201);
+});
+
 // ---- member profile / onboarding ----------------------------------------
 app.get("/api/me", async (c) => {
   const userId = c.get("userId");
@@ -124,7 +142,8 @@ app.get("/api/me", async (c) => {
 
 app.post("/api/me/onboarding", async (c) => {
   const userId = c.get("userId");
-  const body = await jsonBody<{ name?: string; phone?: string; sponsorCode?: string }>(c);
+  const body = await jsonBody<{ name?: string; phone?: string; sponsorCode?: string; termsAccepted?: boolean }>(c);
+  if (body.termsAccepted !== true) throw badRequest("Terms & Conditions must be accepted", "terms_required");
   const member = await withTransaction(async (client) => {
     await ensureMember(client, { id: userId, email: c.get("userEmail") });
     if (body.name?.trim()) {
@@ -555,6 +574,33 @@ app.get("/api/admin/users", async (c) => {
     `select m.*, u.name, u.email from members m join "user" u on u.id = m.user_id order by m.created_at desc`,
   );
   return c.json({ members: rows });
+});
+
+app.get("/api/admin/contact-requests", async (c) => {
+  const adminId = c.get("userId");
+  const requests = await withTransaction(async (client) => {
+    await requireAdmin(client, adminId);
+    return listContactRequests(client);
+  });
+  return c.json({ requests });
+});
+
+app.post("/api/admin/contact-requests/:id/status", async (c) => {
+  const adminId = c.get("userId");
+  const body = await jsonBody<{ status?: string }>(c);
+  const request = await withTransaction(async (client) => {
+    await requireAdmin(client, adminId);
+    const result = await updateContactRequestStatus(client, c.req.param("id"), body.status ?? "", adminId);
+    await logAdminAction(client, {
+      adminUserId: adminId,
+      actionType: "contact.status",
+      targetType: "contact_request",
+      targetId: result.id,
+      payload: { status: result.status },
+    });
+    return result;
+  });
+  return c.json({ request });
 });
 
 app.post("/api/admin/users/:id/role", async (c) => {

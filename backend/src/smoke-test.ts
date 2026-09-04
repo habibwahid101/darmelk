@@ -53,6 +53,11 @@ async function main() {
   const adminMe = await json(adminMeRes);
   record("admin /api/me provisions member with role=admin", adminMe.member?.role === "admin", adminMe);
 
+  const lookupOk = await json(await app.request(`/api/referral/${adminMe.member.referral_code}`));
+  record("public sponsor lookup accepts valid code", lookupOk.ok === true && lookupOk.referralCode === adminMe.member.referral_code, lookupOk);
+  const lookupBad = await app.request("/api/referral/DM-NOTREAL");
+  record("public sponsor lookup rejects invalid code", lookupBad.status === 404, lookupBad.status);
+
   const rootSignUp = await app.request("/api/auth/sign-up/email", {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -63,7 +68,7 @@ async function main() {
   const rootOnboarding = await json(await app.request("/api/me/onboarding", {
     method: "POST",
     headers: { cookie: rootCookie, "content-type": "application/json" },
-    body: JSON.stringify({ name: "Root Member", phone: "", sponsorCode: "" }),
+    body: JSON.stringify({ name: "Root Member", phone: "", sponsorCode: "", termsAccepted: true }),
   }));
   record(
     "root member completes onboarding with optional phone and no sponsor",
@@ -71,6 +76,42 @@ async function main() {
       rootOnboarding.member?.network_parent_user_id === null && Boolean(rootOnboarding.member?.referral_code),
     rootOnboarding.member,
   );
+
+  const missingSponsor = await app.request("/api/auth/sign-up/email", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ email: "nosponsor@example.com", password: "password123", name: "No Sponsor" }),
+  });
+  const noSponsorCookie = extractCookie(missingSponsor);
+  await app.request("/api/me", { headers: { cookie: noSponsorCookie } });
+  const noSponsorOnboard = await json(
+    await app.request("/api/me/onboarding", {
+      method: "POST",
+      headers: { cookie: noSponsorCookie, "content-type": "application/json" },
+      body: JSON.stringify({ name: "No Sponsor", sponsorCode: "", termsAccepted: true }),
+    }),
+  );
+  record(
+    "normal member without sponsor is rejected",
+    noSponsorOnboard.error?.code === "sponsor_required" || noSponsorOnboard.member?.onboarding_complete !== true,
+    noSponsorOnboard,
+  );
+  const noTerms = await json(
+    await app.request("/api/me/onboarding", {
+      method: "POST",
+      headers: { cookie: noSponsorCookie, "content-type": "application/json" },
+      body: JSON.stringify({ sponsorCode: adminMe.member.referral_code }),
+    }),
+  );
+  record("onboarding without terms accepted is rejected", noTerms.error?.code === "terms_required", noTerms);
+  const badCode = await json(
+    await app.request("/api/me/onboarding", {
+      method: "POST",
+      headers: { cookie: noSponsorCookie, "content-type": "application/json" },
+      body: JSON.stringify({ sponsorCode: "DM-NOTREAL", termsAccepted: true }),
+    }),
+  );
+  record("invalid sponsor code is rejected", badCode.error?.code === "sponsor_not_found", badCode);
 
   const adminActivationRequest = await json(await app.request("/api/activation/request", {
     method: "POST",
@@ -93,7 +134,7 @@ async function main() {
   const onboardRes = await app.request("/api/me/onboarding", {
     method: "POST",
     headers: { cookie: memberCookie, "content-type": "application/json" },
-    body: JSON.stringify({ phone: "+8801000000000", sponsorCode: adminMe.member.referral_code }),
+    body: JSON.stringify({ phone: "+8801000000000", sponsorCode: adminMe.member.referral_code, termsAccepted: true }),
   });
   const onboarded = await json(onboardRes);
   record(
@@ -179,7 +220,7 @@ async function main() {
     await app.request("/api/me/onboarding", {
       method: "POST",
       headers: { cookie, "content-type": "application/json" },
-      body: JSON.stringify({ phone: `+88010000000${n}`, sponsorCode: adminMe.member.referral_code }),
+      body: JSON.stringify({ phone: `+88010000000${n}`, sponsorCode: adminMe.member.referral_code, termsAccepted: true }),
     });
   }
   const [m2, m3, m4] = await Promise.all(
@@ -464,6 +505,47 @@ async function main() {
 
   const reconnectState = await query<any>(`select count(*)::int count from members where user_id like 'darmelk_qa_matrix_%' and onboarding_complete=true`);
   record("fixture persists across independent transactions/reconnect queries", reconnectState[0]?.count === 363, reconnectState[0]);
+
+  const contactRes = await app.request("/api/contact", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      name: "Amina Rahman",
+      profession: "Architect",
+      mobile: "+8801712345678",
+      location: "Dhaka",
+    }),
+  });
+  const contact = await json(contactRes);
+  record(
+    "public contact submission persists as new",
+    contactRes.status === 201 && contact.request?.status === "new" && contact.request?.name === "Amina Rahman",
+    contact,
+  );
+  const invalidContact = await app.request("/api/contact", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ name: "X" }),
+  });
+  record("invalid contact submission is rejected", invalidContact.status === 400, invalidContact.status);
+  const memberContactAdmin = await app.request("/api/admin/contact-requests", { headers: { cookie: memberCookie } });
+  record("member cannot list contact requests", memberContactAdmin.status === 403, memberContactAdmin.status);
+  const anonContactAdmin = await app.request("/api/admin/contact-requests");
+  record("anonymous cannot list contact requests", anonContactAdmin.status === 401, anonContactAdmin.status);
+  const adminList = await json(await app.request("/api/admin/contact-requests", { headers: { cookie: adminCookie } }));
+  record(
+    "admin sees persisted contact request",
+    Array.isArray(adminList.requests) && adminList.requests.some((r: { name: string }) => r.name === "Amina Rahman"),
+    adminList.requests?.length,
+  );
+  const createdId = adminList.requests?.find((r: { name: string }) => r.name === "Amina Rahman")?.id;
+  const statusRes = await app.request(`/api/admin/contact-requests/${createdId}/status`, {
+    method: "POST",
+    headers: { cookie: adminCookie, "content-type": "application/json" },
+    body: JSON.stringify({ status: "reviewed" }),
+  });
+  const statusBody = await json(statusRes);
+  record("admin can transition contact request status", statusBody.request?.status === "reviewed", statusBody);
 
   const failed = results.filter((r) => !r.ok);
   console.log(`\n${results.length - failed.length}/${results.length} checks passed`);

@@ -1,4 +1,4 @@
-import { Link, Navigate, Outlet, useRouterState } from "@tanstack/react-router";
+import { Link, Outlet, useRouterState } from "@tanstack/react-router";
 import {
   BadgeCheck,
   Building2,
@@ -90,9 +90,6 @@ export function AppShell() {
   }
 
   if (!user || !member) return <RedirectToSignIn />;
-  if (!member.onboarding_complete && pathname !== "/app/onboarding") {
-    return <Navigate to="/app/onboarding" />;
-  }
 
   async function onSignOut() {
     setSigningOut(true);
