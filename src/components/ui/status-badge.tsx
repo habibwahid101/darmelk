@@ -25,6 +25,9 @@ const MAP: Record<string, { label: string; tone: keyof typeof TONES }> = {
   "coming-soon": { label: "Coming soon", tone: "muted" },
   admin: { label: "Admin", tone: "ok" },
   member: { label: "Member", tone: "muted" },
+  new: { label: "New", tone: "pending" },
+  reviewed: { label: "Reviewed", tone: "ok" },
+  closed: { label: "Closed", tone: "muted" },
 };
 
 export function StatusBadge({

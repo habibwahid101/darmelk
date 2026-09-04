@@ -1,9 +1,10 @@
-import { Link, Navigate, Outlet, useRouterState } from "@tanstack/react-router";
+import { Link, Outlet, useRouterState } from "@tanstack/react-router";
 import {
   BadgeCheck,
   Building2,
   FileText,
   GitFork,
+  Inbox,
   LayoutDashboard,
   Menu,
   Settings,
@@ -32,7 +33,8 @@ type AdminPath =
   | "/admin/documents"
   | "/admin/settings"
   | "/admin/payments"
-  | "/admin/withdrawals";
+  | "/admin/withdrawals"
+  | "/admin/contact-requests";
 
 type NavItem = {
   to: AdminPath;
@@ -47,6 +49,7 @@ const NAV: NavItem[] = [
   { to: "/admin/payments", label: "Payments", icon: CreditCard },
   { to: "/admin/withdrawals", label: "Withdrawals", icon: Wallet },
   { to: "/admin/users", label: "Users", icon: Users },
+  { to: "/admin/contact-requests", label: "Contact Requests", icon: Inbox },
   { to: "/admin/network", label: "Network", icon: GitFork },
   { to: "/admin/commission", label: "Commission", icon: Wallet },
   { to: "/admin/activation", label: "Activation", icon: BadgeCheck },
@@ -90,7 +93,6 @@ export function AdminShell() {
   }
 
   if (!user || !member) return <RedirectToSignIn />;
-  if (!member.onboarding_complete) return <Navigate to="/app/onboarding" />;
 
   if (member.role !== "admin") {
     return (

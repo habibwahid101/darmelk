@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { GitFork } from "lucide-react";
+import { Check, Copy, GitFork } from "lucide-react";
+import { useState } from "react";
 import { EmptyState, PageHeader, StatCard, Surface } from "@/components/states";
 import { useMemberSession } from "@/components/layout/use-member";
 import { COMMISSION_LEVELS, TOTAL_POSITIONS } from "@/lib/offers";
@@ -37,12 +38,7 @@ function NetworkPage() {
           value={`${filled} / ${TOTAL_POSITIONS}`}
           hint={`${TOTAL_POSITIONS} is the total across five levels, not Level 5.`}
         />
-        <StatCard
-          label="Your referral code"
-          value={member.referral_code}
-          hint="Share this code. Cross-offer sponsorship is supported."
-          compact
-        />
+        <ReferralCodeCard code={member.referral_code} />
       </div>
 
       <Surface>
@@ -79,20 +75,53 @@ function NetworkPage() {
         />
       ) : (
         <Surface>
-          <h2 className="font-display text-xl font-semibold">Personal Sponsors</h2>
+          <h2 className="font-display text-xl font-semibold">Direct sponsors</h2>
           <ul className="mt-4 divide-y divide-line">
             {directs.map((d) => (
               <li key={d.user_id} className="flex items-center justify-between gap-3 py-3">
                 <div>
-                  <p className="text-sm font-medium">{d.name}</p>
-                  <p className="text-xs capitalize text-muted">{d.activation_status}</p>
+                  <p className="text-sm font-medium">{d.name || d.email}</p>
+                  <p className="text-xs text-muted">{d.referral_code}</p>
                 </div>
-                <p className="text-xs text-muted">{d.referral_code}</p>
+                <p className="text-xs capitalize text-muted">{d.activation_status}</p>
               </li>
             ))}
           </ul>
         </Surface>
       )}
     </div>
+  );
+}
+
+function ReferralCodeCard({ code }: { code: string }) {
+  const [copied, setCopied] = useState(false);
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1600);
+    } catch {
+      setCopied(false);
+    }
+  }
+
+  return (
+    <Surface className="flex flex-col justify-between">
+      <div>
+        <p className="text-xs font-medium uppercase tracking-[0.16em] text-subtle">Your Referral Code</p>
+        <p className="mt-2 font-display text-2xl font-semibold tracking-wide">{code}</p>
+        <p className="mt-1 text-xs text-muted">Share this code. Cross-offer sponsorship is supported.</p>
+      </div>
+      <button
+        type="button"
+        onClick={() => void copy()}
+        className="mt-4 inline-flex min-h-10 items-center gap-2 self-start rounded-lg px-3 text-sm font-medium text-pine hover:bg-pine/8"
+        aria-label={copied ? "Referral code copied" : "Copy referral code"}
+      >
+        {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
+        {copied ? "Copied" : "Copy"}
+      </button>
+    </Surface>
   );
 }

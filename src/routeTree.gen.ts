@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AccountRouteImport } from './routes/account'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AppRouteImport } from './routes/app'
+import { Route as ContactRouteImport } from './routes/contact'
 import { Route as FaqRouteImport } from './routes/faq'
 import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as LoginRouteImport } from './routes/login'
@@ -25,6 +26,7 @@ import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as AdminActivationRouteImport } from './routes/admin/activation'
 import { Route as AdminBookingsRouteImport } from './routes/admin/bookings'
 import { Route as AdminCommissionRouteImport } from './routes/admin/commission'
+import { Route as AdminContactRequestsRouteImport } from './routes/admin/contact-requests'
 import { Route as AdminDocumentsRouteImport } from './routes/admin/documents'
 import { Route as AdminNetworkRouteImport } from './routes/admin/network'
 import { Route as AdminOffersRouteImport } from './routes/admin/offers'
@@ -66,6 +68,11 @@ const AdminRoute = AdminRouteImport.update({
 const AppRoute = AppRouteImport.update({
   id: '/app',
   path: '/app',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ContactRoute = ContactRouteImport.update({
+  id: '/contact',
+  path: '/contact',
   getParentRoute: () => rootRouteImport,
 } as any)
 const FaqRoute = FaqRouteImport.update({
@@ -126,6 +133,11 @@ const AdminBookingsRoute = AdminBookingsRouteImport.update({
 const AdminCommissionRoute = AdminCommissionRouteImport.update({
   id: '/commission',
   path: '/commission',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminContactRequestsRoute = AdminContactRequestsRouteImport.update({
+  id: '/contact-requests',
+  path: '/contact-requests',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminDocumentsRoute = AdminDocumentsRouteImport.update({
@@ -244,6 +256,7 @@ export interface FileRoutesByFullPath {
   '/account': typeof AccountRoute
   '/admin': typeof AdminRouteWithChildren
   '/app': typeof AppRouteWithChildren
+  '/contact': typeof ContactRoute
   '/faq': typeof FaqRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
@@ -255,6 +268,7 @@ export interface FileRoutesByFullPath {
   '/admin/activation': typeof AdminActivationRoute
   '/admin/bookings': typeof AdminBookingsRoute
   '/admin/commission': typeof AdminCommissionRoute
+  '/admin/contact-requests': typeof AdminContactRequestsRoute
   '/admin/documents': typeof AdminDocumentsRoute
   '/admin/network': typeof AdminNetworkRoute
   '/admin/offers': typeof AdminOffersRoute
@@ -282,6 +296,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/account': typeof AccountRoute
+  '/contact': typeof ContactRoute
   '/faq': typeof FaqRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
@@ -292,6 +307,7 @@ export interface FileRoutesByTo {
   '/admin/activation': typeof AdminActivationRoute
   '/admin/bookings': typeof AdminBookingsRoute
   '/admin/commission': typeof AdminCommissionRoute
+  '/admin/contact-requests': typeof AdminContactRequestsRoute
   '/admin/documents': typeof AdminDocumentsRoute
   '/admin/network': typeof AdminNetworkRoute
   '/admin/offers': typeof AdminOffersRoute
@@ -322,6 +338,7 @@ export interface FileRoutesById {
   '/account': typeof AccountRoute
   '/admin': typeof AdminRouteWithChildren
   '/app': typeof AppRouteWithChildren
+  '/contact': typeof ContactRoute
   '/faq': typeof FaqRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
@@ -333,6 +350,7 @@ export interface FileRoutesById {
   '/admin/activation': typeof AdminActivationRoute
   '/admin/bookings': typeof AdminBookingsRoute
   '/admin/commission': typeof AdminCommissionRoute
+  '/admin/contact-requests': typeof AdminContactRequestsRoute
   '/admin/documents': typeof AdminDocumentsRoute
   '/admin/network': typeof AdminNetworkRoute
   '/admin/offers': typeof AdminOffersRoute
@@ -364,6 +382,7 @@ export interface FileRouteTypes {
     | '/account'
     | '/admin'
     | '/app'
+    | '/contact'
     | '/faq'
     | '/forgot-password'
     | '/login'
@@ -375,6 +394,7 @@ export interface FileRouteTypes {
     | '/admin/activation'
     | '/admin/bookings'
     | '/admin/commission'
+    | '/admin/contact-requests'
     | '/admin/documents'
     | '/admin/network'
     | '/admin/offers'
@@ -402,6 +422,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/account'
+    | '/contact'
     | '/faq'
     | '/forgot-password'
     | '/login'
@@ -412,6 +433,7 @@ export interface FileRouteTypes {
     | '/admin/activation'
     | '/admin/bookings'
     | '/admin/commission'
+    | '/admin/contact-requests'
     | '/admin/documents'
     | '/admin/network'
     | '/admin/offers'
@@ -441,6 +463,7 @@ export interface FileRouteTypes {
     | '/account'
     | '/admin'
     | '/app'
+    | '/contact'
     | '/faq'
     | '/forgot-password'
     | '/login'
@@ -452,6 +475,7 @@ export interface FileRouteTypes {
     | '/admin/activation'
     | '/admin/bookings'
     | '/admin/commission'
+    | '/admin/contact-requests'
     | '/admin/documents'
     | '/admin/network'
     | '/admin/offers'
@@ -482,6 +506,7 @@ export interface RootRouteChildren {
   AccountRoute: typeof AccountRoute
   AdminRoute: typeof AdminRouteWithChildren
   AppRoute: typeof AppRouteWithChildren
+  ContactRoute: typeof ContactRoute
   FaqRoute: typeof FaqRoute
   ForgotPasswordRoute: typeof ForgotPasswordRoute
   LoginRoute: typeof LoginRoute
@@ -521,6 +546,13 @@ declare module '@tanstack/react-router' {
       path: '/app'
       fullPath: '/app'
       preLoaderRoute: typeof AppRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/contact': {
+      id: '/contact'
+      path: '/contact'
+      fullPath: '/contact'
+      preLoaderRoute: typeof ContactRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/faq': {
@@ -605,6 +637,13 @@ declare module '@tanstack/react-router' {
       path: '/commission'
       fullPath: '/admin/commission'
       preLoaderRoute: typeof AdminCommissionRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/contact-requests': {
+      id: '/admin/contact-requests'
+      path: '/contact-requests'
+      fullPath: '/admin/contact-requests'
+      preLoaderRoute: typeof AdminContactRequestsRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/documents': {
@@ -768,6 +807,7 @@ interface AdminRouteChildren {
   AdminActivationRoute: typeof AdminActivationRoute
   AdminBookingsRoute: typeof AdminBookingsRoute
   AdminCommissionRoute: typeof AdminCommissionRoute
+  AdminContactRequestsRoute: typeof AdminContactRequestsRoute
   AdminDocumentsRoute: typeof AdminDocumentsRoute
   AdminNetworkRoute: typeof AdminNetworkRoute
   AdminOffersRoute: typeof AdminOffersRoute
@@ -782,6 +822,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminActivationRoute: AdminActivationRoute,
   AdminBookingsRoute: AdminBookingsRoute,
   AdminCommissionRoute: AdminCommissionRoute,
+  AdminContactRequestsRoute: AdminContactRequestsRoute,
   AdminDocumentsRoute: AdminDocumentsRoute,
   AdminNetworkRoute: AdminNetworkRoute,
   AdminOffersRoute: AdminOffersRoute,
@@ -855,6 +896,7 @@ const rootRouteChildren: RootRouteChildren = {
   AccountRoute: AccountRoute,
   AdminRoute: AdminRouteWithChildren,
   AppRoute: AppRouteWithChildren,
+  ContactRoute: ContactRoute,
   FaqRoute: FaqRoute,
   ForgotPasswordRoute: ForgotPasswordRoute,
   LoginRoute: LoginRoute,

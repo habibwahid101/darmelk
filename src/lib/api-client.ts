@@ -162,11 +162,26 @@ export type Transaction = {
   reference: string;
 };
 
+export type ContactRequest = {
+  id: string;
+  name: string;
+  profession: string;
+  mobile: string;
+  location: string;
+  status: "new" | "reviewed" | "closed";
+  created_at: string;
+  updated_at: string;
+};
+
 export const api = {
   paymentDestinations: () => request<{ destinations: PaymentDestination[] }>("/api/payment-destinations"),
   me: () => request<{ member: Member }>("/api/me"),
-  onboarding: (data: { name?: string; phone?: string; sponsorCode?: string }) =>
+  onboarding: (data: { name?: string; phone?: string; sponsorCode?: string; termsAccepted?: boolean }) =>
     post<{ member: Member }>("/api/me/onboarding", data),
+  lookupSponsor: (code: string) =>
+    request<{ ok: true; referralCode: string }>(`/api/referral/${encodeURIComponent(code.trim().toUpperCase())}`),
+  submitContact: (data: { name: string; profession: string; mobile: string; location: string }) =>
+    post<{ request: ContactRequest }>("/api/contact", data),
 
   offers: () => request<{ offers: Offer[] }>("/api/offers"),
   offer: (slug: string) => request<{ offer: Offer }>(`/api/offers/${slug}`),
@@ -225,6 +240,9 @@ export const api = {
 
     users: () => request<{ members: Array<Member & { name: string; email: string }> }>("/api/admin/users"),
     setRole: (id: string, role: "admin" | "member") => post<{ member: Member }>(`/api/admin/users/${id}/role`, { role }),
+    contactRequests: () => request<{ requests: ContactRequest[] }>("/api/admin/contact-requests"),
+    updateContactRequest: (id: string, status: ContactRequest["status"]) =>
+      post<{ request: ContactRequest }>(`/api/admin/contact-requests/${id}/status`, { status }),
 
     upsertOffer: (offer: Partial<Offer> & { slug: string }) => post<{ offer: Offer }>("/api/admin/offers", offer),
   },

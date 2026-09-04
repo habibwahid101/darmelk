@@ -81,14 +81,6 @@ export function SiteHeader() {
               key={item.label}
               to={item.to}
               hash={item.hash || undefined}
-              onClick={() => {
-                window.setTimeout(() => {
-                  if (item.hash) document.getElementById(item.hash)?.scrollIntoView({
-                    behavior: "smooth",
-                    block: "start",
-                  });
-                }, 80);
-              }}
               className={cn(
                 "text-[13px] font-medium tracking-wide transition-colors duration-150",
                 inverted ? "text-cream/80 hover:text-cream" : "text-ink/70 hover:text-ink",
@@ -128,15 +120,7 @@ export function SiteHeader() {
                 key={item.label}
                 to={item.to}
                 hash={item.hash || undefined}
-                onClick={() => {
-                  setOpen(false);
-                  window.setTimeout(() => {
-                    if (item.hash) document.getElementById(item.hash)?.scrollIntoView({
-                      behavior: "smooth",
-                      block: "start",
-                    });
-                  }, 80);
-                }}
+                onClick={() => setOpen(false)}
                 className="rounded-lg px-3 py-3 text-[15px] font-medium text-ink hover:bg-ink/5"
               >
                 {item.label}

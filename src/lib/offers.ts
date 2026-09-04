@@ -60,17 +60,17 @@ export const CATEGORIES: Category[] = [
   },
   {
     slug: "apartments",
-    title: "Apartments / Residential",
+    title: "Flats & Apartments",
     image: "/images/category-apt.jpg",
     available: false,
     blurb: "Residential offers will appear here when published.",
   },
   {
     slug: "investment",
-    title: "Investment Properties",
-    image: "/images/hero-hotel.jpg",
+    title: "Commercial Properties",
+    image: "/images/category-commercial.jpg",
     available: false,
-    blurb: "Additional investment offers will appear here when published.",
+    blurb: "Commercial and office offers will appear here when published.",
   },
 ];
 

@@ -5,6 +5,7 @@ import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { PasswordField } from "@/components/ui/password-field";
 import { authClient, authEnabled } from "@/lib/auth/client";
+import { api, ApiError } from "@/lib/api-client";
 import { FLAGSHIP, formatBdt, getOffer } from "@/lib/offers";
 import { cn } from "@/lib/utils";
 
@@ -12,6 +13,7 @@ type LoginSearch = {
   mode?: "create" | "signin";
   intent?: string;
   offer?: string;
+  ref?: string;
 };
 
 export const Route = createFileRoute("/login")({
@@ -19,25 +21,24 @@ export const Route = createFileRoute("/login")({
     mode: s.mode === "create" ? "create" : s.mode === "signin" ? "signin" : undefined,
     intent: typeof s.intent === "string" ? s.intent : undefined,
     offer: typeof s.offer === "string" ? s.offer : undefined,
+    ref: typeof s.ref === "string" ? s.ref : undefined,
   }),
   component: Login,
 });
 
 function Login() {
-  const { mode, intent, offer } = Route.useSearch();
+  const { mode, intent, offer, ref } = Route.useSearch();
   const navigate = useNavigate();
   const [create, setCreate] = useState(mode === "create");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
+  const [sponsorCode, setSponsorCode] = useState(ref ?? "");
+  const [termsAccepted, setTermsAccepted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
   const selected = offer ? getOffer(offer) : intent === "book" ? FLAGSHIP : undefined;
-  const afterAuth =
-    intent === "book" && selected
-      ? `/app/book/${selected.slug}`
-      : "/app";
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -46,18 +47,43 @@ function Login() {
       setError("Use at least 8 characters.");
       return;
     }
+    if (create) {
+      if (!name.trim()) {
+        setError("Enter your name.");
+        return;
+      }
+      if (!sponsorCode.trim()) {
+        setError("Sponsor referral code is required.");
+        return;
+      }
+      if (!termsAccepted) {
+        setError("Please accept the Terms & Conditions to continue.");
+        return;
+      }
+    }
     setPending(true);
     try {
       if (create) {
-        if (!name.trim()) {
-          throw new Error("Enter your name.");
-        }
+        const lookup = await api.lookupSponsor(sponsorCode.trim());
+        if (!lookup.ok) throw new Error("Sponsor code not found.");
         const { error: err } = await authClient.signUp.email({
           email,
           password,
           name: name.trim(),
         });
         if (err) throw new Error(err.message || "Could not create account");
+        try {
+          await api.onboarding({
+            name: name.trim(),
+            sponsorCode: sponsorCode.trim(),
+            termsAccepted: true,
+          });
+        } catch (onboardErr) {
+          await authClient.signOut().catch(() => undefined);
+          throw onboardErr instanceof ApiError
+            ? onboardErr
+            : new Error("Account created, but the sponsor code could not be applied. Sign in and try again.");
+        }
       } else {
         const { error: err } = await authClient.signIn.email({ email, password });
         if (err) throw new Error(err.message || "Could not sign in");
@@ -78,48 +104,36 @@ function Login() {
     <main className="container-pg grid min-h-[100svh] place-items-center py-24">
       <div className="grid w-full max-w-4xl overflow-hidden rounded-2xl bg-cream shadow-[var(--shadow-card)] lg:grid-cols-2">
         <div className="relative hidden min-h-[28rem] lg:block">
-          <img src="/images/hero-hotel.jpg" alt="" className="absolute inset-0 size-full object-cover" />
+          <img src="/images/hero-platform.jpg" alt="" className="absolute inset-0 size-full object-cover" />
           <div className="absolute inset-0 bg-ink/45" />
           <div className="relative flex h-full flex-col justify-end p-8 text-cream">
-            <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-cream/70">
-              Property first
-            </p>
-            <p className="mt-2 font-display text-3xl font-semibold">
-              {create ? "Create your account" : "Welcome back"}
-            </p>
-            <p className="mt-3 max-w-sm text-sm text-cream/75">
+            <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-cream/70">Property first</p>
+            <p className="mt-2 font-display text-3xl font-semibold">{create ? "Create your account" : "Welcome back"}</p>
+            <p className="mt-3 max-w-sm text-sm text-cream/75 text-pretty">
               Review offer terms before you book. Progress, commission, and benefit stay separate.
             </p>
           </div>
         </div>
 
         <div className="p-6 sm:p-8">
-          <h1 className="font-display text-2xl font-semibold tracking-tight">
-            {create ? "Create account" : "Sign in"}
-          </h1>
+          <h1 className="font-display text-2xl font-semibold tracking-tight">{create ? "Create account" : "Sign in"}</h1>
           <p className="mt-2 text-sm text-muted">
-            {create
-              ? "Save bookings and track 3×5 progress in one place."
-              : "Continue to your member area."}
+            {create ? "Register with your sponsor code to open the member dashboard." : "Continue to your member area."}
           </p>
 
           {selected ? (
             <div className="mt-5 rounded-xl bg-paper px-4 py-3 text-sm">
-              <p className="text-[11px] font-medium uppercase tracking-wide text-subtle">
-                Booking intent
-              </p>
+              <p className="text-[11px] font-medium uppercase tracking-wide text-subtle">Booking intent</p>
               <p className="mt-1 font-medium text-ink">{selected.title}</p>
               <p className="text-muted">Booking amount {formatBdt(selected.bookingAmount)}</p>
             </div>
           ) : null}
 
-          {!authEnabled ? (
-            <p className="mt-6 text-sm text-muted">Sign-in is disabled.</p>
-          ) : null}
+          {!authEnabled ? <p className="mt-6 text-sm text-muted">Sign-in is disabled.</p> : null}
 
           <form onSubmit={onSubmit} className="mt-6 space-y-3">
             {create ? (
-              <Field label="Full name">
+              <Field label="Full Name">
                 <Input
                   id="full-name"
                   name="name"
@@ -149,6 +163,37 @@ function Login() {
               required
               hint={create ? "At least 8 characters." : undefined}
             />
+            {create ? (
+              <>
+                <Field label="Sponsor Referral Code" hint="Required. This relationship is permanent after registration.">
+                  <Input
+                    id="sponsor-code"
+                    name="sponsorCode"
+                    value={sponsorCode}
+                    onChange={(e) => setSponsorCode(e.target.value.toUpperCase())}
+                    autoCapitalize="characters"
+                    autoComplete="off"
+                    required
+                  />
+                </Field>
+                <label className="flex items-start gap-3 rounded-xl bg-paper px-3 py-3 text-sm leading-relaxed text-ink">
+                  <input
+                    type="checkbox"
+                    className="mt-0.5 size-4 shrink-0 accent-[var(--color-pine)]"
+                    checked={termsAccepted}
+                    onChange={(e) => setTermsAccepted(e.target.checked)}
+                    required
+                  />
+                  <span>
+                    I have read, understood, and agree to the{" "}
+                    <Link to="/terms" className="font-medium text-pine underline-offset-2 hover:underline">
+                      Terms & Conditions
+                    </Link>
+                    .
+                  </span>
+                </label>
+              </>
+            ) : null}
             {error ? <p className="text-sm text-clay">{error}</p> : null}
             <Button type="submit" className="w-full" disabled={pending || !authEnabled}>
               {pending ? "Please wait…" : create ? "Create account" : "Sign in"}
