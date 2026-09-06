@@ -50,7 +50,7 @@ function BookingsPage() {
               <Link
                 to="/app/bookings/$id"
                 params={{ id: b.id }}
-                className="grid gap-4 rounded-2xl bg-cream p-4 shadow-[var(--shadow-card)] sm:grid-cols-[7.5rem_1fr_auto] sm:items-center"
+                className="grid min-w-0 gap-4 rounded-2xl bg-cream p-4 shadow-[var(--shadow-card)] sm:grid-cols-[7.5rem_1fr_auto] sm:items-center"
               >
                 <img
                   src={b.image ?? "/images/hero-hotel.jpg"}

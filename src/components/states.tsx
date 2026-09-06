@@ -20,8 +20,8 @@ export function PageHeader({
           {kicker}
         </p>
       ) : null}
-      <div className="mt-2 flex items-start justify-between gap-3">
-        <h1 className="min-w-0 font-display text-3xl font-semibold tracking-tight md:text-4xl">
+      <div className="mt-2 flex min-w-0 items-start justify-between gap-3">
+        <h1 className="min-w-0 text-pretty font-display text-[1.65rem] font-semibold tracking-tight sm:text-3xl md:text-4xl">
           {title}
         </h1>
         {action ? <div className="shrink-0 pt-1">{action}</div> : null}
@@ -132,17 +132,17 @@ export function StatCard({
   compact?: boolean;
 }) {
   return (
-    <article className="flex h-full flex-col rounded-2xl bg-cream p-5 shadow-[var(--shadow-card)]">
+    <article className="flex h-full min-w-0 max-w-full flex-col overflow-hidden rounded-2xl bg-cream p-5 shadow-[var(--shadow-card)]">
       <p className="text-[11px] font-medium uppercase tracking-wide text-subtle">{label}</p>
       <p
         className={cn(
-          "mt-3 font-display font-semibold tracking-tight tabular-nums whitespace-nowrap",
-          compact ? "text-xl" : "text-2xl",
+          "mt-3 min-w-0 font-display font-semibold tracking-tight tabular-nums text-pretty break-words",
+          compact ? "text-xl" : "text-[1.35rem] sm:text-2xl",
         )}
       >
         {value}
       </p>
-      {hint ? <p className="mt-1 text-sm text-muted">{hint}</p> : null}
+      {hint ? <p className="mt-1 min-w-0 text-sm text-muted text-pretty">{hint}</p> : null}
       {action ? <div className="mt-4">{action}</div> : null}
     </article>
   );
@@ -159,7 +159,7 @@ export function AmountRow({
 }) {
   const figure = value.toLocaleString("en-US");
   return (
-    <div className="grid grid-cols-[minmax(0,1fr)_auto_8.5ch] items-baseline gap-x-3 border-b border-line py-2.5 last:border-0 last:pb-0 first:pt-0">
+    <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto_minmax(4.5ch,8.5ch)] items-baseline gap-x-2 border-b border-line py-2.5 last:border-0 last:pb-0 first:pt-0 sm:gap-x-3">
       <dt className="min-w-0 text-sm text-muted">{label}</dt>
       <span aria-hidden="true" className="text-sm font-medium text-muted">
         BDT
@@ -185,7 +185,7 @@ export function Surface({
   children: ReactNode;
 }) {
   return (
-    <div className={cn("rounded-2xl bg-cream p-5 shadow-[var(--shadow-card)] sm:p-6", className)}>
+    <div className={cn("min-w-0 max-w-full rounded-2xl bg-cream p-5 shadow-[var(--shadow-card)] sm:p-6", className)}>
       {children}
     </div>
   );

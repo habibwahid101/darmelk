@@ -32,7 +32,7 @@ test("withdrawal request reserves available without a reservedBalance column", (
 
 test("referral copy action sits on the right of the code row on mobile", () => {
   const src = read("src/routes/app/network.tsx");
-  assert.match(src, /flex items-center justify-between gap-3 sm:block/);
+  assert.match(src, /flex min-w-0 items-center justify-between gap-3 sm:block/);
   assert.match(src, /sm:mt-4/);
   assert.match(src, /navigator\.clipboard\.writeText\(code\)/);
 });

@@ -159,7 +159,7 @@ export function AppShell() {
       </header>
 
       {more ? (
-        <div className="fixed inset-0 z-30 overflow-y-auto bg-paper pt-14 pb-24 lg:hidden">
+        <div className="fixed inset-0 z-30 overflow-y-auto bg-paper pt-14 pb-[var(--darmelk-bottom-nav-clearance)] lg:hidden">
           <nav className="px-4 py-4" aria-label="More">
             {allNav.map((item) => (
               <Link
@@ -200,7 +200,7 @@ export function AppShell() {
         </div>
       ) : null}
 
-      <div className="lg:pl-60">
+      <div className="min-w-0 lg:pl-60">
         <div className="hidden h-14 items-center justify-between border-b border-line px-8 lg:flex">
           <p className="text-sm text-muted">Member console</p>
           <div className="flex items-center gap-3">
@@ -210,15 +210,15 @@ export function AppShell() {
             <span className="text-sm font-medium">{user.displayName ?? "Member"}</span>
           </div>
         </div>
-        <main className="px-5 py-6 pb-28 md:px-8 md:py-8 lg:pb-12">
-          <div className="mx-auto max-w-6xl">
+        <main className="app-main-with-nav px-[var(--darmelk-gutter)] py-6 md:px-8 md:py-8">
+          <div className="mx-auto min-w-0 max-w-6xl">
             <Outlet />
           </div>
         </main>
       </div>
 
       <nav
-        className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-paper/95 pb-[max(0.4rem,env(safe-area-inset-bottom))] backdrop-blur lg:hidden"
+        className="app-bottom-nav fixed inset-x-0 bottom-0 z-40 border-t border-line bg-paper/95 backdrop-blur lg:hidden"
         aria-label="Mobile"
       >
         <div className="grid grid-cols-5">
