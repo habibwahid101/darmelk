@@ -52,11 +52,11 @@ export function LandingPage() {
         />
         <div className="absolute inset-0 bg-[linear-gradient(90deg,rgb(40_33_30/.88),rgb(40_33_30/.42)_55%,rgb(40_33_30/.22))]" />
         <div className="container-pg relative flex min-h-[78svh] items-end py-16 pt-28 md:items-center md:py-24">
-          <div className="max-w-2xl text-cream">
+          <div className="min-w-0 max-w-4xl text-cream">
             <p className="text-xs font-medium uppercase tracking-[.2em] text-cream/70">Your property gateway</p>
-            <h1 className="mt-4 font-display text-[2.05rem] font-semibold leading-[1.18] tracking-tight text-pretty sm:text-5xl sm:leading-[1.12] md:text-6xl md:leading-[1.08]">
-              Explore Property Opportunities{" "}
-              <span className="md:block">with Clarity and Confidence.</span>
+            <h1 className="hero-headline mt-4 font-display font-semibold text-cream">
+              <span>Explore Property Opportunities</span>
+              <span>With Clarity and Confidence</span>
             </h1>
             <p className="mt-5 max-w-xl text-[15px] leading-relaxed text-cream/80 text-pretty md:text-base">
               Discover carefully presented property opportunities with clear terms, documented activity, and a straightforward path from exploration to booking.
@@ -214,8 +214,8 @@ export function LandingPage() {
             {faqs.map(([q, a], i) => (
               <Accordion.Item value={`q-${i}`} key={q}>
                 <Accordion.Header>
-                  <Accordion.Trigger className="flex w-full items-center justify-between gap-4 py-5 text-left font-medium">
-                    {q}
+                  <Accordion.Trigger className="flex w-full min-w-0 items-center justify-between gap-4 py-5 text-left font-medium">
+                    <span className="min-w-0 text-pretty">{q}</span>
                     <ChevronDown className="size-4 shrink-0" />
                   </Accordion.Trigger>
                 </Accordion.Header>

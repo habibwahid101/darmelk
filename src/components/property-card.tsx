@@ -17,7 +17,7 @@ export function PropertyCard({
   return (
     <article
       className={cn(
-        "flex h-full flex-col overflow-hidden rounded-2xl bg-cream shadow-[var(--shadow-card)] transition-[box-shadow,transform] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:shadow-[var(--shadow-card-hover)]",
+        "flex h-full min-w-0 max-w-full flex-col overflow-hidden rounded-2xl bg-cream shadow-[var(--shadow-card)] transition-[box-shadow,transform] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:shadow-[var(--shadow-card-hover)]",
         className,
       )}
     >
@@ -27,7 +27,7 @@ export function PropertyCard({
           alt={offer.title}
           className="size-full object-cover"
         />
-        <div className="absolute left-3 top-3 flex gap-2">
+        <div className="absolute left-3 top-3 flex max-w-[calc(100%-1.5rem)] flex-wrap gap-2">
           <Badge tone="cream">{offer.category}</Badge>
           {offer.flagship ? <Badge tone="pine">Flagship</Badge> : null}
         </div>
@@ -39,7 +39,7 @@ export function PropertyCard({
       </div>
       <div className="flex flex-1 flex-col gap-4 p-5">
         <div className="space-y-1.5">
-          <h3 className="font-display text-xl font-semibold tracking-tight text-ink">
+          <h3 className="min-w-0 font-display text-xl font-semibold tracking-tight text-pretty text-ink">
             {offer.title}
           </h3>
           {offer.location ? (
@@ -69,7 +69,7 @@ export function FeaturedOffer({ offer }: { offer: PropertyOffer }) {
   const canBook = offer.status === "available";
 
   return (
-    <article className="grid overflow-hidden rounded-2xl bg-cream shadow-[var(--shadow-card)] md:grid-cols-[1.35fr_1fr]">
+    <article className="grid min-w-0 overflow-hidden rounded-2xl bg-cream shadow-[var(--shadow-card)] md:grid-cols-[1.35fr_1fr]">
       <div className="relative overflow-hidden bg-mist md:min-h-[28rem]">
         <img
           src={offer.heroImage ?? offer.image}
@@ -83,7 +83,7 @@ export function FeaturedOffer({ offer }: { offer: PropertyOffer }) {
           </Badge>
         </div>
       </div>
-      <div className="flex flex-col justify-center p-5 sm:p-6 lg:p-8">
+      <div className="flex min-w-0 flex-col justify-center p-5 sm:p-6 lg:p-8">
         {offer.location ? (
           <p className="flex items-center gap-1.5 text-sm text-muted">
             <MapPin className="size-3.5" aria-hidden="true" />

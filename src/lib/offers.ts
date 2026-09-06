@@ -8,6 +8,7 @@ export type PropertyOffer = {
   location?: string;
   image: string;
   heroImage?: string;
+  gallery?: string[];
   retailValue: number;
   bookingAmount: number;
   qualificationBenefit: number;
@@ -24,6 +25,7 @@ export const FLAGSHIP: PropertyOffer = {
   location: "Bangladesh",
   image: "/images/flagship-suite.jpg",
   heroImage: "/images/hero-hotel.jpg",
+  gallery: ["/images/category-resort.jpg"],
   retailValue: 650_000,
   bookingAmount: 50_000,
   qualificationBenefit: 600_000,
@@ -94,6 +96,18 @@ export function exampleCommission(bookingAmount: number, rate: number, positions
 
 export function getOffer(slug: string) {
   return OFFERS.find((o) => o.slug === slug);
+}
+
+/** Unique approved images for an offer, hero first, then card, then gallery. */
+export function offerImages(offer: Pick<PropertyOffer, "image" | "heroImage" | "gallery">): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const src of [offer.heroImage, offer.image, ...(offer.gallery ?? [])]) {
+    if (!src || seen.has(src)) continue;
+    seen.add(src);
+    out.push(src);
+  }
+  return out;
 }
 
 export function offersInCategory(categorySlug: string) {

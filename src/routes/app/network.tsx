@@ -129,8 +129,8 @@ function ReferralCodeCard({ code }: { code: string }) {
   return (
     <Surface className="flex flex-col justify-between">
       <p className="text-xs font-medium uppercase tracking-[0.16em] text-subtle">Your Referral Code</p>
-      <div className="mt-2 flex items-center justify-between gap-3 sm:block">
-        <p className="min-w-0 truncate font-display text-2xl font-semibold tracking-wide">{code}</p>
+      <div className="mt-2 flex min-w-0 items-center justify-between gap-3 sm:block">
+        <p className="min-w-0 truncate font-display text-xl font-semibold tracking-wide sm:text-2xl">{code}</p>
         <button
           type="button"
           onClick={() => void copy()}
