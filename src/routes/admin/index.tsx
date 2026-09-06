@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { PageHeader, StatCard, Surface } from "@/components/states";
 import { Button } from "@/components/ui/button";
-import { CATEGORIES, formatBdt, OFFERS } from "@/lib/offers";
+import { CATEGORIES, formatBdt, fromApiOffer, isPublished } from "@/lib/offers";
 import { api } from "@/lib/api-client";
 import { useAsync } from "@/lib/use-async";
 
@@ -12,13 +12,14 @@ function AdminOverview() {
   const { data: bookingsData } = useAsync(() => api.admin.bookings(), []);
   const { data: commissionsData } = useAsync(() => api.admin.commissions(), []);
   const { data: withdrawalsData } = useAsync(() => api.admin.withdrawals(), []);
+  const { data: offersData } = useAsync(() => api.admin.offers(), []);
 
   const members = usersData?.members ?? [];
   const bookings = bookingsData?.bookings ?? [];
   const commissions = commissionsData?.commissions ?? [];
   const withdrawals = withdrawalsData?.withdrawals ?? [];
 
-  const published = OFFERS.filter((o) => o.status === "available").length;
+  const published = (offersData?.offers ?? []).map(fromApiOffer).filter((o) => isPublished(o.status)).length;
   const confirmed = bookings.filter((b) => b.status === "confirmed" || b.status === "activated").length;
   const pending = bookings.filter((b) => b.status === "pending").length;
   const active = members.filter((m) => m.activation_status === "active").length;

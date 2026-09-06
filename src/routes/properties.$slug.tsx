@@ -3,16 +3,21 @@ import { FileText, MapPin } from "lucide-react";
 import { AmountRow } from "@/components/states";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { getOffer, offerImages } from "@/lib/offers";
+import { formatBdt, fromApiOffer, getOffer, isBookable, offerImages } from "@/lib/offers";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { api } from "@/lib/api-client";
 import { useAsync } from "@/lib/use-async";
 
 export const Route = createFileRoute("/properties/$slug")({
-  loader: ({ params }) => {
-    const offer = getOffer(params.slug);
-    if (!offer) throw notFound();
-    return { offer };
+  loader: async ({ params }) => {
+    try {
+      const { offer } = await api.offer(params.slug);
+      return { offer: fromApiOffer(offer) };
+    } catch {
+      const fallback = getOffer(params.slug);
+      if (!fallback) throw notFound();
+      return { offer: fallback };
+    }
   },
   component: PropertyDetail,
 });
@@ -25,6 +30,7 @@ function PropertyDetail() {
   const images = offerImages(offer);
   const hero = images[0];
   const rest = images.slice(1);
+  const bookable = isBookable(offer.status);
 
   return (
     <main className="pb-16 pt-20 md:pt-24">
@@ -33,7 +39,7 @@ function PropertyDetail() {
           {hero ? (
             <img
               src={hero}
-              alt={offer.title}
+              alt={offer.heroImageAlt || offer.imageAlt || offer.title}
               className="aspect-[16/10] w-full rounded-2xl object-cover object-center"
             />
           ) : null}
@@ -61,7 +67,7 @@ function PropertyDetail() {
           <div className="flex flex-wrap gap-2">
             <Badge>{offer.category}</Badge>
             {offer.flagship ? <Badge tone="pine">Flagship</Badge> : null}
-            <Badge tone="pine">Available</Badge>
+            <Badge tone={bookable ? "pine" : "cream"}>{bookable ? "Available" : offer.status === "closed" ? "Closed" : "Coming soon"}</Badge>
           </div>
           <h1 className="mt-4 font-display text-3xl font-semibold text-pretty sm:text-4xl">{offer.title}</h1>
           {offer.location ? (
@@ -76,23 +82,28 @@ function PropertyDetail() {
             <AmountRow label="Booking amount" value={offer.bookingAmount} />
             <AmountRow label="Qualification benefit" value={offer.qualificationBenefit} />
           </dl>
-          <StateCta pending={isPending} user={Boolean(user)} active={active} slug={offer.slug} />
+          <StateCta pending={isPending} user={Boolean(user)} active={active} slug={offer.slug} bookable={bookable} />
         </div>
       </section>
       <section className="border-y border-line bg-cream section-y">
         <div className="container-pg grid gap-5 md:grid-cols-2">
           <Info title="What is being acquired?">
-            This offer is presented as a Five-Star Hotel Share. Darmelk does not add ownership, deed, stay,
-            rental-return, or operator-right claims beyond approved offer materials.
+            {offer.details ||
+              `This offer is presented as ${offer.title}. Darmelk does not add ownership, deed, stay, rental-return, or operator-right claims beyond approved offer materials.`}
           </Info>
           <Info title="Benefits">
-            The approved qualification benefit for this booked offer is BDT 600,000 after the program
-            qualification conditions are met. It is separate from commission.
+            The approved qualification benefit for this booked offer is {formatBdt(offer.qualificationBenefit)} after the
+            program qualification conditions are met. It is separate from commission.
           </Info>
+          {offer.features?.length ? (
+            <Info title="Features">
+              {offer.features.join(" · ")}
+            </Info>
+          ) : null}
           <Info title="Documents" icon>
             <span>
-              Property and booking records are connected to the member’s booking. Sensitive files, when
-              available, are shown in the authenticated Documents area.
+              Property and booking records are connected to the member’s booking. Sensitive files, when available, are
+              shown in the authenticated Documents area.
             </span>
           </Info>
           <Info title="Qualification">
@@ -125,12 +136,12 @@ function PropertyDetail() {
             <h2 className="mt-3 font-display text-3xl font-semibold text-pretty">Review before you book</h2>
             <div className="mt-6 rounded-2xl bg-cream p-6 text-sm leading-relaxed text-muted">
               <p>
-                Booking payment is manual and does not become approved when submitted. An admin verifies the
-                transaction reference and payment proof.
+                Booking payment is manual and does not become approved when submitted. An admin verifies the transaction
+                reference and payment proof.
               </p>
               <p className="mt-4">
-                Booking values are frozen from this offer. Cancellation, rejection, reversal, payment, and audit
-                records remain recorded according to current program behavior.
+                Booking values are frozen from this offer. Cancellation, rejection, reversal, payment, and audit records
+                remain recorded according to current program behavior.
               </p>
               <div className="mt-5 flex flex-wrap gap-4">
                 <Link to="/terms" className="font-medium text-pine hover:underline">
@@ -153,12 +164,20 @@ function StateCta({
   user,
   active,
   slug,
+  bookable,
 }: {
   pending: boolean;
   user: boolean;
   active: boolean;
   slug: string;
+  bookable: boolean;
 }) {
+  if (!bookable)
+    return (
+      <Button className="mt-6 w-full" disabled>
+        Booking closed
+      </Button>
+    );
   if (pending)
     return (
       <Button className="mt-6 w-full" disabled>

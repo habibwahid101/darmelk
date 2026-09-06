@@ -606,6 +606,128 @@ async function main() {
   const statusBody = await json(statusRes);
   record("admin can transition contact request status", statusBody.request?.status === "reviewed", statusBody);
 
+  const publicOffers = await json(await app.request("/api/offers"));
+  const flagshipLive = publicOffers.offers?.find((o: { slug: string }) => o.slug === "five-star-hotel-share");
+  record(
+    "public catalog includes published Five-Star Hotel Share",
+    flagshipLive?.status === "published" && flagshipLive?.booking_amount === 50000 && flagshipLive?.retail_value === 650000 && flagshipLive?.qualification_benefit === 600000,
+    flagshipLive,
+  );
+
+  const memberCreateOffer = await app.request("/api/admin/offers", {
+    method: "POST",
+    headers: { cookie: memberCookie, "content-type": "application/json" },
+    body: JSON.stringify({ title: "Should fail", categorySlug: "land-plots", retailValue: 1000, bookingAmount: 100, qualificationBenefit: 900 }),
+  });
+  record("non-admin cannot create offers", memberCreateOffer.status === 403, memberCreateOffer.status);
+  const anonCreateOffer = await app.request("/api/admin/offers", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ title: "Should fail", categorySlug: "land-plots", retailValue: 1000, bookingAmount: 100, qualificationBenefit: 900 }),
+  });
+  record("anonymous cannot create offers", anonCreateOffer.status === 401, anonCreateOffer.status);
+
+  const draftCreate = await json(await app.request("/api/admin/offers", {
+    method: "POST",
+    headers: { cookie: adminCookie, "content-type": "application/json" },
+    body: JSON.stringify({
+      title: "Chittagong Plot Share",
+      categorySlug: "land-plots",
+      location: "Chittagong",
+      summary: "Draft plot offer",
+      retailValue: 400000,
+      bookingAmount: 25000,
+      qualificationBenefit: 375000,
+      commissionEligibleAmount: 25000,
+      status: "draft",
+    }),
+  }));
+  record(
+    "admin can create a draft offer with its own economics",
+    draftCreate.offer?.status === "draft" && draftCreate.offer?.booking_amount === 25000 && draftCreate.offer?.slug === "chittagong-plot-share",
+    draftCreate.offer,
+  );
+  const publicAfterDraft = await json(await app.request("/api/offers"));
+  record(
+    "draft offer is not in the public catalog",
+    Array.isArray(publicAfterDraft.offers) && !publicAfterDraft.offers.some((o: { slug: string }) => o.slug === "chittagong-plot-share"),
+    publicAfterDraft.offers?.map((o: { slug: string }) => o.slug),
+  );
+  const publicDraftGet = await app.request("/api/offers/chittagong-plot-share");
+  record("draft offer is not publicly fetchable", publicDraftGet.status === 404, publicDraftGet.status);
+
+  const draftEdit = await json(await app.request("/api/admin/offers/chittagong-plot-share", {
+    method: "POST",
+    headers: { cookie: adminCookie, "content-type": "application/json" },
+    body: JSON.stringify({ details: "Plot details for members.", features: ["Road access", "Surveyed"] }),
+  }));
+  record("admin can edit a draft offer", draftEdit.offer?.details === "Plot details for members." && Array.isArray(draftEdit.offer?.features), draftEdit.offer);
+
+  const png = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+  const coverUpload = await json(await app.request("/api/admin/offers/chittagong-plot-share/media", {
+    method: "POST",
+    headers: { cookie: adminCookie, "content-type": "application/json" },
+    body: JSON.stringify({ kind: "cover", filename: "cover.png", mime: "image/png", bytesBase64: png, alt: "Plot cover" }),
+  }));
+  const galleryUpload = await json(await app.request("/api/admin/offers/chittagong-plot-share/media", {
+    method: "POST",
+    headers: { cookie: adminCookie, "content-type": "application/json" },
+    body: JSON.stringify({ kind: "gallery", filename: "gallery.png", mime: "image/png", bytesBase64: png, alt: "Plot gallery" }),
+  }));
+  record(
+    "admin can upload cover and gallery images",
+    Boolean(coverUpload.offer?.image) && Array.isArray(galleryUpload.offer?.gallery) && galleryUpload.offer.gallery.length >= 1,
+    { image: coverUpload.offer?.image, gallery: galleryUpload.offer?.gallery },
+  );
+
+  const publishRes = await json(await app.request("/api/admin/offers/chittagong-plot-share/status", {
+    method: "POST",
+    headers: { cookie: adminCookie, "content-type": "application/json" },
+    body: JSON.stringify({ status: "published" }),
+  }));
+  record("admin can publish an offer", publishRes.offer?.status === "published", publishRes.offer);
+  const publicAfterPublish = await json(await app.request("/api/offers"));
+  record(
+    "published offer appears in the public catalog",
+    publicAfterPublish.offers?.some((o: { slug: string }) => o.slug === "chittagong-plot-share"),
+    publicAfterPublish.offers?.map((o: { slug: string }) => o.slug),
+  );
+  const publicDetail = await json(await app.request("/api/offers/chittagong-plot-share"));
+  record(
+    "published offer detail uses offer-specific economics",
+    publicDetail.offer?.booking_amount === 25000 && publicDetail.offer?.retail_value === 400000 && publicDetail.offer?.qualification_benefit === 375000,
+    publicDetail.offer,
+  );
+
+  const frozenBefore = await query<any>(`select booking_amount, retail_value, qualification_benefit from bookings where offer_slug='five-star-hotel-share' order by created_at asc limit 1`);
+  const flagshipEdit = await json(await app.request("/api/admin/offers/five-star-hotel-share", {
+    method: "POST",
+    headers: { cookie: adminCookie, "content-type": "application/json" },
+    body: JSON.stringify({ notes: "Admin note only", summary: flagshipLive?.summary }),
+  }));
+  const frozenAfter = await query<any>(`select booking_amount, retail_value, qualification_benefit from bookings where offer_slug='five-star-hotel-share' order by created_at asc limit 1`);
+  record(
+    "editing an offer does not mutate historical booking snapshots",
+    frozenBefore[0]?.booking_amount === 50000 && frozenAfter[0]?.booking_amount === 50000 && frozenAfter[0]?.retail_value === frozenBefore[0]?.retail_value,
+    { frozenBefore: frozenBefore[0], frozenAfter: frozenAfter[0], version: flagshipEdit.offer?.version },
+  );
+
+  const closeRes = await json(await app.request("/api/admin/offers/chittagong-plot-share/status", {
+    method: "POST",
+    headers: { cookie: adminCookie, "content-type": "application/json" },
+    body: JSON.stringify({ status: "closed" }),
+  }));
+  record("admin can close an offer", closeRes.offer?.status === "closed", closeRes.offer);
+  const closedBooking = await withTransaction(async (client) => {
+    try {
+      await createBooking(client, adminMe.member.user_id, "chittagong-plot-share");
+      return { ok: true };
+    } catch (err: any) {
+      return { ok: false, code: err?.code, message: err?.message };
+    }
+  });
+  record("closed offer blocks new booking initiation", closedBooking.ok === false, closedBooking);
+
   const failed = results.filter((r) => !r.ok);
   console.log(`\n${results.length - failed.length}/${results.length} checks passed`);
   if (failed.length) {

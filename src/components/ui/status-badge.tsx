@@ -14,6 +14,8 @@ const MAP: Record<string, { label: string; tone: keyof typeof TONES }> = {
   cancelled: { label: "Cancelled", tone: "muted" },
   reversed: { label: "Reversed", tone: "danger" },
   available: { label: "Available", tone: "ok" },
+  published: { label: "Published", tone: "ok" },
+  draft: { label: "Draft", tone: "muted" },
   paid: { label: "Paid", tone: "ok" },
   rejected: { label: "Rejected", tone: "danger" },
   inactive: { label: "Inactive", tone: "muted" },

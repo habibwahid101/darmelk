@@ -11,6 +11,8 @@ export type Booking = {
   retail_value: number;
   booking_amount: number;
   qualification_benefit: number;
+  commission_eligible_amount?: number;
+  offer_version?: number;
   status: "pending" | "confirmed" | "activated" | "cancelled" | "reversed";
   created_at: string;
   confirmed_at: string | null;
@@ -28,20 +30,37 @@ export async function createBooking(client: PoolClient, userId: string, offerSlu
     retail_value: number;
     booking_amount: number;
     qualification_benefit: number;
+    commission_eligible_amount: number | null;
+    version: number | null;
     status: string;
-  }>(`select slug, retail_value, booking_amount, qualification_benefit, status from offers where slug = $1`, [
-    offerSlug,
-  ]);
+  }>(
+    `select slug, retail_value, booking_amount, qualification_benefit,
+            coalesce(commission_eligible_amount, booking_amount) as commission_eligible_amount,
+            coalesce(version, 1) as version, status
+       from offers where slug = $1`,
+    [offerSlug],
+  );
   const offer = offerRows[0];
   if (!offer) throw notFound("Offer not found");
-  if (offer.status !== "available") throw badRequest("Offer is not currently available", "offer_unavailable");
+  if (offer.status !== "available" && offer.status !== "published") {
+    throw badRequest("Offer is not currently available", "offer_unavailable");
+  }
 
   const id = uid("bk");
   const { rows } = await client.query<Booking>(
-    `insert into bookings (id, user_id, offer_slug, retail_value, booking_amount, qualification_benefit, status)
-     values ($1, $2, $3, $4, $5, $6, 'pending')
+    `insert into bookings (id, user_id, offer_slug, retail_value, booking_amount, qualification_benefit, commission_eligible_amount, offer_version, status)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, 'pending')
      returning *`,
-    [id, userId, offer.slug, offer.retail_value, offer.booking_amount, offer.qualification_benefit],
+    [
+      id,
+      userId,
+      offer.slug,
+      offer.retail_value,
+      offer.booking_amount,
+      offer.qualification_benefit,
+      offer.commission_eligible_amount ?? offer.booking_amount,
+      offer.version ?? 1,
+    ],
   );
   return rows[0]!;
 }
@@ -80,8 +99,8 @@ export async function activateBooking(client: PoolClient, bookingId: string): Pr
   );
   await client.query(
     `insert into booking_snapshots
-       (id, booking_id, user_id, offer_slug, offer_title, retail_value, booking_amount, qualification_benefit, activated_at)
-     values ($1, $2, $3, $4, $5, $6, $7, $8, now())
+       (id, booking_id, user_id, offer_slug, offer_title, retail_value, booking_amount, qualification_benefit, commission_eligible_amount, offer_version, activated_at)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, now())
      on conflict (booking_id) do nothing`,
     [
       uid("snap"),
@@ -92,12 +111,14 @@ export async function activateBooking(client: PoolClient, bookingId: string): Pr
       booking.retail_value,
       booking.booking_amount,
       booking.qualification_benefit,
+      booking.commission_eligible_amount ?? booking.booking_amount,
+      booking.offer_version ?? 1,
     ],
   );
   await postCommissionsForBooking(client, {
     id: booking.id,
     userId: booking.user_id,
-    bookingAmount: booking.booking_amount,
+    bookingAmount: booking.commission_eligible_amount ?? booking.booking_amount,
   });
   return updated[0]!;
 }
