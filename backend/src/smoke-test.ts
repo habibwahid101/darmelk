@@ -263,6 +263,16 @@ async function main() {
   const withdrawal = await json(withdrawRes);
   record("withdrawal requested against available commission balance", withdrawal.withdrawal?.status === "requested" && withdrawal.withdrawal?.amount === 5000, withdrawal);
 
+  const afterRequestTotals = await json(await app.request("/api/me/commissions", { headers: { cookie: adminCookie } }));
+  record("requested withdrawal immediately reserves the amount from available", afterRequestTotals.totals?.available === 0, afterRequestTotals.totals);
+
+  const reservedAgainRes = await app.request("/api/withdrawals", {
+    method: "POST",
+    headers: { cookie: adminCookie, "content-type": "application/json" },
+    body: JSON.stringify({ amount: 1000, payoutMethodId: payoutMethod.method.id }),
+  });
+  record("reserved amount is no longer withdrawable (409)", reservedAgainRes.status === 409);
+
   const overWithdrawRes = await app.request("/api/withdrawals", {
     method: "POST",
     headers: { cookie: adminCookie, "content-type": "application/json" },
@@ -270,22 +280,71 @@ async function main() {
   });
   record("withdrawal exceeding available balance is rejected (409)", overWithdrawRes.status === 409);
 
-  const approveWdRes = await app.request(`/api/admin/withdrawals/${withdrawal.withdrawal.id}/approve`, {
+  const approveOpenRes = await app.request(`/api/admin/withdrawals/${withdrawal.withdrawal.id}/approve`, {
+    method: "POST",
+    headers: { cookie: adminCookie },
+  });
+  const approvedOpen = await json(approveOpenRes);
+  record("open withdrawal can be approved before payout", approvedOpen.withdrawal?.status === "approved", approvedOpen);
+  const rejectOpenRes = await app.request(`/api/admin/withdrawals/${withdrawal.withdrawal.id}/reject`, {
+    method: "POST",
+    headers: { cookie: adminCookie },
+  });
+  const rejectedOpen = await json(rejectOpenRes);
+  record("unpaid approved withdrawal can be rejected", rejectedOpen.withdrawal?.status === "rejected", rejectedOpen);
+  const afterRejectTotals = await json(await app.request("/api/me/commissions", { headers: { cookie: adminCookie } }));
+  record("rejecting an unpaid withdrawal releases the reserved amount once", afterRejectTotals.totals?.available === 5000, afterRejectTotals.totals);
+
+  const withdrawRes2 = await app.request("/api/withdrawals", {
+    method: "POST",
+    headers: { cookie: adminCookie, "content-type": "application/json" },
+    body: JSON.stringify({ amount: 5000, payoutMethodId: payoutMethod.method.id }),
+  });
+  const withdrawal2 = await json(withdrawRes2);
+  record("released amount can be requested again", withdrawal2.withdrawal?.status === "requested" && withdrawal2.withdrawal?.amount === 5000, withdrawal2);
+
+  const approveWdRes = await app.request(`/api/admin/withdrawals/${withdrawal2.withdrawal.id}/approve`, {
     method: "POST",
     headers: { cookie: adminCookie },
   });
   const approveWd = await json(approveWdRes);
-  const paidRes = await app.request(`/api/admin/withdrawals/${withdrawal.withdrawal.id}/mark-paid`, {
+  const missingRefRes = await app.request(`/api/admin/withdrawals/${withdrawal2.withdrawal.id}/mark-paid`, {
+    method: "POST",
+    headers: { cookie: adminCookie, "content-type": "application/json" },
+    body: JSON.stringify({ paymentReference: "   " }),
+  });
+  record("mark as paid without a reference is rejected", missingRefRes.status === 400);
+  const paidRes = await app.request(`/api/admin/withdrawals/${withdrawal2.withdrawal.id}/mark-paid`, {
     method: "POST",
     headers: { cookie: adminCookie, "content-type": "application/json" },
     body: JSON.stringify({ paymentReference: "QA-PAYOUT-001" }),
   });
   const paid = await json(paidRes);
-  record("withdrawal approved then marked paid", approveWd.withdrawal?.status === "approved" && paid.withdrawal?.status === "paid", paid);
+  record(
+    "withdrawal approved then marked paid with immutable payout snapshot",
+    approveWd.withdrawal?.status === "approved"
+      && paid.withdrawal?.status === "paid"
+      && paid.withdrawal?.admin_payment_reference === "QA-PAYOUT-001"
+      && paid.withdrawal?.paid_by_admin_id
+      && paid.withdrawal?.amount === 5000
+      && paid.withdrawal?.fee_amount === 125
+      && paid.withdrawal?.net_amount === 4875
+      && Boolean(paid.withdrawal?.paid_at),
+    paid,
+  );
+
+  const paidAgainRes = await app.request(`/api/admin/withdrawals/${withdrawal2.withdrawal.id}/mark-paid`, {
+    method: "POST",
+    headers: { cookie: adminCookie, "content-type": "application/json" },
+    body: JSON.stringify({ paymentReference: "QA-PAYOUT-002" }),
+  });
+  record("the same withdrawal cannot be paid twice", paidAgainRes.status === 409);
 
   const commissionsAfterPay = await json(await app.request("/api/me/commissions", { headers: { cookie: adminCookie } }));
   const paidCommission = commissionsAfterPay.commissions.find((cm: { source_booking_id: string }) => cm.source_booking_id === book2.booking.id);
   record("the commission backing the paid withdrawal flipped to status=paid (not deleted)", paidCommission?.status === "paid", paidCommission);
+  record("mark as paid does not deduct the reserved amount a second time", commissionsAfterPay.totals?.available === 0 && commissionsAfterPay.totals?.paid === 5000, commissionsAfterPay.totals);
+
 
   // --- deterministic production-equivalent 3x5 fixture -----------------
   // Uses the same PostgreSQL schema and engine functions as Lambda. Only the

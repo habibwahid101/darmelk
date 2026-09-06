@@ -480,7 +480,7 @@ app.post("/api/admin/withdrawals/:id/:decision", async (c) => {
     const result = decisionParam === "mark-paid"
       ? await markWithdrawalPaid(client, withdrawalId, adminId, body.paymentReference ?? "")
       : await decideWithdrawal(client, withdrawalId, decisionParam === "approve" ? "approved" : "rejected", adminId);
-    await logAdminAction(client, { adminUserId: adminId, actionType: `withdrawal.${decisionParam}`, targetType: "withdrawal", targetId: withdrawalId, payload: decisionParam === "mark-paid" ? { paymentReference: body.paymentReference } : {} });
+    await logAdminAction(client, { adminUserId: adminId, actionType: `withdrawal.${decisionParam}`, targetType: "withdrawal", targetId: withdrawalId, payload: decisionParam === "mark-paid" ? { paymentReference: body.paymentReference, amount: result.amount, feeAmount: result.fee_amount, netAmount: result.net_amount, paidAt: result.paid_at, paidByAdmin: adminId } : {} });
     return result;
   });
   return c.json({ withdrawal });

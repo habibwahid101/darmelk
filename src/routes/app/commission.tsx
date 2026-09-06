@@ -19,7 +19,7 @@ export const Route = createFileRoute("/app/commission")({
 
 function CommissionPage() {
   const { member } = useMemberSession();
-  const { data } = useAsync(() => api.myCommissions(), [member?.user_id], { enabled: Boolean(member) });
+  const { data, reload: reloadCommissions } = useAsync(() => api.myCommissions(), [member?.user_id], { enabled: Boolean(member) });
   const { data: payoutData } = useAsync(() => api.payoutMethods(), [member?.user_id], { enabled: Boolean(member) });
   const { data: withdrawalData, reload: reloadWithdrawals } = useAsync(() => api.myWithdrawals(), [member?.user_id], { enabled: Boolean(member) });
   const { data: bookingData } = useAsync(() => api.myBookings(), [member?.user_id], { enabled: Boolean(member) });
@@ -31,7 +31,7 @@ function CommissionPage() {
   const fee = Math.round((Number.isFinite(amount)?amount:0)*0.025);
   const hasOwnBooking=(bookingData?.bookings??[]).some(b=>b.status==="confirmed"||b.status==="activated");
   const eligible=member.activation_status==="active"&&hasOwnBooking&&wallet.available>=1000;
-  async function withdraw(e:React.FormEvent){e.preventDefault();setPending(true);setError(null);try{await api.requestWithdrawal(amount,methodId,crypto.randomUUID());reloadWithdrawals();}catch(err){setError(err instanceof ApiError?err.message:"Could not request withdrawal.");}finally{setPending(false)}}
+  async function withdraw(e:React.FormEvent){e.preventDefault();setPending(true);setError(null);try{await api.requestWithdrawal(amount,methodId,crypto.randomUUID());reloadWithdrawals();reloadCommissions();}catch(err){setError(err instanceof ApiError?err.message:"Could not request withdrawal.");}finally{setPending(false)}}
 
   return (
     <div className="space-y-8">
