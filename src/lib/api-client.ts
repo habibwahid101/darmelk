@@ -138,6 +138,7 @@ export type Withdrawal = {
   requested_at: string;
   decided_at: string | null;
   paid_at: string | null;
+  paid_by_admin_id: string | null;
   fee_amount: number;
   net_amount: number;
   payout_method_id: string;

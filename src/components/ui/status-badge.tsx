@@ -41,7 +41,9 @@ export function StatusBadge({
   return (
     <span
       className={cn(
-        "inline-flex shrink-0 items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-medium uppercase tracking-wide",
+        "inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-medium uppercase tracking-wide",
+        (status === "activated" || status === "cancelled" || status === "confirmed" || status === "pending" || status === "reversed") &&
+          "max-sm:min-h-8 max-sm:px-3 max-sm:py-1.5",
         TONES[mapped.tone],
         className,
       )}

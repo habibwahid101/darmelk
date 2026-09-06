@@ -10,6 +10,23 @@ import { useAsync } from "@/lib/use-async";
 
 export const Route = createFileRoute("/app/network")({ component: NetworkPage });
 
+function currentLevelProgress(counts: Record<1 | 2 | 3 | 4 | 5, number>) {
+  for (const level of COMMISSION_LEVELS) {
+    const filled = counts[level.level as 1 | 2 | 3 | 4 | 5] ?? 0;
+    if (filled < level.positions) {
+      const remaining = level.positions - filled;
+      return {
+        value: `Level ${level.level} — ${filled} of ${level.positions}`,
+        hint: `${remaining} more confirmed member${remaining === 1 ? "" : "s"} to complete Level ${level.level}.`,
+      };
+    }
+  }
+  return {
+    value: `Level 5 — ${COMMISSION_LEVELS[4].positions} of ${COMMISSION_LEVELS[4].positions}`,
+    hint: "Level 5 is complete.",
+  };
+}
+
 function NetworkPage() {
   const { member } = useMemberSession();
   const { data } = useAsync(() => api.myNetwork(), [member?.user_id], { enabled: Boolean(member) });
@@ -18,6 +35,7 @@ function NetworkPage() {
   const directs = data?.directs ?? [];
   const counts = data?.levelCounts ?? { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
   const filled = Object.values(counts).reduce((a, b) => a + b, 0);
+  const current = currentLevelProgress(counts);
 
   return (
     <div className="space-y-8">
@@ -33,11 +51,7 @@ function NetworkPage() {
           value={`${directs.length} / ${PERSONAL_SPONSOR_TARGET}`}
           hint="Eligible after the referred member’s booking is confirmed."
         />
-        <StatCard
-          label="Confirmed Members"
-          value={`${filled} / ${TOTAL_POSITIONS}`}
-          hint={`${TOTAL_POSITIONS} is the total across five levels, not Level 5.`}
-        />
+        <StatCard label="Current Level Progress" value={current.value} hint={current.hint} />
         <ReferralCodeCard code={member.referral_code} />
       </div>
 
@@ -64,6 +78,12 @@ function NetworkPage() {
               </li>
             );
           })}
+          <li className="flex items-baseline justify-between gap-3 border-t border-line pt-3 text-sm">
+            <span className="font-medium">Total</span>
+            <span className="tabular-nums text-muted">
+              {filled} / {TOTAL_POSITIONS}
+            </span>
+          </li>
         </ul>
       </Surface>
 
@@ -108,20 +128,20 @@ function ReferralCodeCard({ code }: { code: string }) {
 
   return (
     <Surface className="flex flex-col justify-between">
-      <div>
-        <p className="text-xs font-medium uppercase tracking-[0.16em] text-subtle">Your Referral Code</p>
-        <p className="mt-2 font-display text-2xl font-semibold tracking-wide">{code}</p>
-        <p className="mt-1 text-xs text-muted">Share this code. Cross-offer sponsorship is supported.</p>
+      <p className="text-xs font-medium uppercase tracking-[0.16em] text-subtle">Your Referral Code</p>
+      <div className="mt-2 flex items-center justify-between gap-3 sm:block">
+        <p className="min-w-0 truncate font-display text-2xl font-semibold tracking-wide">{code}</p>
+        <button
+          type="button"
+          onClick={() => void copy()}
+          className="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-lg px-3 text-sm font-medium text-pine hover:bg-pine/8 sm:mt-4"
+          aria-label={copied ? "Referral code copied" : "Copy referral code"}
+        >
+          {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
+          {copied ? "Copied" : "Copy"}
+        </button>
       </div>
-      <button
-        type="button"
-        onClick={() => void copy()}
-        className="mt-4 inline-flex min-h-10 items-center gap-2 self-start rounded-lg px-3 text-sm font-medium text-pine hover:bg-pine/8"
-        aria-label={copied ? "Referral code copied" : "Copy referral code"}
-      >
-        {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
-        {copied ? "Copied" : "Copy"}
-      </button>
+      <p className="mt-1 text-xs text-muted">Share this code. Cross-offer sponsorship is supported.</p>
     </Surface>
   );
 }

@@ -89,6 +89,16 @@ export async function reverseCommissionsForBooking(
   return rows.length;
 }
 
+/** Open (requested/approved) withdrawals already reserved against available. */
+export async function reservedWithdrawalTotal(client: PoolClient, userId: string): Promise<number> {
+  const { rows } = await client.query<{ total: string }>(
+    `select coalesce(sum(amount), 0)::text as total from withdrawals
+      where user_id = $1 and status in ('requested', 'approved')`,
+    [userId],
+  );
+  return Number(rows[0]?.total ?? 0);
+}
+
 export async function getCommissionTotals(
   client: PoolClient,
   userId: string,
@@ -119,6 +129,9 @@ export async function getCommissionTotals(
      )::text as total`, [userId],
   );
   totals.paid = Number(paidRows[0]?.total ?? 0);
-  totals.available = Math.max(0, totals.available - allocatedFromAvailable);
+  const reserved = await reservedWithdrawalTotal(client, userId);
+  // Open withdrawals lock spendable balance immediately. Allocations exist
+  // only after Mark as Paid, so they are not subtracted again here.
+  totals.available = Math.max(0, totals.available - allocatedFromAvailable - reserved);
   return totals;
 }
