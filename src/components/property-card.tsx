@@ -4,7 +4,7 @@ import { AmountRow } from "@/components/states";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
-import { type PropertyOffer } from "@/lib/offers";
+import { type PropertyOffer, isBookable, resolveMediaSrc } from "@/lib/offers";
 import { cn } from "@/lib/utils";
 
 export function PropertyCard({
@@ -23,7 +23,7 @@ export function PropertyCard({
     >
       <div className="relative aspect-[16/10] overflow-hidden">
         <img
-          src={offer.image}
+          src={resolveMediaSrc(offer.image)}
           alt={offer.title}
           className="size-full object-cover"
         />
@@ -32,8 +32,8 @@ export function PropertyCard({
           {offer.flagship ? <Badge tone="pine">Flagship</Badge> : null}
         </div>
         <div className="absolute bottom-3 right-3">
-          <Badge tone={offer.status === "available" ? "pine" : "cream"}>
-            {offer.status === "available" ? "Available" : "Coming soon"}
+          <Badge tone={isBookable(offer.status) ? "pine" : "cream"}>
+            {isBookable(offer.status) ? "Available" : offer.status === "closed" ? "Closed" : "Coming soon"}
           </Badge>
         </div>
       </div>
@@ -66,20 +66,20 @@ export function PropertyCard({
 
 export function FeaturedOffer({ offer }: { offer: PropertyOffer }) {
   const { user, isPending } = useCurrentUserState();
-  const canBook = offer.status === "available";
+  const canBook = isBookable(offer.status);
 
   return (
     <article className="grid min-w-0 overflow-hidden rounded-2xl bg-cream shadow-[var(--shadow-card)] md:grid-cols-[1.35fr_1fr]">
       <div className="relative overflow-hidden bg-mist md:min-h-[28rem]">
         <img
-          src={offer.heroImage ?? offer.image}
+          src={resolveMediaSrc(offer.heroImage ?? offer.image)}
           alt={offer.title}
           className="aspect-[16/10] size-full object-cover md:absolute md:inset-0 md:aspect-auto"
         />
         <div className="absolute left-3 top-3 flex flex-wrap gap-1.5">
           <Badge tone="cream">{offer.category}</Badge>
           <Badge tone={canBook ? "pine" : "cream"}>
-            {canBook ? "Currently available" : "Coming soon"}
+            {canBook ? "Currently available" : offer.status === "closed" ? "Closed" : "Coming soon"}
           </Badge>
         </div>
       </div>
@@ -121,7 +121,7 @@ export function FeaturedOffer({ offer }: { offer: PropertyOffer }) {
             )
           ) : (
             <Button className="w-full lg:flex-1" disabled>
-              Coming soon
+              {offer.status === "closed" ? "Closed" : "Coming soon"}
             </Button>
           )}
           <Button asChild variant="secondary" className="w-full lg:flex-1">

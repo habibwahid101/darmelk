@@ -9,6 +9,8 @@
  * URL. Every call sends cookies (`credentials: "include"`) since Better Auth
  * sessions live there.
  */
+import type { ApiOffer, OfferStatus } from "@/lib/offers";
+
 const API_URL = import.meta.env.VITE_API_URL ?? "";
 
 export class ApiError extends Error {
@@ -45,21 +47,7 @@ const post = <T>(path: string, body?: unknown, idempotencyKey?: string) =>
   request<T>(path, { method: "POST", body: body !== undefined ? JSON.stringify(body) : undefined, idempotencyKey });
 
 // ---- types mirroring the backend's response shapes -----------------------
-export type Offer = {
-  slug: string;
-  title: string;
-  category: string;
-  category_slug: string;
-  location: string | null;
-  image: string | null;
-  hero_image: string | null;
-  retail_value: number;
-  booking_amount: number;
-  qualification_benefit: number;
-  status: "available" | "coming-soon";
-  flagship: boolean;
-  summary: string;
-};
+export type Offer = ApiOffer;
 
 export type Member = {
   user_id: string;
@@ -245,6 +233,18 @@ export const api = {
     updateContactRequest: (id: string, status: ContactRequest["status"]) =>
       post<{ request: ContactRequest }>(`/api/admin/contact-requests/${id}/status`, { status }),
 
-    upsertOffer: (offer: Partial<Offer> & { slug: string }) => post<{ offer: Offer }>("/api/admin/offers", offer),
+    offers: () => request<{ offers: Offer[] }>("/api/admin/offers"),
+    offer: (slug: string) => request<{ offer: Offer }>(`/api/admin/offers/${encodeURIComponent(slug)}`),
+    createOffer: (offer: Record<string, unknown>) => post<{ offer: Offer }>("/api/admin/offers", offer),
+    updateOffer: (slug: string, offer: Record<string, unknown>) =>
+      post<{ offer: Offer }>(`/api/admin/offers/${encodeURIComponent(slug)}`, offer),
+    setOfferStatus: (slug: string, status: OfferStatus | "unpublish") =>
+      post<{ offer: Offer }>(`/api/admin/offers/${encodeURIComponent(slug)}/status`, { status }),
+    addOfferMedia: (
+      slug: string,
+      data: { kind: "cover" | "hero" | "gallery"; filename: string; mime: string; bytesBase64: string; alt?: string },
+    ) => post<{ offer: Offer; src: string; id: string }>(`/api/admin/offers/${encodeURIComponent(slug)}/media`, data),
+    removeOfferMedia: (slug: string, id: string) =>
+      post<{ offer: Offer }>(`/api/admin/offers/${encodeURIComponent(slug)}/media/${encodeURIComponent(id)}/remove`),
   },
 };

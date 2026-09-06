@@ -3,17 +3,23 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { AmountRow, PageHeader, SuccessBanner, Surface } from "@/components/states";
 import { useMemberSession } from "@/components/layout/use-member";
-import { formatBdt, getOffer } from "@/lib/offers";
+import { formatBdt, fromApiOffer, getOffer, isBookable } from "@/lib/offers";
 import { api, ApiError } from "@/lib/api-client";
 import { PaymentForm } from "@/components/payment-form";
 
 const ACTIVATION_FEE = 1000;
 
 export const Route = createFileRoute("/app/book/$slug")({
-  loader: ({ params }) => {
-    const offer = getOffer(params.slug);
-    if (!offer || offer.status !== "available") throw notFound();
-    return { offer };
+  loader: async ({ params }) => {
+    let mapped;
+    try {
+      const { offer } = await api.offer(params.slug);
+      mapped = fromApiOffer(offer);
+    } catch {
+      mapped = getOffer(params.slug);
+    }
+    if (!mapped || !isBookable(mapped.status)) throw notFound();
+    return { offer: mapped };
   },
   component: BookOfferPage,
 });

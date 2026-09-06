@@ -23,6 +23,18 @@ import { getQualificationStatus, PERSONAL_SPONSOR_TARGET, TOTAL_POSITIONS } from
 import { decideWithdrawal, markWithdrawalPaid, requestWithdrawal } from "./engine/withdrawals.js";
 import { createPaymentSubmission, finalizePayment, getPaymentProof, markPaymentUnderReview, PAYMENT_DESTINATIONS, type PaymentMethod, type PaymentTarget } from "./engine/payments.js";
 import { uid } from "./ids.js";
+import {
+  addOfferMedia,
+  createOffer,
+  getOfferMedia,
+  getOfferRow,
+  listAdminOffers,
+  listPublicOffers,
+  removeOfferMedia,
+  setOfferStatus,
+  updateOffer,
+  type OfferInput,
+} from "./engine/offers.js";
 
 type Vars = { userId: string; userEmail: string };
 const app = new Hono<{ Variables: Vars }>();
@@ -38,6 +50,7 @@ app.use(
     origin: trustedOrigins,
     credentials: true,
     allowHeaders: ["Content-Type", "Authorization", "Idempotency-Key"],
+    allowMethods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
   }),
 );
 
@@ -106,12 +119,21 @@ app.use("/api/admin/*", async (c, next) => {
 
 // ---- offers (public) ----------------------------------------------------
 app.get("/api/offers", async (c) => {
-  const offers = await query(`select * from offers order by flagship desc, created_at asc`);
+  const offers = await withTransaction((client) => listPublicOffers(client));
   return c.json({ offers });
 });
+app.get("/api/offers/:slug/media/:id", async (c) => {
+  const media = await withTransaction((client) => getOfferMedia(client, c.req.param("slug"), c.req.param("id")));
+  return new Response(new Uint8Array(media.bytes), {
+    headers: {
+      "content-type": media.mime,
+      "cache-control": "public, max-age=86400",
+      "content-disposition": `inline; filename="${media.filename.replace(/["\\]/g, "_")}"`,
+    },
+  });
+});
 app.get("/api/offers/:slug", async (c) => {
-  const offer = await queryOne(`select * from offers where slug = $1`, [c.req.param("slug")]);
-  if (!offer) throw notFound("Offer not found");
+  const offer = await withTransaction((client) => getOfferRow(client, c.req.param("slug")));
   return c.json({ offer });
 });
 
@@ -627,33 +649,118 @@ app.post("/api/admin/users/:id/role", async (c) => {
   return c.json({ member });
 });
 
-app.post("/api/admin/offers", async (c) => {
+app.get("/api/admin/offers", async (c) => {
   const adminId = c.get("userId");
-  const body = await jsonBody<Record<string, unknown>>(c);
+  const offers = await withTransaction(async (client) => {
+    await requireAdmin(client, adminId);
+    return listAdminOffers(client);
+  });
+  return c.json({ offers });
+});
+
+app.get("/api/admin/offers/:slug", async (c) => {
+  const adminId = c.get("userId");
   const offer = await withTransaction(async (client) => {
     await requireAdmin(client, adminId);
-    const { rows } = await client.query(
-      `insert into offers (slug, title, category, category_slug, location, image, hero_image, retail_value, booking_amount, qualification_benefit, status, flagship, summary)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
-       on conflict (slug) do update set
-         title = excluded.title, category = excluded.category, category_slug = excluded.category_slug,
-         location = excluded.location, image = excluded.image, hero_image = excluded.hero_image,
-         retail_value = excluded.retail_value, booking_amount = excluded.booking_amount,
-         qualification_benefit = excluded.qualification_benefit, status = excluded.status,
-         flagship = excluded.flagship, summary = excluded.summary, updated_at = now()
-       returning *`,
-      [
-        body.slug, body.title, body.category, body.categorySlug ?? body.category_slug, body.location ?? null,
-        body.image ?? null, body.heroImage ?? body.hero_image ?? null, body.retailValue ?? body.retail_value,
-        body.bookingAmount ?? body.booking_amount, body.qualificationBenefit ?? body.qualification_benefit,
-        body.status ?? "available", Boolean(body.flagship), body.summary ?? "",
-      ],
-    );
-    await logAdminAction(client, { adminUserId: adminId, actionType: "offer.upsert", targetType: "offer", targetId: String(body.slug), payload: body });
-    return rows[0];
+    return getOfferRow(client, c.req.param("slug"), { includeDraft: true });
   });
   return c.json({ offer });
 });
+
+app.post("/api/admin/offers", async (c) => {
+  const adminId = c.get("userId");
+  const body = await jsonBody<OfferInput>(c);
+  const offer = await withTransaction(async (client) => {
+    await requireAdmin(client, adminId);
+    const result = await createOffer(client, body);
+    await logAdminAction(client, {
+      adminUserId: adminId,
+      actionType: "offer.create",
+      targetType: "offer",
+      targetId: result.slug,
+      payload: { status: result.status },
+    });
+    return result;
+  });
+  return c.json({ offer }, 201);
+});
+
+app.post("/api/admin/offers/:slug/status", async (c) => {
+  const adminId = c.get("userId");
+  const slug = c.req.param("slug");
+  const body = await jsonBody<{ status?: string }>(c);
+  const offer = await withTransaction(async (client) => {
+    await requireAdmin(client, adminId);
+    const result = await setOfferStatus(client, slug, body.status ?? "");
+    await logAdminAction(client, {
+      adminUserId: adminId,
+      actionType: "offer.status",
+      targetType: "offer",
+      targetId: slug,
+      payload: { status: result.status },
+    });
+    return result;
+  });
+  return c.json({ offer });
+});
+
+app.post("/api/admin/offers/:slug/media", async (c) => {
+  const adminId = c.get("userId");
+  const slug = c.req.param("slug");
+  const body = await jsonBody<{ kind?: string; filename?: string; mime?: string; bytesBase64?: string; alt?: string }>(c);
+  const result = await withTransaction(async (client) => {
+    await requireAdmin(client, adminId);
+    const added = await addOfferMedia(client, slug, body);
+    await logAdminAction(client, {
+      adminUserId: adminId,
+      actionType: "offer.media.add",
+      targetType: "offer",
+      targetId: slug,
+      payload: { id: added.id, kind: body.kind },
+    });
+    return added;
+  });
+  return c.json(result, 201);
+});
+
+app.post("/api/admin/offers/:slug/media/:id/remove", async (c) => {
+  const adminId = c.get("userId");
+  const slug = c.req.param("slug");
+  const mediaId = c.req.param("id");
+  const offer = await withTransaction(async (client) => {
+    await requireAdmin(client, adminId);
+    const result = await removeOfferMedia(client, slug, mediaId);
+    await logAdminAction(client, {
+      adminUserId: adminId,
+      actionType: "offer.media.remove",
+      targetType: "offer",
+      targetId: slug,
+      payload: { id: mediaId },
+    });
+    return result;
+  });
+  return c.json({ offer });
+});
+
+app.post("/api/admin/offers/:slug", async (c) => {
+  const adminId = c.get("userId");
+  const slug = c.req.param("slug");
+  const body = await jsonBody<OfferInput>(c);
+  const offer = await withTransaction(async (client) => {
+    await requireAdmin(client, adminId);
+    const result = await updateOffer(client, slug, body);
+    await logAdminAction(client, {
+      adminUserId: adminId,
+      actionType: "offer.update",
+      targetType: "offer",
+      targetId: slug,
+      payload: { version: result.version, status: result.status },
+    });
+    return result;
+  });
+  return c.json({ offer });
+});
+
 app.onError((err, c) => {
   if (err instanceof ApiError) {
     return c.json({ error: { code: err.code, message: err.message } }, err.status as 400 | 401 | 403 | 404 | 409);

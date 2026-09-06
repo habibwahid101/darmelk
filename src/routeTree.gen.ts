@@ -46,9 +46,14 @@ import { Route as AppSettingsRouteImport } from './routes/app/settings'
 import { Route as AppTransactionsRouteImport } from './routes/app/transactions'
 import { Route as PropertiesIndexRouteImport } from './routes/properties/index'
 import { Route as PropertiesSlugRouteImport } from './routes/properties.$slug'
+import { Route as AdminOffersIndexRouteImport } from './routes/admin/offers.index'
+import { Route as AdminOffersSlugRouteImport } from './routes/admin/offers.$slug'
+import { Route as AdminOffersNewRouteImport } from './routes/admin/offers.new'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as AppBookSlugRouteImport } from './routes/app/book.$slug'
 import { Route as AppBookingsIdRouteImport } from './routes/app/bookings.$id'
+import { Route as AdminOffersSlugIndexRouteImport } from './routes/admin/offers.$slug.index'
+import { Route as AdminOffersSlugPreviewRouteImport } from './routes/admin/offers.$slug.preview'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -235,6 +240,21 @@ const PropertiesSlugRoute = PropertiesSlugRouteImport.update({
   path: '/$slug',
   getParentRoute: () => PropertiesRoute,
 } as any)
+const AdminOffersIndexRoute = AdminOffersIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AdminOffersRoute,
+} as any)
+const AdminOffersSlugRoute = AdminOffersSlugRouteImport.update({
+  id: '/$slug',
+  path: '/$slug',
+  getParentRoute: () => AdminOffersRoute,
+} as any)
+const AdminOffersNewRoute = AdminOffersNewRouteImport.update({
+  id: '/new',
+  path: '/new',
+  getParentRoute: () => AdminOffersRoute,
+} as any)
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   id: '/api/auth/$',
   path: '/api/auth/$',
@@ -249,6 +269,16 @@ const AppBookingsIdRoute = AppBookingsIdRouteImport.update({
   id: '/$id',
   path: '/$id',
   getParentRoute: () => AppBookingsRoute,
+} as any)
+const AdminOffersSlugIndexRoute = AdminOffersSlugIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AdminOffersSlugRoute,
+} as any)
+const AdminOffersSlugPreviewRoute = AdminOffersSlugPreviewRouteImport.update({
+  id: '/preview',
+  path: '/preview',
+  getParentRoute: () => AdminOffersSlugRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
@@ -271,7 +301,7 @@ export interface FileRoutesByFullPath {
   '/admin/contact-requests': typeof AdminContactRequestsRoute
   '/admin/documents': typeof AdminDocumentsRoute
   '/admin/network': typeof AdminNetworkRoute
-  '/admin/offers': typeof AdminOffersRoute
+  '/admin/offers': typeof AdminOffersRouteWithChildren
   '/admin/payments': typeof AdminPaymentsRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/users': typeof AdminUsersRoute
@@ -289,9 +319,14 @@ export interface FileRoutesByFullPath {
   '/admin/': typeof AdminIndexRoute
   '/app/': typeof AppIndexRoute
   '/properties/': typeof PropertiesIndexRoute
+  '/admin/offers/$slug': typeof AdminOffersSlugRouteWithChildren
+  '/admin/offers/new': typeof AdminOffersNewRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/app/book/$slug': typeof AppBookSlugRoute
   '/app/bookings/$id': typeof AppBookingsIdRoute
+  '/admin/offers/': typeof AdminOffersIndexRoute
+  '/admin/offers/$slug/preview': typeof AdminOffersSlugPreviewRoute
+  '/admin/offers/$slug/': typeof AdminOffersSlugIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -310,7 +345,6 @@ export interface FileRoutesByTo {
   '/admin/contact-requests': typeof AdminContactRequestsRoute
   '/admin/documents': typeof AdminDocumentsRoute
   '/admin/network': typeof AdminNetworkRoute
-  '/admin/offers': typeof AdminOffersRoute
   '/admin/payments': typeof AdminPaymentsRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/users': typeof AdminUsersRoute
@@ -328,9 +362,13 @@ export interface FileRoutesByTo {
   '/admin': typeof AdminIndexRoute
   '/app': typeof AppIndexRoute
   '/properties': typeof PropertiesIndexRoute
+  '/admin/offers/new': typeof AdminOffersNewRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/app/book/$slug': typeof AppBookSlugRoute
   '/app/bookings/$id': typeof AppBookingsIdRoute
+  '/admin/offers': typeof AdminOffersIndexRoute
+  '/admin/offers/$slug/preview': typeof AdminOffersSlugPreviewRoute
+  '/admin/offers/$slug': typeof AdminOffersSlugIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -353,7 +391,7 @@ export interface FileRoutesById {
   '/admin/contact-requests': typeof AdminContactRequestsRoute
   '/admin/documents': typeof AdminDocumentsRoute
   '/admin/network': typeof AdminNetworkRoute
-  '/admin/offers': typeof AdminOffersRoute
+  '/admin/offers': typeof AdminOffersRouteWithChildren
   '/admin/payments': typeof AdminPaymentsRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/users': typeof AdminUsersRoute
@@ -371,9 +409,14 @@ export interface FileRoutesById {
   '/admin/': typeof AdminIndexRoute
   '/app/': typeof AppIndexRoute
   '/properties/': typeof PropertiesIndexRoute
+  '/admin/offers/$slug': typeof AdminOffersSlugRouteWithChildren
+  '/admin/offers/new': typeof AdminOffersNewRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/app/book/$slug': typeof AppBookSlugRoute
   '/app/bookings/$id': typeof AppBookingsIdRoute
+  '/admin/offers/': typeof AdminOffersIndexRoute
+  '/admin/offers/$slug/preview': typeof AdminOffersSlugPreviewRoute
+  '/admin/offers/$slug/': typeof AdminOffersSlugIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -415,9 +458,14 @@ export interface FileRouteTypes {
     | '/admin/'
     | '/app/'
     | '/properties/'
+    | '/admin/offers/$slug'
+    | '/admin/offers/new'
     | '/api/auth/$'
     | '/app/book/$slug'
     | '/app/bookings/$id'
+    | '/admin/offers/'
+    | '/admin/offers/$slug/preview'
+    | '/admin/offers/$slug/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -436,7 +484,6 @@ export interface FileRouteTypes {
     | '/admin/contact-requests'
     | '/admin/documents'
     | '/admin/network'
-    | '/admin/offers'
     | '/admin/payments'
     | '/admin/settings'
     | '/admin/users'
@@ -454,9 +501,13 @@ export interface FileRouteTypes {
     | '/admin'
     | '/app'
     | '/properties'
+    | '/admin/offers/new'
     | '/api/auth/$'
     | '/app/book/$slug'
     | '/app/bookings/$id'
+    | '/admin/offers'
+    | '/admin/offers/$slug/preview'
+    | '/admin/offers/$slug'
   id:
     | '__root__'
     | '/'
@@ -496,9 +547,14 @@ export interface FileRouteTypes {
     | '/admin/'
     | '/app/'
     | '/properties/'
+    | '/admin/offers/$slug'
+    | '/admin/offers/new'
     | '/api/auth/$'
     | '/app/book/$slug'
     | '/app/bookings/$id'
+    | '/admin/offers/'
+    | '/admin/offers/$slug/preview'
+    | '/admin/offers/$slug/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -779,6 +835,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PropertiesSlugRouteImport
       parentRoute: typeof PropertiesRoute
     }
+    '/admin/offers/': {
+      id: '/admin/offers/'
+      path: '/'
+      fullPath: '/admin/offers/'
+      preLoaderRoute: typeof AdminOffersIndexRouteImport
+      parentRoute: typeof AdminOffersRoute
+    }
+    '/admin/offers/$slug': {
+      id: '/admin/offers/$slug'
+      path: '/$slug'
+      fullPath: '/admin/offers/$slug'
+      preLoaderRoute: typeof AdminOffersSlugRouteImport
+      parentRoute: typeof AdminOffersRoute
+    }
+    '/admin/offers/new': {
+      id: '/admin/offers/new'
+      path: '/new'
+      fullPath: '/admin/offers/new'
+      preLoaderRoute: typeof AdminOffersNewRouteImport
+      parentRoute: typeof AdminOffersRoute
+    }
     '/api/auth/$': {
       id: '/api/auth/$'
       path: '/api/auth/$'
@@ -800,8 +877,52 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppBookingsIdRouteImport
       parentRoute: typeof AppBookingsRoute
     }
+    '/admin/offers/$slug/': {
+      id: '/admin/offers/$slug/'
+      path: '/'
+      fullPath: '/admin/offers/$slug/'
+      preLoaderRoute: typeof AdminOffersSlugIndexRouteImport
+      parentRoute: typeof AdminOffersSlugRoute
+    }
+    '/admin/offers/$slug/preview': {
+      id: '/admin/offers/$slug/preview'
+      path: '/preview'
+      fullPath: '/admin/offers/$slug/preview'
+      preLoaderRoute: typeof AdminOffersSlugPreviewRouteImport
+      parentRoute: typeof AdminOffersSlugRoute
+    }
   }
 }
+
+interface AdminOffersSlugRouteChildren {
+  AdminOffersSlugPreviewRoute: typeof AdminOffersSlugPreviewRoute
+  AdminOffersSlugIndexRoute: typeof AdminOffersSlugIndexRoute
+}
+
+const AdminOffersSlugRouteChildren: AdminOffersSlugRouteChildren = {
+  AdminOffersSlugPreviewRoute: AdminOffersSlugPreviewRoute,
+  AdminOffersSlugIndexRoute: AdminOffersSlugIndexRoute,
+}
+
+const AdminOffersSlugRouteWithChildren = AdminOffersSlugRoute._addFileChildren(
+  AdminOffersSlugRouteChildren,
+)
+
+interface AdminOffersRouteChildren {
+  AdminOffersSlugRoute: typeof AdminOffersSlugRouteWithChildren
+  AdminOffersNewRoute: typeof AdminOffersNewRoute
+  AdminOffersIndexRoute: typeof AdminOffersIndexRoute
+}
+
+const AdminOffersRouteChildren: AdminOffersRouteChildren = {
+  AdminOffersSlugRoute: AdminOffersSlugRouteWithChildren,
+  AdminOffersNewRoute: AdminOffersNewRoute,
+  AdminOffersIndexRoute: AdminOffersIndexRoute,
+}
+
+const AdminOffersRouteWithChildren = AdminOffersRoute._addFileChildren(
+  AdminOffersRouteChildren,
+)
 
 interface AdminRouteChildren {
   AdminActivationRoute: typeof AdminActivationRoute
@@ -810,7 +931,7 @@ interface AdminRouteChildren {
   AdminContactRequestsRoute: typeof AdminContactRequestsRoute
   AdminDocumentsRoute: typeof AdminDocumentsRoute
   AdminNetworkRoute: typeof AdminNetworkRoute
-  AdminOffersRoute: typeof AdminOffersRoute
+  AdminOffersRoute: typeof AdminOffersRouteWithChildren
   AdminPaymentsRoute: typeof AdminPaymentsRoute
   AdminSettingsRoute: typeof AdminSettingsRoute
   AdminUsersRoute: typeof AdminUsersRoute
@@ -825,7 +946,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminContactRequestsRoute: AdminContactRequestsRoute,
   AdminDocumentsRoute: AdminDocumentsRoute,
   AdminNetworkRoute: AdminNetworkRoute,
-  AdminOffersRoute: AdminOffersRoute,
+  AdminOffersRoute: AdminOffersRouteWithChildren,
   AdminPaymentsRoute: AdminPaymentsRoute,
   AdminSettingsRoute: AdminSettingsRoute,
   AdminUsersRoute: AdminUsersRoute,

@@ -1,8 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { FeaturedOffer, PropertyCard } from "@/components/property-card";
 import { Badge } from "@/components/ui/badge";
-import { CATEGORIES, OFFERS, offersInCategory } from "@/lib/offers";
+import { api } from "@/lib/api-client";
+import { CATEGORIES, catalogWithFallback, fromApiOffer, isPublished, offersInCategory } from "@/lib/offers";
 import { cn } from "@/lib/utils";
+import { useAsync } from "@/lib/use-async";
 
 type PropertiesSearch = { category?: string };
 
@@ -15,8 +17,14 @@ export const Route = createFileRoute("/properties/")({
 
 function PropertiesPage() {
   const { category } = Route.useSearch();
-  const list = category ? offersInCategory(category) : OFFERS;
+  const { data } = useAsync(() => api.offers(), []);
+  const offers = catalogWithFallback((data?.offers ?? []).map(fromApiOffer).filter((o) => isPublished(o.status)));
+  const list = category ? offersInCategory(category, offers) : offers;
   const active = CATEGORIES.find((c) => c.slug === category);
+  const categories = CATEGORIES.map((c) => ({
+    ...c,
+    available: offers.some((o) => o.categorySlug === c.slug),
+  }));
 
   return (
     <>
@@ -39,16 +47,14 @@ function PropertiesPage() {
               <FilterChip to="/properties" active={!category}>
                 All available
               </FilterChip>
-              {CATEGORIES.filter((c) => c.available).map((c) => (
+              {categories.filter((c) => c.available).map((c) => (
                 <FilterChip
                   key={c.slug}
                   to="/properties"
                   search={{ category: c.slug }}
                   active={category === c.slug}
-                  disabled={!c.available}
                 >
                   {c.title}
-                  {!c.available ? " · Soon" : ""}
                 </FilterChip>
               ))}
             </div>
@@ -94,21 +100,12 @@ function FilterChip({
   to,
   search,
   active,
-  disabled,
 }: {
   children: React.ReactNode;
   to: "/properties";
   search?: PropertiesSearch;
   active?: boolean;
-  disabled?: boolean;
 }) {
-  if (disabled) {
-    return (
-      <span className="inline-flex h-11 shrink-0 items-center rounded-full bg-mist px-4 text-sm text-subtle">
-        {children}
-      </span>
-    );
-  }
   return (
     <Link
       to={to}

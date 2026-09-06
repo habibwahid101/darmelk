@@ -3,7 +3,9 @@ import * as Accordion from "@radix-ui/react-accordion";
 import { ArrowRight, ChevronDown, FileText, Scale, ShieldCheck } from "lucide-react";
 import { AmountRow } from "@/components/states";
 import { Button } from "@/components/ui/button";
-import { FLAGSHIP, OFFERS } from "@/lib/offers";
+import { catalogWithFallback, fromApiOffer, isPublished, pickFlagship, resolveMediaSrc } from "@/lib/offers";
+import { api } from "@/lib/api-client";
+import { useAsync } from "@/lib/use-async";
 
 const propertyCategories = [
   {
@@ -42,6 +44,10 @@ const faqs = [
 ];
 
 export function LandingPage() {
+  const { data } = useAsync(() => api.offers(), []);
+  const offers = catalogWithFallback((data?.offers ?? []).map(fromApiOffer));
+  const FLAGSHIP = pickFlagship(offers);
+
   return (
     <div>
       <section className="relative min-h-[78svh] overflow-hidden bg-ink">
@@ -77,7 +83,7 @@ export function LandingPage() {
 
       <section className="section-y">
         <div className="container-pg grid gap-8 lg:grid-cols-[1.15fr_.85fr] lg:items-center">
-          <img src={FLAGSHIP.image} alt={FLAGSHIP.title} className="aspect-[16/11] w-full rounded-2xl object-cover" />
+          <img src={resolveMediaSrc(FLAGSHIP.image)} alt={FLAGSHIP.title} className="aspect-[16/11] w-full rounded-2xl object-cover" />
           <div>
             <p className="text-xs font-medium uppercase tracking-[.18em] text-pine">Flagship property</p>
             <h2 className="mt-3 font-display text-3xl font-semibold text-pretty">{FLAGSHIP.title}</h2>
@@ -108,8 +114,9 @@ export function LandingPage() {
           </div>
           <div className="mt-7 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {propertyCategories.map((category) => {
-              const availableCount = OFFERS.filter(
-                (offer) => offer.categorySlug === category.slug && offer.status === "available",
+              const categorySlug = category.slug === "commercial-properties" ? "investment" : category.slug;
+              const availableCount = offers.filter(
+                (offer) => offer.categorySlug === categorySlug && isPublished(offer.status),
               ).length;
               const inner = (
                 <>
@@ -132,7 +139,7 @@ export function LandingPage() {
                 <Link
                   key={category.slug}
                   to="/properties"
-                  search={{ category: category.slug }}
+                  search={{ category: categorySlug }}
                   className="group overflow-hidden rounded-2xl bg-paper shadow-[var(--shadow-card)] transition-transform duration-150 hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pine"
                 >
                   {inner}
