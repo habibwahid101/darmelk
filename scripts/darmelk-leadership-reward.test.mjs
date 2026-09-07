@@ -34,6 +34,7 @@ test("engine uses Level 5 completion, following month, and any-3 directs", () =>
   assert.match(engine, /on conflict \(cycle_id, reward_month\) do nothing/);
   assert.match(engine, /on conflict \(cycle_id, tier\) do nothing/);
   assert.match(engine, /sponsor_user_id/);
+  assert.match(engine, /m\.user_id <> \$1/);
   assert.match(engine, /refreshExistingCycle/);
   assert.doesNotMatch(engine, /Months 1–4|months 1-4|Month 1-4/);
   assert.doesNotMatch(engine, /Employee Salary/);

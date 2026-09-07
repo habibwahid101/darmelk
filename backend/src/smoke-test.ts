@@ -474,7 +474,7 @@ async function main() {
   const level5WithoutSponsor3 = await withTransaction(async (client) => {
     await client.query(`update members set sponsor_user_id=null where user_id like 'darmelk_qa_matrix_%'`);
     const status = await getQualificationStatus(client, matrixRootId);
-    await client.query(`update members set sponsor_user_id=$1 where user_id like 'darmelk_qa_matrix_%' and user_id <> 'darmelk_qa_matrix_364'`, [matrixRootId]);
+    await client.query(`update members set sponsor_user_id=$1 where user_id like 'darmelk_qa_matrix_%' and user_id <> 'darmelk_qa_matrix_364' and user_id <> $1`, [matrixRootId]);
     return status;
   });
   record(

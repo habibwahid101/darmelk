@@ -259,6 +259,7 @@ async function sponseeCycles(client: PoolClient, userId: string): Promise<CycleR
        from leadership_reward_cycles c
        join members m on m.user_id = c.user_id
       where m.sponsor_user_id = $1
+        and m.user_id <> $1
       order by c.level5_completed_at asc, c.user_id asc`,
     [userId],
   );
@@ -276,7 +277,7 @@ async function sponseeTierEvents(
             e.applies_in_cycle, e.evidence, e.created_at, m.sponsor_user_id
        from leadership_reward_tier_events e
        join members m on m.user_id = e.user_id
-      where m.sponsor_user_id = $1 and e.tier = $2
+      where m.sponsor_user_id = $1 and e.user_id <> $1 and e.tier = $2
       order by e.eligible_at asc, e.user_id asc`,
     [userId, tier],
   );
