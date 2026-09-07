@@ -35,6 +35,15 @@ import {
   updateOffer,
   type OfferInput,
 } from "./engine/offers.js";
+import {
+  createJob,
+  getJobRow,
+  listAdminJobs,
+  listPublicJobs,
+  setJobStatus,
+  updateJob,
+  type JobInput,
+} from "./engine/jobs.js";
 
 type Vars = { userId: string; userEmail: string };
 const app = new Hono<{ Variables: Vars }>();
@@ -135,6 +144,15 @@ app.get("/api/offers/:slug/media/:id", async (c) => {
 app.get("/api/offers/:slug", async (c) => {
   const offer = await withTransaction((client) => getOfferRow(client, c.req.param("slug")));
   return c.json({ offer });
+});
+
+app.get("/api/jobs", async (c) => {
+  const jobs = await withTransaction((client) => listPublicJobs(client));
+  return c.json({ jobs });
+});
+app.get("/api/jobs/:slug", async (c) => {
+  const job = await withTransaction((client) => getJobRow(client, c.req.param("slug")));
+  return c.json({ job });
 });
 
 app.get("/api/referral/:code", async (c) => {
@@ -759,6 +777,80 @@ app.post("/api/admin/offers/:slug", async (c) => {
     return result;
   });
   return c.json({ offer });
+});
+
+app.get("/api/admin/jobs", async (c) => {
+  const adminId = c.get("userId");
+  const jobs = await withTransaction(async (client) => {
+    await requireAdmin(client, adminId);
+    return listAdminJobs(client);
+  });
+  return c.json({ jobs });
+});
+
+app.get("/api/admin/jobs/:slug", async (c) => {
+  const adminId = c.get("userId");
+  const job = await withTransaction(async (client) => {
+    await requireAdmin(client, adminId);
+    return getJobRow(client, c.req.param("slug"), { includeDraft: true });
+  });
+  return c.json({ job });
+});
+
+app.post("/api/admin/jobs", async (c) => {
+  const adminId = c.get("userId");
+  const body = await jsonBody<JobInput>(c);
+  const job = await withTransaction(async (client) => {
+    await requireAdmin(client, adminId);
+    const result = await createJob(client, body);
+    await logAdminAction(client, {
+      adminUserId: adminId,
+      actionType: "job.create",
+      targetType: "job",
+      targetId: result.slug,
+      payload: { status: result.status },
+    });
+    return result;
+  });
+  return c.json({ job }, 201);
+});
+
+app.post("/api/admin/jobs/:slug/status", async (c) => {
+  const adminId = c.get("userId");
+  const slug = c.req.param("slug");
+  const body = await jsonBody<{ status?: string }>(c);
+  const job = await withTransaction(async (client) => {
+    await requireAdmin(client, adminId);
+    const result = await setJobStatus(client, slug, body.status ?? "");
+    await logAdminAction(client, {
+      adminUserId: adminId,
+      actionType: "job.status",
+      targetType: "job",
+      targetId: slug,
+      payload: { status: result.status },
+    });
+    return result;
+  });
+  return c.json({ job });
+});
+
+app.post("/api/admin/jobs/:slug", async (c) => {
+  const adminId = c.get("userId");
+  const slug = c.req.param("slug");
+  const body = await jsonBody<JobInput>(c);
+  const job = await withTransaction(async (client) => {
+    await requireAdmin(client, adminId);
+    const result = await updateJob(client, slug, body);
+    await logAdminAction(client, {
+      adminUserId: adminId,
+      actionType: "job.update",
+      targetType: "job",
+      targetId: slug,
+      payload: { status: result.status },
+    });
+    return result;
+  });
+  return c.json({ job });
 });
 
 app.onError((err, c) => {

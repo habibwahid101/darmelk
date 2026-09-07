@@ -11,46 +11,52 @@ export function SiteFooter() {
             A property-first platform for curated offers. Booking terms, progress, and benefits are offer-specific — always shown before you commit.
           </p>
         </div>
-        <div>
-          <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-subtle">Explore</p>
-          <ul className="mt-2 columns-2 gap-x-8 space-y-0 text-sm">
+        <nav aria-label="Footer" className="grid min-w-0 grid-cols-2 gap-x-6 sm:gap-x-10">
+          <ul className="min-w-0 text-sm">
             <li>
-              <Link to="/properties" className="inline-flex min-h-8 items-center text-ink/80 hover:text-ink">
+              <Link to="/properties" className="inline-flex min-h-8 max-w-full items-center text-ink/80 hover:text-ink">
                 Properties
               </Link>
             </li>
             <li>
-              <Link to="/" hash="how-it-works" className="inline-flex min-h-8 items-center text-ink/80 hover:text-ink">
-                How it works
+              <Link to="/" hash="how-it-works" className="inline-flex min-h-8 max-w-full items-center text-ink/80 hover:text-ink">
+                How It Works
               </Link>
             </li>
             <li>
-              <Link to="/faq" className="inline-flex min-h-8 items-center text-ink/80 hover:text-ink">
+              <Link to="/faq" className="inline-flex min-h-8 max-w-full items-center text-ink/80 hover:text-ink">
                 FAQ
               </Link>
             </li>
             <li>
-              <Link to="/contact" className="inline-flex min-h-8 items-center text-ink/80 hover:text-ink">
+              <Link to="/contact" className="inline-flex min-h-8 max-w-full items-center text-ink/80 hover:text-ink">
                 Contact Us
               </Link>
             </li>
+          </ul>
+          <ul className="min-w-0 text-sm">
             <li>
-              <Link to="/program-rules" className="inline-flex min-h-8 items-center text-ink/80 hover:text-ink">
+              <Link to="/program-rules" className="inline-flex min-h-8 max-w-full items-center text-ink/80 hover:text-ink">
                 Program Rules
               </Link>
             </li>
             <li>
-              <Link to="/terms" className="inline-flex min-h-8 items-center text-ink/80 hover:text-ink">
+              <Link to="/terms" className="inline-flex min-h-8 max-w-full items-center text-ink/80 hover:text-ink">
                 Terms
               </Link>
             </li>
             <li>
-              <Link to="/privacy" className="inline-flex min-h-8 items-center text-ink/80 hover:text-ink">
+              <Link to="/privacy" className="inline-flex min-h-8 max-w-full items-center text-ink/80 hover:text-ink">
                 Privacy
               </Link>
             </li>
+            <li>
+              <Link to="/career" className="inline-flex min-h-8 max-w-full items-center text-ink/80 hover:text-ink">
+                Career
+              </Link>
+            </li>
           </ul>
-        </div>
+        </nav>
       </div>
       <div className="border-t border-line">
         <div className="container-pg flex flex-col gap-1 py-4 text-xs text-subtle sm:flex-row sm:items-center sm:justify-between sm:py-5">

@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AccountRouteImport } from './routes/account'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AppRouteImport } from './routes/app'
+import { Route as CareerRouteImport } from './routes/career'
 import { Route as ContactRouteImport } from './routes/contact'
 import { Route as FaqRouteImport } from './routes/faq'
 import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
@@ -25,6 +26,7 @@ import { Route as TermsRouteImport } from './routes/terms'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as AdminActivationRouteImport } from './routes/admin/activation'
 import { Route as AdminBookingsRouteImport } from './routes/admin/bookings'
+import { Route as AdminCareerRouteImport } from './routes/admin/career'
 import { Route as AdminCommissionRouteImport } from './routes/admin/commission'
 import { Route as AdminContactRequestsRouteImport } from './routes/admin/contact-requests'
 import { Route as AdminDocumentsRouteImport } from './routes/admin/documents'
@@ -44,14 +46,21 @@ import { Route as AppOnboardingRouteImport } from './routes/app/onboarding'
 import { Route as AppQualificationRouteImport } from './routes/app/qualification'
 import { Route as AppSettingsRouteImport } from './routes/app/settings'
 import { Route as AppTransactionsRouteImport } from './routes/app/transactions'
+import { Route as CareerIndexRouteImport } from './routes/career/index'
+import { Route as CareerSlugRouteImport } from './routes/career.$slug'
 import { Route as PropertiesIndexRouteImport } from './routes/properties/index'
 import { Route as PropertiesSlugRouteImport } from './routes/properties.$slug'
+import { Route as AdminCareerIndexRouteImport } from './routes/admin/career.index'
+import { Route as AdminCareerSlugRouteImport } from './routes/admin/career.$slug'
+import { Route as AdminCareerNewRouteImport } from './routes/admin/career.new'
 import { Route as AdminOffersIndexRouteImport } from './routes/admin/offers.index'
 import { Route as AdminOffersSlugRouteImport } from './routes/admin/offers.$slug'
 import { Route as AdminOffersNewRouteImport } from './routes/admin/offers.new'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as AppBookSlugRouteImport } from './routes/app/book.$slug'
 import { Route as AppBookingsIdRouteImport } from './routes/app/bookings.$id'
+import { Route as AdminCareerSlugIndexRouteImport } from './routes/admin/career.$slug.index'
+import { Route as AdminCareerSlugPreviewRouteImport } from './routes/admin/career.$slug.preview'
 import { Route as AdminOffersSlugIndexRouteImport } from './routes/admin/offers.$slug.index'
 import { Route as AdminOffersSlugPreviewRouteImport } from './routes/admin/offers.$slug.preview'
 
@@ -73,6 +82,11 @@ const AdminRoute = AdminRouteImport.update({
 const AppRoute = AppRouteImport.update({
   id: '/app',
   path: '/app',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CareerRoute = CareerRouteImport.update({
+  id: '/career',
+  path: '/career',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ContactRoute = ContactRouteImport.update({
@@ -133,6 +147,11 @@ const AdminActivationRoute = AdminActivationRouteImport.update({
 const AdminBookingsRoute = AdminBookingsRouteImport.update({
   id: '/bookings',
   path: '/bookings',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminCareerRoute = AdminCareerRouteImport.update({
+  id: '/career',
+  path: '/career',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminCommissionRoute = AdminCommissionRouteImport.update({
@@ -230,6 +249,16 @@ const AppTransactionsRoute = AppTransactionsRouteImport.update({
   path: '/transactions',
   getParentRoute: () => AppRoute,
 } as any)
+const CareerIndexRoute = CareerIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => CareerRoute,
+} as any)
+const CareerSlugRoute = CareerSlugRouteImport.update({
+  id: '/$slug',
+  path: '/$slug',
+  getParentRoute: () => CareerRoute,
+} as any)
 const PropertiesIndexRoute = PropertiesIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -239,6 +268,21 @@ const PropertiesSlugRoute = PropertiesSlugRouteImport.update({
   id: '/$slug',
   path: '/$slug',
   getParentRoute: () => PropertiesRoute,
+} as any)
+const AdminCareerIndexRoute = AdminCareerIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AdminCareerRoute,
+} as any)
+const AdminCareerSlugRoute = AdminCareerSlugRouteImport.update({
+  id: '/$slug',
+  path: '/$slug',
+  getParentRoute: () => AdminCareerRoute,
+} as any)
+const AdminCareerNewRoute = AdminCareerNewRouteImport.update({
+  id: '/new',
+  path: '/new',
+  getParentRoute: () => AdminCareerRoute,
 } as any)
 const AdminOffersIndexRoute = AdminOffersIndexRouteImport.update({
   id: '/',
@@ -270,6 +314,16 @@ const AppBookingsIdRoute = AppBookingsIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => AppBookingsRoute,
 } as any)
+const AdminCareerSlugIndexRoute = AdminCareerSlugIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AdminCareerSlugRoute,
+} as any)
+const AdminCareerSlugPreviewRoute = AdminCareerSlugPreviewRouteImport.update({
+  id: '/preview',
+  path: '/preview',
+  getParentRoute: () => AdminCareerSlugRoute,
+} as any)
 const AdminOffersSlugIndexRoute = AdminOffersSlugIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -286,6 +340,7 @@ export interface FileRoutesByFullPath {
   '/account': typeof AccountRoute
   '/admin': typeof AdminRouteWithChildren
   '/app': typeof AppRouteWithChildren
+  '/career': typeof CareerRouteWithChildren
   '/contact': typeof ContactRoute
   '/faq': typeof FaqRoute
   '/forgot-password': typeof ForgotPasswordRoute
@@ -297,6 +352,7 @@ export interface FileRoutesByFullPath {
   '/terms': typeof TermsRoute
   '/admin/activation': typeof AdminActivationRoute
   '/admin/bookings': typeof AdminBookingsRoute
+  '/admin/career': typeof AdminCareerRouteWithChildren
   '/admin/commission': typeof AdminCommissionRoute
   '/admin/contact-requests': typeof AdminContactRequestsRoute
   '/admin/documents': typeof AdminDocumentsRoute
@@ -315,17 +371,24 @@ export interface FileRoutesByFullPath {
   '/app/qualification': typeof AppQualificationRoute
   '/app/settings': typeof AppSettingsRoute
   '/app/transactions': typeof AppTransactionsRoute
+  '/career/$slug': typeof CareerSlugRoute
   '/properties/$slug': typeof PropertiesSlugRoute
   '/admin/': typeof AdminIndexRoute
   '/app/': typeof AppIndexRoute
+  '/career/': typeof CareerIndexRoute
   '/properties/': typeof PropertiesIndexRoute
+  '/admin/career/$slug': typeof AdminCareerSlugRouteWithChildren
+  '/admin/career/new': typeof AdminCareerNewRoute
   '/admin/offers/$slug': typeof AdminOffersSlugRouteWithChildren
   '/admin/offers/new': typeof AdminOffersNewRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/app/book/$slug': typeof AppBookSlugRoute
   '/app/bookings/$id': typeof AppBookingsIdRoute
+  '/admin/career/': typeof AdminCareerIndexRoute
   '/admin/offers/': typeof AdminOffersIndexRoute
+  '/admin/career/$slug/preview': typeof AdminCareerSlugPreviewRoute
   '/admin/offers/$slug/preview': typeof AdminOffersSlugPreviewRoute
+  '/admin/career/$slug/': typeof AdminCareerSlugIndexRoute
   '/admin/offers/$slug/': typeof AdminOffersSlugIndexRoute
 }
 export interface FileRoutesByTo {
@@ -358,16 +421,22 @@ export interface FileRoutesByTo {
   '/app/qualification': typeof AppQualificationRoute
   '/app/settings': typeof AppSettingsRoute
   '/app/transactions': typeof AppTransactionsRoute
+  '/career/$slug': typeof CareerSlugRoute
   '/properties/$slug': typeof PropertiesSlugRoute
   '/admin': typeof AdminIndexRoute
   '/app': typeof AppIndexRoute
+  '/career': typeof CareerIndexRoute
   '/properties': typeof PropertiesIndexRoute
+  '/admin/career/new': typeof AdminCareerNewRoute
   '/admin/offers/new': typeof AdminOffersNewRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/app/book/$slug': typeof AppBookSlugRoute
   '/app/bookings/$id': typeof AppBookingsIdRoute
+  '/admin/career': typeof AdminCareerIndexRoute
   '/admin/offers': typeof AdminOffersIndexRoute
+  '/admin/career/$slug/preview': typeof AdminCareerSlugPreviewRoute
   '/admin/offers/$slug/preview': typeof AdminOffersSlugPreviewRoute
+  '/admin/career/$slug': typeof AdminCareerSlugIndexRoute
   '/admin/offers/$slug': typeof AdminOffersSlugIndexRoute
 }
 export interface FileRoutesById {
@@ -376,6 +445,7 @@ export interface FileRoutesById {
   '/account': typeof AccountRoute
   '/admin': typeof AdminRouteWithChildren
   '/app': typeof AppRouteWithChildren
+  '/career': typeof CareerRouteWithChildren
   '/contact': typeof ContactRoute
   '/faq': typeof FaqRoute
   '/forgot-password': typeof ForgotPasswordRoute
@@ -387,6 +457,7 @@ export interface FileRoutesById {
   '/terms': typeof TermsRoute
   '/admin/activation': typeof AdminActivationRoute
   '/admin/bookings': typeof AdminBookingsRoute
+  '/admin/career': typeof AdminCareerRouteWithChildren
   '/admin/commission': typeof AdminCommissionRoute
   '/admin/contact-requests': typeof AdminContactRequestsRoute
   '/admin/documents': typeof AdminDocumentsRoute
@@ -405,17 +476,24 @@ export interface FileRoutesById {
   '/app/qualification': typeof AppQualificationRoute
   '/app/settings': typeof AppSettingsRoute
   '/app/transactions': typeof AppTransactionsRoute
+  '/career/$slug': typeof CareerSlugRoute
   '/properties/$slug': typeof PropertiesSlugRoute
   '/admin/': typeof AdminIndexRoute
   '/app/': typeof AppIndexRoute
+  '/career/': typeof CareerIndexRoute
   '/properties/': typeof PropertiesIndexRoute
+  '/admin/career/$slug': typeof AdminCareerSlugRouteWithChildren
+  '/admin/career/new': typeof AdminCareerNewRoute
   '/admin/offers/$slug': typeof AdminOffersSlugRouteWithChildren
   '/admin/offers/new': typeof AdminOffersNewRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/app/book/$slug': typeof AppBookSlugRoute
   '/app/bookings/$id': typeof AppBookingsIdRoute
+  '/admin/career/': typeof AdminCareerIndexRoute
   '/admin/offers/': typeof AdminOffersIndexRoute
+  '/admin/career/$slug/preview': typeof AdminCareerSlugPreviewRoute
   '/admin/offers/$slug/preview': typeof AdminOffersSlugPreviewRoute
+  '/admin/career/$slug/': typeof AdminCareerSlugIndexRoute
   '/admin/offers/$slug/': typeof AdminOffersSlugIndexRoute
 }
 export interface FileRouteTypes {
@@ -425,6 +503,7 @@ export interface FileRouteTypes {
     | '/account'
     | '/admin'
     | '/app'
+    | '/career'
     | '/contact'
     | '/faq'
     | '/forgot-password'
@@ -436,6 +515,7 @@ export interface FileRouteTypes {
     | '/terms'
     | '/admin/activation'
     | '/admin/bookings'
+    | '/admin/career'
     | '/admin/commission'
     | '/admin/contact-requests'
     | '/admin/documents'
@@ -454,17 +534,24 @@ export interface FileRouteTypes {
     | '/app/qualification'
     | '/app/settings'
     | '/app/transactions'
+    | '/career/$slug'
     | '/properties/$slug'
     | '/admin/'
     | '/app/'
+    | '/career/'
     | '/properties/'
+    | '/admin/career/$slug'
+    | '/admin/career/new'
     | '/admin/offers/$slug'
     | '/admin/offers/new'
     | '/api/auth/$'
     | '/app/book/$slug'
     | '/app/bookings/$id'
+    | '/admin/career/'
     | '/admin/offers/'
+    | '/admin/career/$slug/preview'
     | '/admin/offers/$slug/preview'
+    | '/admin/career/$slug/'
     | '/admin/offers/$slug/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -497,16 +584,22 @@ export interface FileRouteTypes {
     | '/app/qualification'
     | '/app/settings'
     | '/app/transactions'
+    | '/career/$slug'
     | '/properties/$slug'
     | '/admin'
     | '/app'
+    | '/career'
     | '/properties'
+    | '/admin/career/new'
     | '/admin/offers/new'
     | '/api/auth/$'
     | '/app/book/$slug'
     | '/app/bookings/$id'
+    | '/admin/career'
     | '/admin/offers'
+    | '/admin/career/$slug/preview'
     | '/admin/offers/$slug/preview'
+    | '/admin/career/$slug'
     | '/admin/offers/$slug'
   id:
     | '__root__'
@@ -514,6 +607,7 @@ export interface FileRouteTypes {
     | '/account'
     | '/admin'
     | '/app'
+    | '/career'
     | '/contact'
     | '/faq'
     | '/forgot-password'
@@ -525,6 +619,7 @@ export interface FileRouteTypes {
     | '/terms'
     | '/admin/activation'
     | '/admin/bookings'
+    | '/admin/career'
     | '/admin/commission'
     | '/admin/contact-requests'
     | '/admin/documents'
@@ -543,17 +638,24 @@ export interface FileRouteTypes {
     | '/app/qualification'
     | '/app/settings'
     | '/app/transactions'
+    | '/career/$slug'
     | '/properties/$slug'
     | '/admin/'
     | '/app/'
+    | '/career/'
     | '/properties/'
+    | '/admin/career/$slug'
+    | '/admin/career/new'
     | '/admin/offers/$slug'
     | '/admin/offers/new'
     | '/api/auth/$'
     | '/app/book/$slug'
     | '/app/bookings/$id'
+    | '/admin/career/'
     | '/admin/offers/'
+    | '/admin/career/$slug/preview'
     | '/admin/offers/$slug/preview'
+    | '/admin/career/$slug/'
     | '/admin/offers/$slug/'
   fileRoutesById: FileRoutesById
 }
@@ -562,6 +664,7 @@ export interface RootRouteChildren {
   AccountRoute: typeof AccountRoute
   AdminRoute: typeof AdminRouteWithChildren
   AppRoute: typeof AppRouteWithChildren
+  CareerRoute: typeof CareerRouteWithChildren
   ContactRoute: typeof ContactRoute
   FaqRoute: typeof FaqRoute
   ForgotPasswordRoute: typeof ForgotPasswordRoute
@@ -602,6 +705,13 @@ declare module '@tanstack/react-router' {
       path: '/app'
       fullPath: '/app'
       preLoaderRoute: typeof AppRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/career': {
+      id: '/career'
+      path: '/career'
+      fullPath: '/career'
+      preLoaderRoute: typeof CareerRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/contact': {
@@ -686,6 +796,13 @@ declare module '@tanstack/react-router' {
       path: '/bookings'
       fullPath: '/admin/bookings'
       preLoaderRoute: typeof AdminBookingsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/career': {
+      id: '/admin/career'
+      path: '/career'
+      fullPath: '/admin/career'
+      preLoaderRoute: typeof AdminCareerRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/commission': {
@@ -821,6 +938,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppTransactionsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/career/': {
+      id: '/career/'
+      path: '/'
+      fullPath: '/career/'
+      preLoaderRoute: typeof CareerIndexRouteImport
+      parentRoute: typeof CareerRoute
+    }
+    '/career/$slug': {
+      id: '/career/$slug'
+      path: '/$slug'
+      fullPath: '/career/$slug'
+      preLoaderRoute: typeof CareerSlugRouteImport
+      parentRoute: typeof CareerRoute
+    }
     '/properties/': {
       id: '/properties/'
       path: '/'
@@ -834,6 +965,27 @@ declare module '@tanstack/react-router' {
       fullPath: '/properties/$slug'
       preLoaderRoute: typeof PropertiesSlugRouteImport
       parentRoute: typeof PropertiesRoute
+    }
+    '/admin/career/': {
+      id: '/admin/career/'
+      path: '/'
+      fullPath: '/admin/career/'
+      preLoaderRoute: typeof AdminCareerIndexRouteImport
+      parentRoute: typeof AdminCareerRoute
+    }
+    '/admin/career/$slug': {
+      id: '/admin/career/$slug'
+      path: '/$slug'
+      fullPath: '/admin/career/$slug'
+      preLoaderRoute: typeof AdminCareerSlugRouteImport
+      parentRoute: typeof AdminCareerRoute
+    }
+    '/admin/career/new': {
+      id: '/admin/career/new'
+      path: '/new'
+      fullPath: '/admin/career/new'
+      preLoaderRoute: typeof AdminCareerNewRouteImport
+      parentRoute: typeof AdminCareerRoute
     }
     '/admin/offers/': {
       id: '/admin/offers/'
@@ -877,6 +1029,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppBookingsIdRouteImport
       parentRoute: typeof AppBookingsRoute
     }
+    '/admin/career/$slug/': {
+      id: '/admin/career/$slug/'
+      path: '/'
+      fullPath: '/admin/career/$slug/'
+      preLoaderRoute: typeof AdminCareerSlugIndexRouteImport
+      parentRoute: typeof AdminCareerSlugRoute
+    }
+    '/admin/career/$slug/preview': {
+      id: '/admin/career/$slug/preview'
+      path: '/preview'
+      fullPath: '/admin/career/$slug/preview'
+      preLoaderRoute: typeof AdminCareerSlugPreviewRouteImport
+      parentRoute: typeof AdminCareerSlugRoute
+    }
     '/admin/offers/$slug/': {
       id: '/admin/offers/$slug/'
       path: '/'
@@ -893,6 +1059,36 @@ declare module '@tanstack/react-router' {
     }
   }
 }
+
+interface AdminCareerSlugRouteChildren {
+  AdminCareerSlugPreviewRoute: typeof AdminCareerSlugPreviewRoute
+  AdminCareerSlugIndexRoute: typeof AdminCareerSlugIndexRoute
+}
+
+const AdminCareerSlugRouteChildren: AdminCareerSlugRouteChildren = {
+  AdminCareerSlugPreviewRoute: AdminCareerSlugPreviewRoute,
+  AdminCareerSlugIndexRoute: AdminCareerSlugIndexRoute,
+}
+
+const AdminCareerSlugRouteWithChildren = AdminCareerSlugRoute._addFileChildren(
+  AdminCareerSlugRouteChildren,
+)
+
+interface AdminCareerRouteChildren {
+  AdminCareerSlugRoute: typeof AdminCareerSlugRouteWithChildren
+  AdminCareerNewRoute: typeof AdminCareerNewRoute
+  AdminCareerIndexRoute: typeof AdminCareerIndexRoute
+}
+
+const AdminCareerRouteChildren: AdminCareerRouteChildren = {
+  AdminCareerSlugRoute: AdminCareerSlugRouteWithChildren,
+  AdminCareerNewRoute: AdminCareerNewRoute,
+  AdminCareerIndexRoute: AdminCareerIndexRoute,
+}
+
+const AdminCareerRouteWithChildren = AdminCareerRoute._addFileChildren(
+  AdminCareerRouteChildren,
+)
 
 interface AdminOffersSlugRouteChildren {
   AdminOffersSlugPreviewRoute: typeof AdminOffersSlugPreviewRoute
@@ -927,6 +1123,7 @@ const AdminOffersRouteWithChildren = AdminOffersRoute._addFileChildren(
 interface AdminRouteChildren {
   AdminActivationRoute: typeof AdminActivationRoute
   AdminBookingsRoute: typeof AdminBookingsRoute
+  AdminCareerRoute: typeof AdminCareerRouteWithChildren
   AdminCommissionRoute: typeof AdminCommissionRoute
   AdminContactRequestsRoute: typeof AdminContactRequestsRoute
   AdminDocumentsRoute: typeof AdminDocumentsRoute
@@ -942,6 +1139,7 @@ interface AdminRouteChildren {
 const AdminRouteChildren: AdminRouteChildren = {
   AdminActivationRoute: AdminActivationRoute,
   AdminBookingsRoute: AdminBookingsRoute,
+  AdminCareerRoute: AdminCareerRouteWithChildren,
   AdminCommissionRoute: AdminCommissionRoute,
   AdminContactRequestsRoute: AdminContactRequestsRoute,
   AdminDocumentsRoute: AdminDocumentsRoute,
@@ -998,6 +1196,19 @@ const AppRouteChildren: AppRouteChildren = {
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
 
+interface CareerRouteChildren {
+  CareerSlugRoute: typeof CareerSlugRoute
+  CareerIndexRoute: typeof CareerIndexRoute
+}
+
+const CareerRouteChildren: CareerRouteChildren = {
+  CareerSlugRoute: CareerSlugRoute,
+  CareerIndexRoute: CareerIndexRoute,
+}
+
+const CareerRouteWithChildren =
+  CareerRoute._addFileChildren(CareerRouteChildren)
+
 interface PropertiesRouteChildren {
   PropertiesSlugRoute: typeof PropertiesSlugRoute
   PropertiesIndexRoute: typeof PropertiesIndexRoute
@@ -1017,6 +1228,7 @@ const rootRouteChildren: RootRouteChildren = {
   AccountRoute: AccountRoute,
   AdminRoute: AdminRouteWithChildren,
   AppRoute: AppRouteWithChildren,
+  CareerRoute: CareerRouteWithChildren,
   ContactRoute: ContactRoute,
   FaqRoute: FaqRoute,
   ForgotPasswordRoute: ForgotPasswordRoute,
