@@ -65,19 +65,14 @@ test("APIs are role-protected and do not add a payout rail", () => {
   assert.doesNotMatch(router, /Set balance/);
 });
 
-test("merchant and promotion batches were not implemented", () => {
-  const files = [
-    "backend/src/engine/leadership.ts",
-    "backend/src/router.ts",
-    "src/routes/app/leadership-reward.tsx",
-    "src/components/layout/app-shell.tsx",
-  ];
-  for (const file of files) {
-    const src = read(file);
-    assert.doesNotMatch(src, /Become a Merchant/);
-    assert.doesNotMatch(src, /Pay by Merchant/);
-    assert.doesNotMatch(src, /promotional gifts/i);
-  }
+test("leadership reward does not mix merchant credit or promotion", () => {
+  const engine = read("backend/src/engine/leadership.ts");
+  assert.doesNotMatch(engine, /Merchant Credit/);
+  assert.doesNotMatch(engine, /Pay by Merchant/);
+  assert.doesNotMatch(engine, /Promotion Reward/);
+  assert.doesNotMatch(engine, /promotional gifts/i);
+  assert.doesNotMatch(read("src/routes/app/leadership-reward.tsx"), /Pay by Merchant/);
+  assert.doesNotMatch(read("src/components/layout/admin-shell.tsx"), /Promotion Management/);
 });
 
 test("batch 1 career, footer, and hero remain intact", () => {

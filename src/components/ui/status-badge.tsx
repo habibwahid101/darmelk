@@ -34,6 +34,14 @@ const MAP: Record<string, { label: string; tone: keyof typeof TONES }> = {
   upcoming: { label: "Upcoming", tone: "pending" },
   completed: { label: "Completed", tone: "ok" },
   "in-progress": { label: "In progress", tone: "pending" },
+  approved: { label: "Approved", tone: "ok" },
+  declined: { label: "Declined", tone: "danger" },
+  reserved: { label: "Reserved", tone: "pending" },
+  settled: { label: "Settled", tone: "ok" },
+  fulfilled: { label: "Fulfilled", tone: "ok" },
+  suspended: { label: "Suspended", tone: "danger" },
+  submitted: { label: "Submitted", tone: "pending" },
+  under_review: { label: "Under review", tone: "pending" },
 };
 
 export function StatusBadge({

@@ -57,7 +57,24 @@ function AdminBookings() {
                   <StatusBadge status={b.status} />
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  {b.status === "pending" ? <p className="text-sm text-muted">Awaiting payment review.</p> : null}
+                  {b.status === "pending" && b.merchant_request_status === "approved" ? (
+                    <Button
+                      size="sm"
+                      disabled={busyId === b.id}
+                      onClick={() => void run(b.id, () => api.admin.confirmBooking(b.id))}
+                    >
+                      Confirm Merchant payment
+                    </Button>
+                  ) : null}
+                  {b.status === "pending" ? (
+                    <p className="text-sm text-muted">
+                      {b.merchant_request_status === "approved"
+                        ? "Merchant Credit is reserved. Confirming settles it and does not post commission until activation."
+                        : b.merchant_request_status === "pending"
+                          ? "Awaiting Merchant approval."
+                          : "Awaiting payment review."}
+                    </p>
+                  ) : null}
                   {b.status === "confirmed" ? (
                     <Button
                       size="sm"

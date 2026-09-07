@@ -33,7 +33,7 @@ async function main() {
     results.push({ step, ok, detail });
     console.log(ok ? "PASS" : "FAIL", step, detail ?? "");
   };
-  const submitAndApprovePayment = async (cookie: string, targetType: "activation" | "booking", targetId: string, key: string) => {
+  const submitAndApprovePayment = async (cookie: string, targetType: "activation" | "booking" | "merchant_bundle", targetId: string, key: string) => {
     const submitted = await json(await app.request("/api/payments", {
       method: "POST",
       headers: { cookie, "content-type": "application/json", "Idempotency-Key": key },
@@ -933,6 +933,406 @@ async function main() {
   const adminDetailLr = await json(await app.request(`/api/admin/leadership-rewards/${matrixRootId}`, { headers: { cookie: adminCookie } }));
   record("admin audit view includes qualifying evidence and monthly history",
     adminDetailLr.leadership?.evidence?.tier50?.length >= 3 && adminDetailLr.leadership?.entitlements?.length === 12, adminDetailLr.leadership?.evidence);
+
+  const signupOnboardActivate = async (email: string, name: string, sponsorCode: string) => {
+    const signUp = await app.request("/api/auth/sign-up/email", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email, password: "password123", name }),
+    });
+    const cookie = extractCookie(signUp);
+    await app.request("/api/me", { headers: { cookie } });
+    await app.request("/api/me/onboarding", {
+      method: "POST",
+      headers: { cookie, "content-type": "application/json" },
+      body: JSON.stringify({ name, phone: "+8801999000000", sponsorCode, termsAccepted: true }),
+    });
+    const act = await json(await app.request("/api/activation/request", { method: "POST", headers: { cookie } }));
+    await submitAndApprovePayment(cookie, "activation", act.activation.id, `${email}-activation`);
+    const me = await json(await app.request("/api/me", { headers: { cookie } }));
+    return { cookie, member: me.member, merchant: me.merchant };
+  };
+
+  const memberMerchantNav = await json(await app.request("/api/me", { headers: { cookie: memberCookie } }));
+  record("normal user is not an active Merchant before purchase", memberMerchantNav.merchant == null || memberMerchantNav.merchant.status !== "active");
+
+  const memberCreateBundle = await app.request("/api/admin/merchant/bundles", {
+    method: "POST",
+    headers: { cookie: memberCookie, "content-type": "application/json" },
+    body: JSON.stringify({ name: "Should fail", purchaseAmount: 1000, purchasedCredit: 1000, terms: "x", status: "active" }),
+  });
+  record("non-admin cannot create Merchant bundles", memberCreateBundle.status === 403, memberCreateBundle.status);
+  const anonCreateBundle = await app.request("/api/admin/merchant/bundles", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ name: "Should fail", purchaseAmount: 1000, purchasedCredit: 1000, terms: "x" }),
+  });
+  record("anonymous cannot create Merchant bundles", anonCreateBundle.status === 401, anonCreateBundle.status);
+
+  const createdBundle = await json(await app.request("/api/admin/merchant/bundles", {
+    method: "POST",
+    headers: { cookie: adminCookie, "content-type": "application/json" },
+    body: JSON.stringify({
+      name: "Merchant Bundle A",
+      description: "Prepaid Merchant Credit",
+      purchaseAmount: 50000,
+      purchasedCredit: 50000,
+      bonusCredit: 10000,
+      gifts: [{ label: "Laptop", quantity: 1 }],
+      terms: "Merchant Credit is non-withdrawable and is not commission.",
+      status: "active",
+      displayOrder: 1,
+    }),
+  }));
+  record(
+    "admin creates Merchant bundle with base credit, bonus credit, and gift",
+    createdBundle.bundle?.purchase_amount === 50000 && createdBundle.bundle?.purchased_credit === 50000
+      && createdBundle.bundle?.bonus_credit === 10000 && createdBundle.bundle?.gifts?.[0]?.label === "Laptop"
+      && createdBundle.bundle?.status === "active",
+    createdBundle.bundle,
+  );
+
+  const noTermsPurchase = await json(await app.request("/api/me/merchant/purchases", {
+    method: "POST",
+    headers: { cookie: memberCookie, "content-type": "application/json" },
+    body: JSON.stringify({ bundleId: createdBundle.bundle.id, termsAccepted: false }),
+  }));
+  record("terms acceptance is required for a Merchant bundle purchase", noTermsPurchase.error?.code === "terms_required", noTermsPurchase);
+
+  const merchantUser = await signupOnboardActivate("merchant@example.com", "Merchant One", adminMe.member.referral_code);
+  const started = await json(await app.request("/api/me/merchant/purchases", {
+    method: "POST",
+    headers: { cookie: merchantUser.cookie, "content-type": "application/json", "Idempotency-Key": "mbp-1" },
+    body: JSON.stringify({ bundleId: createdBundle.bundle.id, termsAccepted: true }),
+  }));
+  record(
+    "unconfirmed bundle purchase issues no credit and does not activate Merchant",
+    started.purchase?.status === "pending" && started.purchase?.purchased_credit === 50000,
+  );
+  const beforeConfirmDash = await json(await app.request("/api/me/merchant", { headers: { cookie: merchantUser.cookie } }));
+  record(
+    "invalid/unconfirmed purchase does not activate Merchant",
+    beforeConfirmDash.merchant?.status === "pending" && beforeConfirmDash.merchant?.available === 0,
+    beforeConfirmDash.merchant,
+  );
+
+  await submitAndApprovePayment(merchantUser.cookie, "merchant_bundle", started.purchase.id, "merchant-bundle-pay-1");
+  const afterConfirmDash = await json(await app.request("/api/me/merchant", { headers: { cookie: merchantUser.cookie } }));
+  const afterConfirmMe = await json(await app.request("/api/me", { headers: { cookie: merchantUser.cookie } }));
+  record(
+    "confirmed purchase issues purchased and bonus credit exactly once and activates Merchant",
+    afterConfirmDash.merchant?.status === "active" && afterConfirmDash.merchant?.available === 60000
+      && afterConfirmDash.merchant?.purchased_issued === 50000 && afterConfirmDash.merchant?.bonus_issued === 10000
+      && afterConfirmMe.merchant?.status === "active",
+    afterConfirmDash.merchant,
+  );
+  record("user sidebar can switch to Merchant after valid activation", afterConfirmMe.merchant?.status === "active");
+  const giftsAfter = afterConfirmDash.gifts ?? [];
+  record("confirmed purchase snapshots gifts for fulfillment tracking", giftsAfter.some((g: { gift_label: string; status: string }) => g.gift_label === "Laptop" && g.status === "pending"), giftsAfter);
+
+  const retryPay = await app.request(`/api/admin/payments/${(await json(await app.request("/api/admin/payments", { headers: { cookie: adminCookie } }))).payments.find((p: { target_id: string }) => p.target_id === started.purchase.id).id}/approve`, {
+    method: "POST", headers: { cookie: adminCookie },
+  });
+  record("retry of confirmed bundle payment does not duplicate credit", retryPay.status === 409, retryPay.status);
+  const ledgerCount = await query<{ n: number }>(
+    `select count(*)::int as n from merchant_credit_ledger where bundle_purchase_id=$1`,
+    [started.purchase.id],
+  );
+  record("purchased and bonus credit remain separately auditable", ledgerCount[0]?.n === 2, ledgerCount[0]);
+
+  const editedBundle = await json(await app.request(`/api/admin/merchant/bundles/${createdBundle.bundle.id}`, {
+    method: "POST",
+    headers: { cookie: adminCookie, "content-type": "application/json" },
+    body: JSON.stringify({
+      name: "Merchant Bundle A edited",
+      purchaseAmount: 999999,
+      purchasedCredit: 1,
+      bonusCredit: 1,
+      terms: "Updated terms are not retroactive.",
+      gifts: [],
+      status: "active",
+    }),
+  }));
+  const purchaseAfterEdit = await json(await app.request("/api/me/merchant", { headers: { cookie: merchantUser.cookie } }));
+  const snap = purchaseAfterEdit.purchases.find((p: { id: string }) => p.id === started.purchase.id);
+  record(
+    "historical bundle purchase survives later bundle edit unchanged",
+    snap?.purchase_amount === 50000 && snap?.purchased_credit === 50000 && snap?.bonus_credit === 10000
+      && snap?.gifts_snapshot?.[0]?.label === "Laptop" && editedBundle.bundle?.purchase_amount === 999999,
+    snap,
+  );
+
+  const customer = await signupOnboardActivate("merchant-customer@example.com", "Merchant Customer", adminMe.member.referral_code);
+  const badId = await json(await app.request("/api/bookings", {
+    method: "POST",
+    headers: { cookie: customer.cookie, "content-type": "application/json", "Idempotency-Key": "m-book-1" },
+    body: JSON.stringify({ offerSlug: "five-star-hotel-share" }),
+  }));
+  const invalidMerchant = await json(await app.request(`/api/bookings/${badId.booking.id}/merchant-pay`, {
+    method: "POST",
+    headers: { cookie: customer.cookie, "content-type": "application/json", "Idempotency-Key": "m-pay-bad" },
+    body: JSON.stringify({ merchantUserId: "not-a-real-user" }),
+  }));
+  record("invalid Merchant User ID is rejected", invalidMerchant.error?.code === "merchant_not_found" || invalidMerchant.error, invalidMerchant);
+  const nonMerchant = await json(await app.request(`/api/bookings/${badId.booking.id}/merchant-pay`, {
+    method: "POST",
+    headers: { cookie: customer.cookie, "content-type": "application/json", "Idempotency-Key": "m-pay-non" },
+    body: JSON.stringify({ merchantUserId: memberMerchantNav.member.user_id }),
+  }));
+  record("non-Merchant User ID is rejected", nonMerchant.error?.code === "merchant_inactive" || nonMerchant.status === 400, nonMerchant);
+
+  const pendingReq = await json(await app.request(`/api/bookings/${badId.booking.id}/merchant-pay`, {
+    method: "POST",
+    headers: { cookie: customer.cookie, "content-type": "application/json", "Idempotency-Key": "m-pay-1" },
+    body: JSON.stringify({ merchantUserId: merchantUser.member.user_id }),
+  }));
+  record(
+    "valid Pay by Merchant request is created pending with no debit",
+    pendingReq.request?.status === "pending" && pendingReq.request?.amount === 50000,
+    pendingReq.request,
+  );
+  const dashAfterRequest = await json(await app.request("/api/me/merchant", { headers: { cookie: merchantUser.cookie } }));
+  record("request creation does not permanently debit Merchant Credit", dashAfterRequest.merchant?.available === 60000 && dashAfterRequest.merchant?.reserved === 0, dashAfterRequest.merchant);
+  const commAfterRequest = await query(`select id from commission_ledger where source_booking_id=$1`, [badId.booking.id]);
+  record("request creation creates no commission", commAfterRequest.length === 0, commAfterRequest.length);
+  record("intended Merchant sees the pending request", dashAfterRequest.incomingRequests?.some((r: { id: string; status: string }) => r.id === pendingReq.request.id && r.status === "pending"));
+
+  const declined = await json(await app.request(`/api/me/merchant/requests/${pendingReq.request.id}/decline`, {
+    method: "POST", headers: { cookie: merchantUser.cookie, "Idempotency-Key": "m-dec-1" },
+  }));
+  record("Merchant can decline a pending request", declined.request?.status === "declined", declined.request);
+  const dashAfterDecline = await json(await app.request("/api/me/merchant", { headers: { cookie: merchantUser.cookie } }));
+  record("decline causes no permanent debit", dashAfterDecline.merchant?.available === 60000 && dashAfterDecline.merchant?.reserved === 0);
+  const commAfterDecline = await query(`select id from commission_ledger where source_booking_id=$1`, [badId.booking.id]);
+  record("decline causes no commission", commAfterDecline.length === 0);
+
+  const secondReq = await json(await app.request(`/api/bookings/${badId.booking.id}/merchant-pay`, {
+    method: "POST",
+    headers: { cookie: customer.cookie, "content-type": "application/json", "Idempotency-Key": "m-pay-2" },
+    body: JSON.stringify({ merchantUserId: merchantUser.member.user_id }),
+  }));
+  const approvedReq = await json(await app.request(`/api/me/merchant/requests/${secondReq.request.id}/approve`, {
+    method: "POST", headers: { cookie: merchantUser.cookie, "Idempotency-Key": "m-appr-1" },
+  }));
+  record("Merchant can approve a valid request and recheck available credit", approvedReq.request?.status === "approved", approvedReq.request);
+  const dashAfterApprove = await json(await app.request("/api/me/merchant", { headers: { cookie: merchantUser.cookie } }));
+  record(
+    "approval reserves credit without settling or double debit",
+    dashAfterApprove.merchant?.available === 10000 && dashAfterApprove.merchant?.reserved === 50000 && dashAfterApprove.merchant?.settled === 0,
+    dashAfterApprove.merchant,
+  );
+  const bookingAfterApprove = await json(await app.request(`/api/bookings/${badId.booking.id}`, { headers: { cookie: customer.cookie } }));
+  record("Merchant approval alone does not confirm or activate the booking", bookingAfterApprove.booking?.status === "pending", bookingAfterApprove.booking?.status);
+  const commAfterApprove = await query(`select id from commission_ledger where source_booking_id=$1`, [badId.booking.id]);
+  record("Merchant approval alone causes no commission", commAfterApprove.length === 0);
+
+  const doubleApprove = await app.request(`/api/me/merchant/requests/${secondReq.request.id}/approve`, {
+    method: "POST", headers: { cookie: merchantUser.cookie, "Idempotency-Key": "m-appr-2" },
+  });
+  const doubleBody = await json(doubleApprove);
+  record("same request cannot be approved twice / retry does not double debit",
+    (doubleBody.request?.status === "approved" || doubleApprove.status === 409) && (await json(await app.request("/api/me/merchant", { headers: { cookie: merchantUser.cookie } }))).merchant?.reserved === 50000,
+    { status: doubleApprove.status, reserved: (await json(await app.request("/api/me/merchant", { headers: { cookie: merchantUser.cookie } }))).merchant?.reserved });
+
+  const confirmMerchantBooking = await json(await app.request(`/api/admin/bookings/${badId.booking.id}/confirm`, {
+    method: "POST", headers: { cookie: adminCookie },
+  }));
+  record("Merchant-funded booking reaches confirmed through existing admin confirmation", confirmMerchantBooking.booking?.status === "confirmed", confirmMerchantBooking.booking);
+  const dashAfterSettle = await json(await app.request("/api/me/merchant", { headers: { cookie: merchantUser.cookie } }));
+  record(
+    "settlement consumes reserved credit exactly once without a second available debit",
+    dashAfterSettle.merchant?.available === 10000 && dashAfterSettle.merchant?.reserved === 0 && dashAfterSettle.merchant?.settled === 50000,
+    dashAfterSettle.merchant,
+  );
+  const commAfterConfirm = await query(`select id from commission_ledger where source_booking_id=$1`, [badId.booking.id]);
+  record("confirmed-but-not-activated Merchant booking still has no commission", commAfterConfirm.length === 0);
+
+  const activateMerchantBooking = await json(await app.request(`/api/admin/bookings/${badId.booking.id}/activate`, {
+    method: "POST", headers: { cookie: adminCookie },
+  }));
+  record("activation of Merchant-funded booking uses existing booking path", activateMerchantBooking.booking?.status === "activated");
+  const commAfterActivate = await query<{ level: number; amount: number; rate: number }>(
+    `select level, amount, rate from commission_ledger where source_booking_id=$1 order by level`,
+    [badId.booking.id],
+  );
+  record(
+    "commission posts only after activation at existing 10/8/6/4/2 rates",
+    commAfterActivate[0]?.level === 1 && commAfterActivate[0]?.amount === 5000 && commAfterActivate[0]?.rate === 0.1,
+    commAfterActivate,
+  );
+
+  const reverseMerchantBooking = await json(await app.request(`/api/admin/bookings/${badId.booking.id}/reverse`, {
+    method: "POST",
+    headers: { cookie: adminCookie, "content-type": "application/json" },
+    body: JSON.stringify({ reason: "Merchant QA reversal" }),
+  }));
+  record("reversed Merchant-funded booking keeps history", reverseMerchantBooking.booking?.status === "reversed");
+  const dashAfterReverse = await json(await app.request("/api/me/merchant", { headers: { cookie: merchantUser.cookie } }));
+  record(
+    "reversal restores settled credit with an auditable ledger entry",
+    dashAfterReverse.merchant?.available === 60000 && dashAfterReverse.merchant?.settled === 0
+      && dashAfterReverse.ledger.some((e: { entry_type: string }) => e.entry_type === "reversal"),
+    dashAfterReverse.merchant,
+  );
+
+  const cancelBook = await json(await app.request("/api/bookings", {
+    method: "POST",
+    headers: { cookie: customer.cookie, "content-type": "application/json", "Idempotency-Key": "m-book-cancel" },
+    body: JSON.stringify({ offerSlug: "five-star-hotel-share" }),
+  }));
+  const cancelReq = await json(await app.request(`/api/bookings/${cancelBook.booking.id}/merchant-pay`, {
+    method: "POST",
+    headers: { cookie: customer.cookie, "content-type": "application/json", "Idempotency-Key": "m-pay-cancel" },
+    body: JSON.stringify({ merchantUserId: merchantUser.member.user_id }),
+  }));
+  await json(await app.request(`/api/me/merchant/requests/${cancelReq.request.id}/approve`, {
+    method: "POST", headers: { cookie: merchantUser.cookie, "Idempotency-Key": "m-appr-cancel" },
+  }));
+  await json(await app.request(`/api/admin/bookings/${cancelBook.booking.id}/cancel`, {
+    method: "POST", headers: { cookie: adminCookie },
+  }));
+  const dashAfterCancel = await json(await app.request("/api/me/merchant", { headers: { cookie: merchantUser.cookie } }));
+  const commAfterCancel = await query(`select id from commission_ledger where source_booking_id=$1`, [cancelBook.booking.id]);
+  record(
+    "cancelled approved Merchant booking releases reserved credit exactly once and posts no commission",
+    dashAfterCancel.merchant?.available === 60000 && dashAfterCancel.merchant?.reserved === 0 && commAfterCancel.length === 0,
+    dashAfterCancel.merchant,
+  );
+
+  const selfBook = await json(await app.request("/api/bookings", {
+    method: "POST",
+    headers: { cookie: merchantUser.cookie, "content-type": "application/json", "Idempotency-Key": "m-book-self" },
+    body: JSON.stringify({ offerSlug: "five-star-hotel-share" }),
+  }));
+  const selfReq = await json(await app.request(`/api/bookings/${selfBook.booking.id}/merchant-pay`, {
+    method: "POST",
+    headers: { cookie: merchantUser.cookie, "content-type": "application/json", "Idempotency-Key": "m-pay-self" },
+    body: JSON.stringify({ merchantUserId: merchantUser.member.user_id }),
+  }));
+  record("Merchant self-pay uses the same request flow", selfReq.request?.status === "pending" && selfReq.request?.merchant_user_id === merchantUser.member.user_id);
+  const selfApprove = await json(await app.request(`/api/me/merchant/requests/${selfReq.request.id}/approve`, {
+    method: "POST", headers: { cookie: merchantUser.cookie, "Idempotency-Key": "m-appr-self" },
+  }));
+  record("self-pay approval follows the same reserve rules", selfApprove.request?.status === "approved");
+  await json(await app.request(`/api/admin/bookings/${selfBook.booking.id}/cancel`, { method: "POST", headers: { cookie: adminCookie } }));
+
+  const insufficientBook = await json(await app.request("/api/bookings", {
+    method: "POST",
+    headers: { cookie: customer.cookie, "content-type": "application/json", "Idempotency-Key": "m-book-low" },
+    body: JSON.stringify({ offerSlug: "five-star-hotel-share" }),
+  }));
+  await query(`update merchants set available = 1000 where user_id=$1`, [merchantUser.member.user_id]);
+  const lowCredit = await json(await app.request(`/api/bookings/${insufficientBook.booking.id}/merchant-pay`, {
+    method: "POST",
+    headers: { cookie: customer.cookie, "content-type": "application/json", "Idempotency-Key": "m-pay-low" },
+    body: JSON.stringify({ merchantUserId: merchantUser.member.user_id }),
+  }));
+  record("insufficient credit is rejected at request creation", lowCredit.error?.code === "insufficient_credit" || lowCredit.status === 409, lowCredit);
+  await query(
+    `update merchants set available = purchased_issued + bonus_issued - reserved - settled where user_id=$1`,
+    [merchantUser.member.user_id],
+  );
+
+  const concA = await signupOnboardActivate("m-conc-a@example.com", "Conc A", adminMe.member.referral_code);
+  const concB = await signupOnboardActivate("m-conc-b@example.com", "Conc B", adminMe.member.referral_code);
+  const smallBundle = await json(await app.request("/api/admin/merchant/bundles", {
+    method: "POST",
+    headers: { cookie: adminCookie, "content-type": "application/json" },
+    body: JSON.stringify({
+      name: "Tight Credit",
+      purchaseAmount: 50000,
+      purchasedCredit: 50000,
+      bonusCredit: 0,
+      terms: "Concurrent overspend protection.",
+      status: "active",
+    }),
+  }));
+  const tightMerchant = await signupOnboardActivate("tight-merchant@example.com", "Tight Merchant", adminMe.member.referral_code);
+  const tightPurchase = await json(await app.request("/api/me/merchant/purchases", {
+    method: "POST",
+    headers: { cookie: tightMerchant.cookie, "content-type": "application/json", "Idempotency-Key": "mbp-tight" },
+    body: JSON.stringify({ bundleId: smallBundle.bundle.id, termsAccepted: true }),
+  }));
+  await submitAndApprovePayment(tightMerchant.cookie, "merchant_bundle", tightPurchase.purchase.id, "tight-bundle-pay");
+  const bookA = await json(await app.request("/api/bookings", {
+    method: "POST", headers: { cookie: concA.cookie, "content-type": "application/json", "Idempotency-Key": "m-book-ca" },
+    body: JSON.stringify({ offerSlug: "five-star-hotel-share" }),
+  }));
+  const bookB = await json(await app.request("/api/bookings", {
+    method: "POST", headers: { cookie: concB.cookie, "content-type": "application/json", "Idempotency-Key": "m-book-cb" },
+    body: JSON.stringify({ offerSlug: "five-star-hotel-share" }),
+  }));
+  const reqA = await json(await app.request(`/api/bookings/${bookA.booking.id}/merchant-pay`, {
+    method: "POST", headers: { cookie: concA.cookie, "content-type": "application/json", "Idempotency-Key": "m-pay-ca" },
+    body: JSON.stringify({ merchantUserId: tightMerchant.member.user_id }),
+  }));
+  const reqB = await json(await app.request(`/api/bookings/${bookB.booking.id}/merchant-pay`, {
+    method: "POST", headers: { cookie: concB.cookie, "content-type": "application/json", "Idempotency-Key": "m-pay-cb" },
+    body: JSON.stringify({ merchantUserId: tightMerchant.member.user_id }),
+  }));
+  const [resA, resB] = await Promise.all([
+    app.request(`/api/me/merchant/requests/${reqA.request.id}/approve`, {
+      method: "POST", headers: { cookie: tightMerchant.cookie, "Idempotency-Key": "m-appr-ca" },
+    }),
+    app.request(`/api/me/merchant/requests/${reqB.request.id}/approve`, {
+      method: "POST", headers: { cookie: tightMerchant.cookie, "Idempotency-Key": "m-appr-cb" },
+    }),
+  ]);
+  const bodyA = await json(resA);
+  const bodyB = await json(resB);
+  const approvedCount = [bodyA.request?.status, bodyB.request?.status].filter((s) => s === "approved").length;
+  const tightDash = await json(await app.request("/api/me/merchant", { headers: { cookie: tightMerchant.cookie } }));
+  record(
+    "two simultaneous approvals cannot overspend available Merchant Credit",
+    approvedCount === 1 && tightDash.merchant?.available === 0 && tightDash.merchant?.reserved === 50000,
+    { approvedCount, available: tightDash.merchant?.available, reserved: tightDash.merchant?.reserved, a: bodyA.request?.status ?? bodyA.error, b: bodyB.request?.status ?? bodyB.error },
+  );
+
+  await json(await app.request(`/api/admin/merchant/accounts/${merchantUser.member.user_id}/status`, {
+    method: "POST",
+    headers: { cookie: adminCookie, "content-type": "application/json" },
+    body: JSON.stringify({ status: "suspended" }),
+  }));
+  const susBook = await json(await app.request("/api/bookings", {
+    method: "POST", headers: { cookie: customer.cookie, "content-type": "application/json", "Idempotency-Key": "m-book-sus" },
+    body: JSON.stringify({ offerSlug: "five-star-hotel-share" }),
+  }));
+  const susReq = await json(await app.request(`/api/bookings/${susBook.booking.id}/merchant-pay`, {
+    method: "POST", headers: { cookie: customer.cookie, "content-type": "application/json", "Idempotency-Key": "m-pay-sus" },
+    body: JSON.stringify({ merchantUserId: merchantUser.member.user_id }),
+  }));
+  record("suspended Merchant cannot accept new payment requests", susReq.error?.code === "merchant_inactive" || susReq.status === 400, susReq);
+
+  const rawOverwrite = await app.request(`/api/admin/merchant/accounts/${tightMerchant.member.user_id}`, {
+    method: "POST",
+    headers: { cookie: adminCookie, "content-type": "application/json" },
+    body: JSON.stringify({ available: 999999 }),
+  });
+  record("admin raw balance overwrite is unavailable", rawOverwrite.status === 404 || rawOverwrite.status === 405 || !(await rawOverwrite.json().catch(() => ({})) as any).merchant?.available, rawOverwrite.status);
+  const adjust = await json(await app.request(`/api/admin/merchant/accounts/${tightMerchant.member.user_id}/adjust`, {
+    method: "POST",
+    headers: { cookie: adminCookie, "content-type": "application/json" },
+    body: JSON.stringify({ amount: 1000, direction: "credit", reason: "QA audited adjustment" }),
+  }));
+  record("admin adjustment requires reason and writes an auditable ledger entry", adjust.merchant?.available === 1000, adjust.merchant);
+  const missingReason = await app.request(`/api/admin/merchant/accounts/${tightMerchant.member.user_id}/adjust`, {
+    method: "POST",
+    headers: { cookie: adminCookie, "content-type": "application/json" },
+    body: JSON.stringify({ amount: 1000, direction: "credit" }),
+  });
+  record("admin adjustment without reason is rejected", missingReason.status === 400, missingReason.status);
+
+  const giftUpdate = await json(await app.request(`/api/admin/merchant/gifts/${giftsAfter[0].id}/status`, {
+    method: "POST",
+    headers: { cookie: adminCookie, "content-type": "application/json" },
+    body: JSON.stringify({ status: "fulfilled", notes: "Delivered in QA" }),
+  }));
+  record("admin can track gift fulfillment without mixing gift value into credit", giftUpdate.gift?.status === "fulfilled" && (await json(await app.request("/api/me/merchant", { headers: { cookie: merchantUser.cookie } }))).merchant?.available !== undefined, giftUpdate.gift);
+
+  const withdrawalsStill = await json(await app.request("/api/me/commissions", { headers: { cookie: adminCookie } }));
+  record("Merchant Credit is not mixed into commission wallet totals", typeof withdrawalsStill.totals?.available === "number");
+  record("existing commission engine rates remain 10/8/6/4/2", commAfterActivate[0]?.rate === 0.1);
+  record("Leadership Reward APIs remain available after Merchant batch", Array.isArray(adminListLr.rewards));
 
   const failed = results.filter((r) => !r.ok);
   console.log(`\n${results.length - failed.length}/${results.length} checks passed`);

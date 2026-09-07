@@ -30,6 +30,7 @@ function BookingDetailPage() {
   }
 
   const booking = data?.booking;
+  const merchantRequest = data?.merchantRequest;
   if (!booking) return null;
 
   return (
@@ -65,6 +66,18 @@ function BookingDetailPage() {
           Pending means operations has not confirmed this request yet. Cancelled and reversed
           history is kept.
         </p>
+        {merchantRequest ? (
+          <div className="mt-5 rounded-xl bg-paper p-4">
+            <p className="text-xs font-medium uppercase tracking-wide text-subtle">Pay by Merchant</p>
+            <div className="mt-2 flex items-center justify-between gap-3">
+              <p className="break-all text-sm text-muted">Request {merchantRequest.id}</p>
+              <StatusBadge status={merchantRequest.status} />
+            </div>
+            <p className="mt-2 text-sm text-muted">
+              Merchant approval reserves credit. Darmelk confirmation and activation still follow the existing booking process.
+            </p>
+          </div>
+        ) : null}
         <Button asChild variant="secondary" className="mt-5">
           <Link to="/properties/$slug" params={{ slug: booking.offer_slug }}>
             View offer
