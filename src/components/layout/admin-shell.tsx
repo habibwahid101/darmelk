@@ -10,6 +10,7 @@ import {
   LayoutDashboard,
   Menu,
   Settings,
+  Store,
   Users,
   Wallet,
   CreditCard,
@@ -35,6 +36,7 @@ type AdminPath =
   | "/admin/documents"
   | "/admin/settings"
   | "/admin/payments"
+  | "/admin/merchant"
   | "/admin/withdrawals"
   | "/admin/contact-requests"
   | "/admin/career"
@@ -51,6 +53,7 @@ const NAV: NavItem[] = [
   { to: "/admin/offers", label: "Properties", icon: Building2 },
   { to: "/admin/bookings", label: "Bookings", icon: FileText },
   { to: "/admin/payments", label: "Payments", icon: CreditCard },
+  { to: "/admin/merchant", label: "Merchant Management", icon: Store },
   { to: "/admin/withdrawals", label: "Withdrawals", icon: Wallet },
   { to: "/admin/users", label: "Users", icon: Users },
   { to: "/admin/contact-requests", label: "Contact Requests", icon: Inbox },

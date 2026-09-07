@@ -1,5 +1,5 @@
 import { useCurrentUserState, type AppUser } from "@/lib/auth/use-current-user";
-import { api, type Member } from "@/lib/api-client";
+import { api, type Member, type MerchantSummary } from "@/lib/api-client";
 import { useAsync } from "@/lib/use-async";
 
 /**
@@ -7,13 +7,20 @@ import { useAsync } from "@/lib/use-async";
  * which also auto-provisions the `members` row on first contact. Replaces
  * the old zustand-store `useMemberSession`.
  */
-export function useMemberSession(): { user: AppUser | null; member: Member | undefined; isPending: boolean; reload: () => void } {
+export function useMemberSession(): {
+  user: AppUser | null;
+  member: Member | undefined;
+  merchant: MerchantSummary | null | undefined;
+  isPending: boolean;
+  reload: () => void;
+} {
   const { user, isPending: sessionPending } = useCurrentUserState();
   const { data, error, reload } = useAsync(() => api.me(), [user?.id], { enabled: Boolean(user) });
 
   return {
     user,
     member: data?.member,
+    merchant: data?.merchant,
     // When auth resolves on a hard load, useAsync's enabling effect has not
     // started yet during that render. Keep the route gated until /api/me has
     // either returned or failed, otherwise a valid session flashes to /login.

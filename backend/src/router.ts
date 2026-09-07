@@ -45,6 +45,32 @@ import {
   updateJob,
   type JobInput,
 } from "./engine/jobs.js";
+import {
+  adjustMerchantCredit,
+  approveMerchantPaymentRequest,
+  bookingHasApprovedMerchantPayment,
+  confirmMerchantPurchase,
+  createBundle,
+  createMerchantPaymentRequest,
+  declineMerchantPaymentRequest,
+  getBundle,
+  getMerchantAdminDetail,
+  getMerchantOverview,
+  getMerchantSummary,
+  listAdminBundles,
+  listAdminGifts,
+  listAdminLedger,
+  listAdminRequests,
+  listMerchantDashboard,
+  listMerchants,
+  listPublicBundles,
+  rejectMerchantPurchase,
+  setBundleStatus,
+  setMerchantStatus,
+  startBundlePurchase,
+  updateBundle,
+  updateGiftFulfillment,
+} from "./engine/merchant.js";
 
 type Vars = { userId: string; userEmail: string };
 const app = new Hono<{ Variables: Vars }>();
@@ -174,11 +200,20 @@ app.post("/api/contact", async (c) => {
 });
 
 // ---- member profile / onboarding ----------------------------------------
+app.get("/api/merchant-bundles", async (c) => {
+  const bundles = await withTransaction((client) => listPublicBundles(client));
+  return c.json({ bundles });
+});
+
 app.get("/api/me", async (c) => {
   const userId = c.get("userId");
   const email = c.get("userEmail");
-  const member = await withTransaction((client) => ensureMember(client, { id: userId, email }));
-  return c.json({ member });
+  const result = await withTransaction(async (client) => {
+    const member = await ensureMember(client, { id: userId, email });
+    const merchant = await getMerchantSummary(client, userId);
+    return { member, merchant };
+  });
+  return c.json(result);
 });
 
 app.post("/api/me/onboarding", async (c) => {
@@ -296,6 +331,64 @@ app.get("/api/me/payments", async (c) => {
   return c.json({ payments: rows });
 });
 
+app.get("/api/me/merchant", async (c) => {
+  const userId = c.get("userId");
+  const dashboard = await withTransaction(async (client) => {
+    await ensureMember(client, { id: userId, email: c.get("userEmail") });
+    return listMerchantDashboard(client, userId);
+  });
+  return c.json(dashboard);
+});
+
+app.post("/api/me/merchant/purchases", async (c) => {
+  const userId = c.get("userId");
+  const body = await jsonBody<{ bundleId?: string; termsAccepted?: boolean }>(c);
+  const result = await withTransaction((client) =>
+    withIdempotency(
+      client,
+      { key: c.req.header("Idempotency-Key"), endpoint: "POST /api/me/merchant/purchases", userId, requestBody: body },
+      async () => {
+        await ensureMember(client, { id: userId, email: c.get("userEmail") });
+        const purchase = await startBundlePurchase(client, userId, body);
+        return { status: 201, body: { purchase } };
+      },
+    ),
+  );
+  return c.json(result.body, result.status as 200 | 201);
+});
+
+app.post("/api/me/merchant/requests/:id/approve", async (c) => {
+  const userId = c.get("userId");
+  const requestId = c.req.param("id");
+  const result = await withTransaction((client) =>
+    withIdempotency(
+      client,
+      { key: c.req.header("Idempotency-Key"), endpoint: `POST /api/me/merchant/requests/${requestId}/approve`, userId, requestBody: {} },
+      async () => {
+        const request = await approveMerchantPaymentRequest(client, userId, requestId);
+        return { status: 200, body: { request } };
+      },
+    ),
+  );
+  return c.json(result.body);
+});
+
+app.post("/api/me/merchant/requests/:id/decline", async (c) => {
+  const userId = c.get("userId");
+  const requestId = c.req.param("id");
+  const result = await withTransaction((client) =>
+    withIdempotency(
+      client,
+      { key: c.req.header("Idempotency-Key"), endpoint: `POST /api/me/merchant/requests/${requestId}/decline`, userId, requestBody: {} },
+      async () => {
+        const request = await declineMerchantPaymentRequest(client, userId, requestId);
+        return { status: 200, body: { request } };
+      },
+    ),
+  );
+  return c.json(result.body);
+});
+
 app.get("/api/me/payout-methods", async (c) => {
   const rows = await query(`select id,method_type,details,created_at,updated_at from payout_methods where user_id=$1 order by created_at`, [c.get("userId")]);
   return c.json({ methods: rows });
@@ -352,7 +445,28 @@ app.get("/api/bookings/:id", async (c) => {
   if (booking.user_id !== userId) {
     await withTransaction((client) => requireAdmin(client, userId));
   }
-  return c.json({ booking });
+  const merchantRequest = await queryOne(
+    `select * from merchant_payment_requests where booking_id = $1 order by created_at desc limit 1`,
+    [c.req.param("id")],
+  );
+  return c.json({ booking, merchantRequest: merchantRequest ?? null });
+});
+
+app.post("/api/bookings/:id/merchant-pay", async (c) => {
+  const userId = c.get("userId");
+  const bookingId = c.req.param("id");
+  const body = await jsonBody<{ merchantUserId?: string }>(c);
+  const result = await withTransaction((client) =>
+    withIdempotency(
+      client,
+      { key: c.req.header("Idempotency-Key"), endpoint: `POST /api/bookings/${bookingId}/merchant-pay`, userId, requestBody: body },
+      async () => {
+        const request = await createMerchantPaymentRequest(client, userId, bookingId, body.merchantUserId);
+        return { status: 201, body: { request } };
+      },
+    ),
+  );
+  return c.json(result.body, result.status as 200 | 201);
 });
 
 app.post("/api/payments", async (c) => {
@@ -419,13 +533,19 @@ app.get("/api/admin/bookings", async (c) => {
   const status = c.req.query("status");
   const rows = status
     ? await query(
-        `select b.*, o.title as offer_title, u.name as user_name, u.email as user_email
+        `select b.*, o.title as offer_title, u.name as user_name, u.email as user_email,
+                (select mpr.status from merchant_payment_requests mpr
+                  where mpr.booking_id = b.id
+                  order by mpr.created_at desc limit 1) as merchant_request_status
            from bookings b join offers o on o.slug = b.offer_slug join "user" u on u.id = b.user_id
           where b.status = $1 order by b.created_at desc`,
         [status],
       )
     : await query(
-        `select b.*, o.title as offer_title, u.name as user_name, u.email as user_email
+        `select b.*, o.title as offer_title, u.name as user_name, u.email as user_email,
+                (select mpr.status from merchant_payment_requests mpr
+                  where mpr.booking_id = b.id
+                  order by mpr.created_at desc limit 1) as merchant_request_status
            from bookings b join offers o on o.slug = b.offer_slug join "user" u on u.id = b.user_id
           order by b.created_at desc`,
       );
@@ -438,7 +558,8 @@ app.post("/api/admin/bookings/:id/confirm", async (c) => {
   const booking = await withTransaction(async (client) => {
     await requireAdmin(client, adminId);
     const paid = await client.query(`select 1 from payment_submissions where target_type='booking' and target_id=$1 and status='approved'`, [bookingId]);
-    if (!paid.rows[0]) throw badRequest("Approved booking payment is required");
+    const merchantPaid = await bookingHasApprovedMerchantPayment(client, bookingId);
+    if (!paid.rows[0] && !merchantPaid) throw badRequest("Approved booking payment is required");
     const result = await confirmBooking(client, bookingId, adminId);
     await logAdminAction(client, { adminUserId: adminId, actionType: "booking.confirm", targetType: "booking", targetId: bookingId });
     return result;
@@ -602,11 +723,13 @@ app.post("/api/admin/payments/:id/:decision", async (c) => {
     const result = await finalizePayment(client, c.req.param("id"), decision === "approve" ? "approved" : "rejected", adminId, body.reason);
     if (decision === "approve") {
       if (result.target_type === "activation") await approveActivation(client, result.target_id, adminId);
+      else if (result.target_type === "merchant_bundle") await confirmMerchantPurchase(client, result.target_id, adminId);
       else {
         await confirmBooking(client, result.target_id, adminId);
         await activateBooking(client, result.target_id);
       }
     } else if (result.target_type === "activation") await rejectActivation(client, result.target_id, adminId);
+    else if (result.target_type === "merchant_bundle") await rejectMerchantPurchase(client, result.target_id);
     else await cancelBooking(client, result.target_id);
     await logAdminAction(client, { adminUserId: adminId, actionType: `payment.${decision}`, targetType: "payment", targetId: result.id, payload: { targetType: result.target_type, targetId: result.target_id, reason: body.reason } });
     return result;
@@ -858,6 +981,190 @@ app.post("/api/admin/jobs/:slug", async (c) => {
     return result;
   });
   return c.json({ job });
+});
+
+app.get("/api/admin/merchant/overview", async (c) => {
+  const adminId = c.get("userId");
+  const overview = await withTransaction(async (client) => {
+    await requireAdmin(client, adminId);
+    return getMerchantOverview(client);
+  });
+  return c.json({ overview });
+});
+
+app.get("/api/admin/merchant/bundles", async (c) => {
+  const adminId = c.get("userId");
+  const bundles = await withTransaction(async (client) => {
+    await requireAdmin(client, adminId);
+    return listAdminBundles(client);
+  });
+  return c.json({ bundles });
+});
+
+app.get("/api/admin/merchant/bundles/:id", async (c) => {
+  const adminId = c.get("userId");
+  const bundle = await withTransaction(async (client) => {
+    await requireAdmin(client, adminId);
+    return getBundle(client, c.req.param("id"), { includeInactive: true });
+  });
+  return c.json({ bundle });
+});
+
+app.post("/api/admin/merchant/bundles", async (c) => {
+  const adminId = c.get("userId");
+  const body = await jsonBody<Record<string, unknown>>(c);
+  const bundle = await withTransaction(async (client) => {
+    await requireAdmin(client, adminId);
+    const result = await createBundle(client, body);
+    await logAdminAction(client, {
+      adminUserId: adminId,
+      actionType: "merchant.bundle.create",
+      targetType: "merchant_bundle",
+      targetId: result.id,
+      payload: { status: result.status },
+    });
+    return result;
+  });
+  return c.json({ bundle }, 201);
+});
+
+app.post("/api/admin/merchant/bundles/:id/status", async (c) => {
+  const adminId = c.get("userId");
+  const id = c.req.param("id");
+  const body = await jsonBody<{ status?: string }>(c);
+  const bundle = await withTransaction(async (client) => {
+    await requireAdmin(client, adminId);
+    const result = await setBundleStatus(client, id, body.status ?? "");
+    await logAdminAction(client, {
+      adminUserId: adminId,
+      actionType: "merchant.bundle.status",
+      targetType: "merchant_bundle",
+      targetId: id,
+      payload: { status: result.status },
+    });
+    return result;
+  });
+  return c.json({ bundle });
+});
+
+app.post("/api/admin/merchant/bundles/:id", async (c) => {
+  const adminId = c.get("userId");
+  const id = c.req.param("id");
+  const body = await jsonBody<Record<string, unknown>>(c);
+  const bundle = await withTransaction(async (client) => {
+    await requireAdmin(client, adminId);
+    const result = await updateBundle(client, id, body);
+    await logAdminAction(client, {
+      adminUserId: adminId,
+      actionType: "merchant.bundle.update",
+      targetType: "merchant_bundle",
+      targetId: id,
+      payload: { version: result.version, status: result.status },
+    });
+    return result;
+  });
+  return c.json({ bundle });
+});
+
+app.get("/api/admin/merchant/accounts", async (c) => {
+  const adminId = c.get("userId");
+  const merchants = await withTransaction(async (client) => {
+    await requireAdmin(client, adminId);
+    return listMerchants(client);
+  });
+  return c.json({ merchants });
+});
+
+app.get("/api/admin/merchant/accounts/:userId", async (c) => {
+  const adminId = c.get("userId");
+  const detail = await withTransaction(async (client) => {
+    await requireAdmin(client, adminId);
+    return getMerchantAdminDetail(client, c.req.param("userId"));
+  });
+  return c.json(detail);
+});
+
+app.post("/api/admin/merchant/accounts/:userId/status", async (c) => {
+  const adminId = c.get("userId");
+  const targetId = c.req.param("userId");
+  const body = await jsonBody<{ status?: string }>(c);
+  const merchant = await withTransaction(async (client) => {
+    await requireAdmin(client, adminId);
+    const result = await setMerchantStatus(client, targetId, body.status ?? "");
+    await logAdminAction(client, {
+      adminUserId: adminId,
+      actionType: "merchant.status",
+      targetType: "merchant",
+      targetId,
+      payload: { status: result.status },
+    });
+    return result;
+  });
+  return c.json({ merchant });
+});
+
+app.post("/api/admin/merchant/accounts/:userId/adjust", async (c) => {
+  const adminId = c.get("userId");
+  const targetId = c.req.param("userId");
+  const body = await jsonBody<{ amount?: number; direction?: string; reason?: string }>(c);
+  const merchant = await withTransaction(async (client) => {
+    await requireAdmin(client, adminId);
+    const result = await adjustMerchantCredit(client, targetId, body, adminId);
+    await logAdminAction(client, {
+      adminUserId: adminId,
+      actionType: "merchant.adjust",
+      targetType: "merchant",
+      targetId,
+      payload: { amount: body.amount, direction: body.direction, reason: body.reason },
+    });
+    return result;
+  });
+  return c.json({ merchant });
+});
+
+app.get("/api/admin/merchant/requests", async (c) => {
+  const adminId = c.get("userId");
+  const requests = await withTransaction(async (client) => {
+    await requireAdmin(client, adminId);
+    return listAdminRequests(client, c.req.query("status"));
+  });
+  return c.json({ requests });
+});
+
+app.get("/api/admin/merchant/ledger", async (c) => {
+  const adminId = c.get("userId");
+  const entries = await withTransaction(async (client) => {
+    await requireAdmin(client, adminId);
+    return listAdminLedger(client, { userId: c.req.query("userId"), entryType: c.req.query("entryType") });
+  });
+  return c.json({ entries });
+});
+
+app.get("/api/admin/merchant/gifts", async (c) => {
+  const adminId = c.get("userId");
+  const gifts = await withTransaction(async (client) => {
+    await requireAdmin(client, adminId);
+    return listAdminGifts(client, c.req.query("status"));
+  });
+  return c.json({ gifts });
+});
+
+app.post("/api/admin/merchant/gifts/:id/status", async (c) => {
+  const adminId = c.get("userId");
+  const body = await jsonBody<{ status?: string; notes?: string }>(c);
+  const gift = await withTransaction(async (client) => {
+    await requireAdmin(client, adminId);
+    const result = await updateGiftFulfillment(client, c.req.param("id"), body, adminId);
+    await logAdminAction(client, {
+      adminUserId: adminId,
+      actionType: "merchant.gift.status",
+      targetType: "merchant_gift",
+      targetId: result.id,
+      payload: { status: result.status },
+    });
+    return result;
+  });
+  return c.json({ gift });
 });
 
 app.get("/api/admin/leadership-rewards", async (c) => {

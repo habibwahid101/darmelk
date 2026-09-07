@@ -11,6 +11,7 @@ import {
   Settings,
   ShieldCheck,
   ShieldEllipsis,
+  Store,
   Wallet,
   X,
 } from "lucide-react";
@@ -30,6 +31,7 @@ type AppPath =
   | "/app/qualification"
   | "/app/commission"
   | "/app/leadership-reward"
+  | "/app/merchant"
   | "/app/transactions"
   | "/app/documents"
   | "/app/activation"
@@ -65,7 +67,7 @@ function isActive(pathname: string, to: string) {
 }
 
 export function AppShell() {
-  const { user, member, isPending } = useMemberSession();
+  const { user, member, merchant, isPending } = useMemberSession();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [more, setMore] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
@@ -103,7 +105,12 @@ export function AppShell() {
     }
   }
 
-  const allNav = [...PRIMARY, ...MORE];
+  const merchantNav: NavItem = {
+    to: "/app/merchant",
+    label: merchant?.status === "active" ? "Merchant" : "Become a Merchant",
+    icon: Store,
+  };
+  const allNav = [...PRIMARY, merchantNav, ...MORE];
 
   return (
     <div className="min-h-dvh bg-paper">

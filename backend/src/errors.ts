@@ -16,5 +16,5 @@ export const forbidden = (message = "Not allowed") =>
   new ApiError(403, "forbidden", message);
 export const notFound = (message = "Not found") =>
   new ApiError(404, "not_found", message);
-export const conflict = (message: string) =>
-  new ApiError(409, "conflict", message);
+export const conflict = (message: string, code = "conflict") =>
+  new ApiError(409, code, message);

@@ -17,7 +17,7 @@ export const PAYMENT_DESTINATIONS = {
 } as const;
 
 export type PaymentMethod = keyof typeof PAYMENT_DESTINATIONS;
-export type PaymentTarget = "activation" | "booking";
+export type PaymentTarget = "activation" | "booking" | "merchant_bundle";
 
 const ALLOWED_MIME = new Set(["image/jpeg", "image/png", "image/webp", "application/pdf"]);
 const MAX_PROOF_BYTES = 4 * 1024 * 1024;
@@ -91,6 +91,21 @@ export async function createPaymentSubmission(
     if (!target || target.user_id !== userId) throw notFound("Booking not found");
     if (target.status !== "pending") throw conflict(`Booking is ${target.status}`);
     amount = target.booking_amount;
+    const openMerchant = await client.query(
+      `select 1 from merchant_payment_requests
+        where booking_id = $1 and status in ('pending', 'approved', 'settled')`,
+      [targetId],
+    );
+    if (openMerchant.rows[0]) throw conflict("A Merchant payment request is already open for this booking");
+  } else if (input.targetType === "merchant_bundle") {
+    const { rows } = await client.query<{ user_id: string; purchase_amount: number; status: string }>(
+      `select user_id, purchase_amount, status from merchant_bundle_purchases where id = $1 for update`,
+      [targetId],
+    );
+    const target = rows[0];
+    if (!target || target.user_id !== userId) throw notFound("Merchant bundle purchase not found");
+    if (target.status !== "pending") throw conflict(`Purchase is ${target.status}`);
+    amount = target.purchase_amount;
   } else {
     throw badRequest("Unsupported payment target");
   }

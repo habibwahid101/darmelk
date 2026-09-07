@@ -79,6 +79,7 @@ export type Booking = {
   confirmed_at: string | null;
   activated_at: string | null;
   cancelled_at: string | null;
+  merchant_request_status?: string | null;
 };
 
 export type Commission = {
@@ -198,8 +199,140 @@ export type Withdrawal = {
 };
 
 export type PaymentDestination = { method: "bkash" | "nagad" | "bank"; label: string; account: string; accountType?: string; bankName?: string; accountName?: string; branch?: string; routingNumber?: string | null };
-export type PaymentSubmission = { id: string; target_type: "activation" | "booking"; target_id: string; user_id: string; amount: number; payment_method: "bkash" | "nagad" | "bank"; destination_snapshot: PaymentDestination; reference_id: string; proof_filename: string; proof_mime: string; notes: string | null; status: "submitted" | "under_review" | "approved" | "rejected"; submitted_at: string; reviewed_at: string | null; rejection_reason: string | null; user_name?: string; user_email?: string };
+export type PaymentSubmission = { id: string; target_type: "activation" | "booking" | "merchant_bundle"; target_id: string; user_id: string; amount: number; payment_method: "bkash" | "nagad" | "bank"; destination_snapshot: PaymentDestination; reference_id: string; proof_filename: string; proof_mime: string; notes: string | null; status: "submitted" | "under_review" | "approved" | "rejected"; submitted_at: string; reviewed_at: string | null; rejection_reason: string | null; user_name?: string; user_email?: string };
 export type PayoutMethod = { id: string; method_type: "bkash" | "nagad" | "bank"; details: Record<string, string>; created_at: string; updated_at: string };
+
+export type MerchantGift = { label: string; quantity: number };
+export type MerchantBundle = {
+  id: string;
+  name: string;
+  description: string;
+  purchase_amount: number;
+  purchased_credit: number;
+  bonus_credit: number;
+  gifts: MerchantGift[];
+  terms: string;
+  terms_version: number;
+  status: "draft" | "active" | "inactive";
+  version: number;
+  display_order: number;
+  created_at: string;
+  updated_at: string;
+};
+export type MerchantAccount = {
+  user_id: string;
+  status: "pending" | "active" | "suspended" | "inactive";
+  activated_at: string | null;
+  purchased_issued: number;
+  bonus_issued: number;
+  available: number;
+  reserved: number;
+  settled: number;
+  created_at: string;
+  updated_at: string;
+  name?: string;
+  email?: string;
+};
+export type MerchantSummary = {
+  status: MerchantAccount["status"];
+  available: number;
+  reserved: number;
+  settled: number;
+  purchasedIssued: number;
+  bonusIssued: number;
+  pendingIncomingCount: number;
+};
+export type MerchantPurchase = {
+  id: string;
+  user_id: string;
+  bundle_id: string;
+  bundle_version: number;
+  bundle_name: string;
+  purchase_amount: number;
+  purchased_credit: number;
+  bonus_credit: number;
+  gifts_snapshot: MerchantGift[];
+  terms_snapshot: string;
+  terms_version: number;
+  terms_accepted: boolean;
+  terms_accepted_at: string;
+  status: "pending" | "confirmed" | "rejected";
+  created_at: string;
+  confirmed_at: string | null;
+  rejected_at: string | null;
+};
+export type MerchantPaymentRequest = {
+  id: string;
+  booking_id: string;
+  customer_user_id: string;
+  merchant_user_id: string;
+  amount: number;
+  offer_slug: string;
+  offer_title: string;
+  status: "pending" | "approved" | "declined" | "cancelled" | "settled" | "reversed";
+  created_at: string;
+  decided_at: string | null;
+  settled_at: string | null;
+  reversed_at: string | null;
+  customer_name?: string;
+  customer_email?: string;
+  merchant_name?: string;
+  merchant_email?: string;
+};
+export type MerchantLedgerEntry = {
+  id: string;
+  merchant_user_id: string;
+  entry_type: string;
+  amount: number;
+  available_delta: number;
+  reserved_delta: number;
+  settled_delta: number;
+  purchased_issued_delta: number;
+  bonus_issued_delta: number;
+  bundle_purchase_id: string | null;
+  payment_request_id: string | null;
+  booking_id: string | null;
+  actor_user_id: string | null;
+  reason: string | null;
+  idempotency_key: string;
+  created_at: string;
+  merchant_name?: string;
+  merchant_email?: string;
+};
+export type MerchantGiftFulfillment = {
+  id: string;
+  purchase_id: string;
+  merchant_user_id: string;
+  gift_label: string;
+  quantity: number;
+  status: "pending" | "fulfilled" | "cancelled";
+  created_at: string;
+  updated_at: string;
+  fulfilled_at: string | null;
+  notes: string | null;
+  bundle_name?: string;
+  merchant_name?: string;
+};
+export type MerchantDashboard = {
+  merchant: MerchantAccount | null;
+  bundles: MerchantBundle[];
+  purchases: MerchantPurchase[];
+  incomingRequests: MerchantPaymentRequest[];
+  outgoingRequests: MerchantPaymentRequest[];
+  ledger: MerchantLedgerEntry[];
+  gifts: MerchantGiftFulfillment[];
+};
+export type MerchantOverview = {
+  active_merchants: number;
+  pending_purchases: number;
+  pending_requests: number;
+  purchased_issued: number;
+  bonus_issued: number;
+  available: number;
+  reserved: number;
+  settled: number;
+  recent: Array<{ id: string; merchant_user_id: string; entry_type: string; amount: number; created_at: string }>;
+};
 
 export type Transaction = {
   id: string;
@@ -223,7 +356,7 @@ export type ContactRequest = {
 
 export const api = {
   paymentDestinations: () => request<{ destinations: PaymentDestination[] }>("/api/payment-destinations"),
-  me: () => request<{ member: Member }>("/api/me"),
+  me: () => request<{ member: Member; merchant: MerchantSummary | null }>("/api/me"),
   onboarding: (data: { name?: string; phone?: string; sponsorCode?: string; termsAccepted?: boolean }) =>
     post<{ member: Member }>("/api/me/onboarding", data),
   lookupSponsor: (code: string) =>
@@ -256,12 +389,23 @@ export const api = {
   savePayoutMethod: (methodType: PayoutMethod["method_type"], details: Record<string, string>) =>
     post<{ method: PayoutMethod }>("/api/me/payout-methods", { methodType, details }),
 
-  booking: (id: string) => request<{ booking: Booking }>(`/api/bookings/${id}`),
+  booking: (id: string) => request<{ booking: Booking; merchantRequest: MerchantPaymentRequest | null }>(`/api/bookings/${id}`),
   createBooking: (offerSlug: string, idempotencyKey: string) =>
     post<{ booking: Booking }>("/api/bookings", { offerSlug }, idempotencyKey),
+  requestMerchantPay: (bookingId: string, merchantUserId: string, idempotencyKey: string) =>
+    post<{ request: MerchantPaymentRequest }>(`/api/bookings/${bookingId}/merchant-pay`, { merchantUserId }, idempotencyKey),
+
+  merchantBundles: () => request<{ bundles: MerchantBundle[] }>("/api/merchant-bundles"),
+  myMerchant: () => request<MerchantDashboard>("/api/me/merchant"),
+  startMerchantPurchase: (bundleId: string, termsAccepted: boolean, idempotencyKey: string) =>
+    post<{ purchase: MerchantPurchase }>("/api/me/merchant/purchases", { bundleId, termsAccepted }, idempotencyKey),
+  approveMerchantRequest: (id: string, idempotencyKey: string) =>
+    post<{ request: MerchantPaymentRequest }>(`/api/me/merchant/requests/${id}/approve`, {}, idempotencyKey),
+  declineMerchantRequest: (id: string, idempotencyKey: string) =>
+    post<{ request: MerchantPaymentRequest }>(`/api/me/merchant/requests/${id}/decline`, {}, idempotencyKey),
 
   requestActivation: (idempotencyKey: string) => post<{ activation: AnnualActivation }>("/api/activation/request", {}, idempotencyKey),
-  submitPayment: (data: { targetType: "activation" | "booking"; targetId: string; paymentMethod: "bkash" | "nagad" | "bank"; referenceId: string; proofFilename: string; proofMime: string; proofBase64: string; notes?: string }, idempotencyKey: string) =>
+  submitPayment: (data: { targetType: "activation" | "booking" | "merchant_bundle"; targetId: string; paymentMethod: "bkash" | "nagad" | "bank"; referenceId: string; proofFilename: string; proofMime: string; proofBase64: string; notes?: string }, idempotencyKey: string) =>
     post<{ payment: PaymentSubmission }>("/api/payments", data, idempotencyKey),
   requestWithdrawal: (amount: number, payoutMethodId: string, idempotencyKey: string) =>
     post<{ withdrawal: Withdrawal }>("/api/withdrawals", { amount, payoutMethodId }, idempotencyKey),
@@ -323,5 +467,34 @@ export const api = {
         member: { userId: string; name: string; email: string; referral_code: string };
         leadership: LeadershipSnapshot;
       }>(`/api/admin/leadership-rewards/${encodeURIComponent(userId)}`),
+
+    merchantOverview: () => request<{ overview: MerchantOverview }>("/api/admin/merchant/overview"),
+    merchantBundles: () => request<{ bundles: MerchantBundle[] }>("/api/admin/merchant/bundles"),
+    merchantBundle: (id: string) => request<{ bundle: MerchantBundle }>(`/api/admin/merchant/bundles/${encodeURIComponent(id)}`),
+    createMerchantBundle: (bundle: Record<string, unknown>) => post<{ bundle: MerchantBundle }>("/api/admin/merchant/bundles", bundle),
+    updateMerchantBundle: (id: string, bundle: Record<string, unknown>) =>
+      post<{ bundle: MerchantBundle }>(`/api/admin/merchant/bundles/${encodeURIComponent(id)}`, bundle),
+    setMerchantBundleStatus: (id: string, status: "draft" | "active" | "inactive") =>
+      post<{ bundle: MerchantBundle }>(`/api/admin/merchant/bundles/${encodeURIComponent(id)}/status`, { status }),
+    merchants: () => request<{ merchants: MerchantAccount[] }>("/api/admin/merchant/accounts"),
+    merchant: (userId: string) =>
+      request<MerchantDashboard & { merchant: MerchantAccount }>(`/api/admin/merchant/accounts/${encodeURIComponent(userId)}`),
+    setMerchantStatus: (userId: string, status: "active" | "suspended" | "inactive") =>
+      post<{ merchant: MerchantAccount }>(`/api/admin/merchant/accounts/${encodeURIComponent(userId)}/status`, { status }),
+    adjustMerchantCredit: (userId: string, data: { amount: number; direction: "credit" | "debit"; reason: string }) =>
+      post<{ merchant: MerchantAccount }>(`/api/admin/merchant/accounts/${encodeURIComponent(userId)}/adjust`, data),
+    merchantRequests: (status?: string) =>
+      request<{ requests: MerchantPaymentRequest[] }>(`/api/admin/merchant/requests${status ? `?status=${encodeURIComponent(status)}` : ""}`),
+    merchantLedger: (opts?: { userId?: string; entryType?: string }) => {
+      const params = new URLSearchParams();
+      if (opts?.userId) params.set("userId", opts.userId);
+      if (opts?.entryType) params.set("entryType", opts.entryType);
+      const q = params.toString();
+      return request<{ entries: MerchantLedgerEntry[] }>(`/api/admin/merchant/ledger${q ? `?${q}` : ""}`);
+    },
+    merchantGifts: (status?: string) =>
+      request<{ gifts: MerchantGiftFulfillment[] }>(`/api/admin/merchant/gifts${status ? `?status=${encodeURIComponent(status)}` : ""}`),
+    setMerchantGiftStatus: (id: string, status: "pending" | "fulfilled" | "cancelled", notes?: string) =>
+      post<{ gift: MerchantGiftFulfillment }>(`/api/admin/merchant/gifts/${encodeURIComponent(id)}/status`, { status, notes }),
   },
 };

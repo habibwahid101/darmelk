@@ -3,6 +3,11 @@ import { badRequest, conflict, notFound } from "../errors.js";
 import { uid } from "../ids.js";
 import { postCommissionsForBooking, reverseCommissionsForBooking } from "./commissions.js";
 import { requireActiveMember } from "./members.js";
+import {
+  releaseMerchantPaymentForBooking,
+  reverseMerchantPaymentForBooking,
+  settleMerchantPaymentForBooking,
+} from "./merchant.js";
 
 export type Booking = {
   id: string;
@@ -78,6 +83,7 @@ export async function confirmBooking(client: PoolClient, bookingId: string, admi
     `update bookings set status = 'confirmed', confirmed_at = now(), confirmed_by_admin_id = $2 where id = $1 returning *`,
     [bookingId, adminUserId],
   );
+  await settleMerchantPaymentForBooking(client, bookingId);
   return updated[0]!;
 }
 
@@ -133,6 +139,7 @@ export async function cancelBooking(client: PoolClient, bookingId: string): Prom
     `update bookings set status = 'cancelled', cancelled_at = now() where id = $1 returning *`,
     [bookingId],
   );
+  await releaseMerchantPaymentForBooking(client, bookingId);
   return updated[0]!;
 }
 
@@ -152,6 +159,7 @@ export async function reverseBooking(
     throw conflict(`Booking is ${booking.status}, expected confirmed or activated`);
   }
   const commissionsReversed = await reverseCommissionsForBooking(client, bookingId, opts);
+  await reverseMerchantPaymentForBooking(client, bookingId, opts.adminUserId);
   const { rows: updated } = await client.query<Booking>(
     `update bookings set status = 'reversed', cancelled_at = now(), cancelled_by_admin_id = $2 where id = $1 returning *`,
     [bookingId, opts.adminUserId],
