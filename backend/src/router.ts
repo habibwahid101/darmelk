@@ -71,6 +71,23 @@ import {
   updateBundle,
   updateGiftFulfillment,
 } from "./engine/merchant.js";
+import {
+  createPromotion,
+  getAdminQualification,
+  getPromotion,
+  getPromotionBanner,
+  getPromotionOverview,
+  getUserQualification,
+  listAdminFulfillments,
+  listAdminPromotions,
+  listAdminQualifications,
+  listDashboardPromotions,
+  listPublicPromotions,
+  setFulfillmentStatus,
+  setPromotionBanner,
+  setPromotionStatus,
+  updatePromotion,
+} from "./engine/promotions.js";
 
 type Vars = { userId: string; userEmail: string };
 const app = new Hono<{ Variables: Vars }>();
@@ -205,6 +222,35 @@ app.get("/api/merchant-bundles", async (c) => {
   return c.json({ bundles });
 });
 
+app.get("/api/promotions", async (c) => {
+  const promotions = await withTransaction((client) => listPublicPromotions(client));
+  return c.json({ promotions, serverNow: new Date().toISOString() });
+});
+
+app.get("/api/promotions/:id/banner", async (c) => {
+  const media = await withTransaction((client) => getPromotionBanner(client, c.req.param("id")));
+  return new Response(new Uint8Array(media.bytes), {
+    headers: {
+      "content-type": media.mime,
+      "cache-control": "public, max-age=86400",
+      "content-disposition": `inline; filename="${media.filename.replace(/["\\]/g, "_")}"`,
+    },
+  });
+});
+
+app.get("/api/promotions/:id", async (c) => {
+  const id = c.req.param("id");
+  const session = await auth.api.getSession({ headers: c.req.raw.headers }).catch(() => null);
+  const result = await withTransaction(async (client) => {
+    const promotion = await getPromotion(client, id);
+    const myQualification = session?.user?.id
+      ? await getUserQualification(client, id, session.user.id)
+      : null;
+    return { promotion, myQualification, serverNow: new Date().toISOString() };
+  });
+  return c.json(result);
+});
+
 app.get("/api/me", async (c) => {
   const userId = c.get("userId");
   const email = c.get("userEmail");
@@ -267,6 +313,12 @@ app.get("/api/me/leadership-reward", async (c) => {
   const userId = c.get("userId");
   const snapshot = await withTransaction((client) => syncLeadershipReward(client, userId));
   return c.json({ leadership: snapshot });
+});
+
+app.get("/api/me/promotions", async (c) => {
+  const userId = c.get("userId");
+  const dashboard = await withTransaction((client) => listDashboardPromotions(client, userId));
+  return c.json(dashboard);
 });
 
 app.get("/api/me/commissions", async (c) => {
@@ -1165,6 +1217,125 @@ app.post("/api/admin/merchant/gifts/:id/status", async (c) => {
     return result;
   });
   return c.json({ gift });
+});
+
+app.get("/api/admin/promotions/overview", async (c) => {
+  const adminId = c.get("userId");
+  const overview = await withTransaction(async (client) => {
+    await requireAdmin(client, adminId);
+    return getPromotionOverview(client);
+  });
+  return c.json({ overview });
+});
+
+app.get("/api/admin/promotions", async (c) => {
+  const adminId = c.get("userId");
+  const promotions = await withTransaction(async (client) => {
+    await requireAdmin(client, adminId);
+    return listAdminPromotions(client);
+  });
+  return c.json({ promotions, serverNow: new Date().toISOString() });
+});
+
+app.get("/api/admin/promotions/qualifications", async (c) => {
+  const adminId = c.get("userId");
+  const rows = await withTransaction(async (client) => {
+    await requireAdmin(client, adminId);
+    return listAdminQualifications(client, c.req.query("promotionId"));
+  });
+  return c.json({ qualifications: rows });
+});
+
+app.get("/api/admin/promotions/qualifications/:id", async (c) => {
+  const adminId = c.get("userId");
+  const qualification = await withTransaction(async (client) => {
+    await requireAdmin(client, adminId);
+    return getAdminQualification(client, c.req.param("id"));
+  });
+  return c.json({ qualification });
+});
+
+app.get("/api/admin/promotions/rewards", async (c) => {
+  const adminId = c.get("userId");
+  const rewards = await withTransaction(async (client) => {
+    await requireAdmin(client, adminId);
+    return listAdminFulfillments(client, c.req.query("status"));
+  });
+  return c.json({ rewards });
+});
+
+app.post("/api/admin/promotions/rewards/:id/status", async (c) => {
+  const adminId = c.get("userId");
+  const body = await jsonBody<{ status?: string; reason?: string; notes?: string }>(c);
+  const reward = await withTransaction(async (client) => {
+    await requireAdmin(client, adminId);
+    return setFulfillmentStatus(client, c.req.param("id"), body, adminId);
+  });
+  return c.json({ reward });
+});
+
+app.get("/api/admin/promotions/:id", async (c) => {
+  const adminId = c.get("userId");
+  const promotion = await withTransaction(async (client) => {
+    await requireAdmin(client, adminId);
+    return getPromotion(client, c.req.param("id"), { includeDraft: true });
+  });
+  return c.json({ promotion, serverNow: new Date().toISOString() });
+});
+
+app.get("/api/admin/promotions/:id/banner", async (c) => {
+  const adminId = c.get("userId");
+  const media = await withTransaction(async (client) => {
+    await requireAdmin(client, adminId);
+    return getPromotionBanner(client, c.req.param("id"), { includeDraft: true });
+  });
+  return new Response(new Uint8Array(media.bytes), {
+    headers: {
+      "content-type": media.mime,
+      "cache-control": "private, max-age=60",
+      "content-disposition": `inline; filename="${media.filename.replace(/["\\]/g, "_")}"`,
+    },
+  });
+});
+
+app.post("/api/admin/promotions", async (c) => {
+  const adminId = c.get("userId");
+  const body = await jsonBody<Record<string, unknown>>(c);
+  const promotion = await withTransaction(async (client) => {
+    await requireAdmin(client, adminId);
+    return createPromotion(client, body, adminId);
+  });
+  return c.json({ promotion }, 201);
+});
+
+app.post("/api/admin/promotions/:id", async (c) => {
+  const adminId = c.get("userId");
+  const body = await jsonBody<Record<string, unknown>>(c);
+  const promotion = await withTransaction(async (client) => {
+    await requireAdmin(client, adminId);
+    return updatePromotion(client, c.req.param("id"), body, adminId);
+  });
+  return c.json({ promotion });
+});
+
+app.post("/api/admin/promotions/:id/status", async (c) => {
+  const adminId = c.get("userId");
+  const body = await jsonBody<{ status?: string }>(c);
+  const promotion = await withTransaction(async (client) => {
+    await requireAdmin(client, adminId);
+    return setPromotionStatus(client, c.req.param("id"), body.status ?? "", adminId);
+  });
+  return c.json({ promotion });
+});
+
+app.post("/api/admin/promotions/:id/banner", async (c) => {
+  const adminId = c.get("userId");
+  const body = await jsonBody<{ filename?: string; mime?: string; bytesBase64?: string }>(c);
+  const promotion = await withTransaction(async (client) => {
+    await requireAdmin(client, adminId);
+    return setPromotionBanner(client, c.req.param("id"), body, adminId);
+  });
+  return c.json({ promotion });
 });
 
 app.get("/api/admin/leadership-rewards", async (c) => {

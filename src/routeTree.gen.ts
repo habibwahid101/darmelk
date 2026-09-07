@@ -35,6 +35,7 @@ import { Route as AdminMerchantRouteImport } from './routes/admin/merchant'
 import { Route as AdminNetworkRouteImport } from './routes/admin/network'
 import { Route as AdminOffersRouteImport } from './routes/admin/offers'
 import { Route as AdminPaymentsRouteImport } from './routes/admin/payments'
+import { Route as AdminPromotionsRouteImport } from './routes/admin/promotions'
 import { Route as AdminSettingsRouteImport } from './routes/admin/settings'
 import { Route as AdminUsersRouteImport } from './routes/admin/users'
 import { Route as AdminWithdrawalsRouteImport } from './routes/admin/withdrawals'
@@ -47,6 +48,7 @@ import { Route as AppLeadershipRewardRouteImport } from './routes/app/leadership
 import { Route as AppMerchantRouteImport } from './routes/app/merchant'
 import { Route as AppNetworkRouteImport } from './routes/app/network'
 import { Route as AppOnboardingRouteImport } from './routes/app/onboarding'
+import { Route as AppPromotionsRouteImport } from './routes/app/promotions'
 import { Route as AppQualificationRouteImport } from './routes/app/qualification'
 import { Route as AppSettingsRouteImport } from './routes/app/settings'
 import { Route as AppTransactionsRouteImport } from './routes/app/transactions'
@@ -68,9 +70,15 @@ import { Route as AdminMerchantRequestsRouteImport } from './routes/admin/mercha
 import { Route as AdminOffersIndexRouteImport } from './routes/admin/offers.index'
 import { Route as AdminOffersSlugRouteImport } from './routes/admin/offers.$slug'
 import { Route as AdminOffersNewRouteImport } from './routes/admin/offers.new'
+import { Route as AdminPromotionsIndexRouteImport } from './routes/admin/promotions.index'
+import { Route as AdminPromotionsCampaignsRouteImport } from './routes/admin/promotions.campaigns'
+import { Route as AdminPromotionsQualificationsRouteImport } from './routes/admin/promotions.qualifications'
+import { Route as AdminPromotionsRewardsRouteImport } from './routes/admin/promotions.rewards'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as AppBookSlugRouteImport } from './routes/app/book.$slug'
 import { Route as AppBookingsIdRouteImport } from './routes/app/bookings.$id'
+import { Route as AppPromotionsIndexRouteImport } from './routes/app/promotions.index'
+import { Route as AppPromotionsIdRouteImport } from './routes/app/promotions.$id'
 import { Route as AdminCareerSlugIndexRouteImport } from './routes/admin/career.$slug.index'
 import { Route as AdminCareerSlugPreviewRouteImport } from './routes/admin/career.$slug.preview'
 import { Route as AdminMerchantAccountsIndexRouteImport } from './routes/admin/merchant.accounts.index'
@@ -80,6 +88,11 @@ import { Route as AdminMerchantBundlesIdRouteImport } from './routes/admin/merch
 import { Route as AdminMerchantBundlesNewRouteImport } from './routes/admin/merchant.bundles.new'
 import { Route as AdminOffersSlugIndexRouteImport } from './routes/admin/offers.$slug.index'
 import { Route as AdminOffersSlugPreviewRouteImport } from './routes/admin/offers.$slug.preview'
+import { Route as AdminPromotionsCampaignsIndexRouteImport } from './routes/admin/promotions.campaigns.index'
+import { Route as AdminPromotionsCampaignsIdRouteImport } from './routes/admin/promotions.campaigns.$id'
+import { Route as AdminPromotionsCampaignsNewRouteImport } from './routes/admin/promotions.campaigns.new'
+import { Route as AdminPromotionsCampaignsIdIndexRouteImport } from './routes/admin/promotions.campaigns.$id.index'
+import { Route as AdminPromotionsCampaignsIdPreviewRouteImport } from './routes/admin/promotions.campaigns.$id.preview'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -211,6 +224,11 @@ const AdminPaymentsRoute = AdminPaymentsRouteImport.update({
   path: '/payments',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminPromotionsRoute = AdminPromotionsRouteImport.update({
+  id: '/promotions',
+  path: '/promotions',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminSettingsRoute = AdminSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
@@ -269,6 +287,11 @@ const AppNetworkRoute = AppNetworkRouteImport.update({
 const AppOnboardingRoute = AppOnboardingRouteImport.update({
   id: '/onboarding',
   path: '/onboarding',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppPromotionsRoute = AppPromotionsRouteImport.update({
+  id: '/promotions',
+  path: '/promotions',
   getParentRoute: () => AppRoute,
 } as any)
 const AppQualificationRoute = AppQualificationRouteImport.update({
@@ -378,6 +401,28 @@ const AdminOffersNewRoute = AdminOffersNewRouteImport.update({
   path: '/new',
   getParentRoute: () => AdminOffersRoute,
 } as any)
+const AdminPromotionsIndexRoute = AdminPromotionsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AdminPromotionsRoute,
+} as any)
+const AdminPromotionsCampaignsRoute =
+  AdminPromotionsCampaignsRouteImport.update({
+    id: '/campaigns',
+    path: '/campaigns',
+    getParentRoute: () => AdminPromotionsRoute,
+  } as any)
+const AdminPromotionsQualificationsRoute =
+  AdminPromotionsQualificationsRouteImport.update({
+    id: '/qualifications',
+    path: '/qualifications',
+    getParentRoute: () => AdminPromotionsRoute,
+  } as any)
+const AdminPromotionsRewardsRoute = AdminPromotionsRewardsRouteImport.update({
+  id: '/rewards',
+  path: '/rewards',
+  getParentRoute: () => AdminPromotionsRoute,
+} as any)
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   id: '/api/auth/$',
   path: '/api/auth/$',
@@ -392,6 +437,16 @@ const AppBookingsIdRoute = AppBookingsIdRouteImport.update({
   id: '/$id',
   path: '/$id',
   getParentRoute: () => AppBookingsRoute,
+} as any)
+const AppPromotionsIndexRoute = AppPromotionsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppPromotionsRoute,
+} as any)
+const AppPromotionsIdRoute = AppPromotionsIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => AppPromotionsRoute,
 } as any)
 const AdminCareerSlugIndexRoute = AdminCareerSlugIndexRouteImport.update({
   id: '/',
@@ -441,6 +496,36 @@ const AdminOffersSlugPreviewRoute = AdminOffersSlugPreviewRouteImport.update({
   path: '/preview',
   getParentRoute: () => AdminOffersSlugRoute,
 } as any)
+const AdminPromotionsCampaignsIndexRoute =
+  AdminPromotionsCampaignsIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AdminPromotionsCampaignsRoute,
+  } as any)
+const AdminPromotionsCampaignsIdRoute =
+  AdminPromotionsCampaignsIdRouteImport.update({
+    id: '/$id',
+    path: '/$id',
+    getParentRoute: () => AdminPromotionsCampaignsRoute,
+  } as any)
+const AdminPromotionsCampaignsNewRoute =
+  AdminPromotionsCampaignsNewRouteImport.update({
+    id: '/new',
+    path: '/new',
+    getParentRoute: () => AdminPromotionsCampaignsRoute,
+  } as any)
+const AdminPromotionsCampaignsIdIndexRoute =
+  AdminPromotionsCampaignsIdIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AdminPromotionsCampaignsIdRoute,
+  } as any)
+const AdminPromotionsCampaignsIdPreviewRoute =
+  AdminPromotionsCampaignsIdPreviewRouteImport.update({
+    id: '/preview',
+    path: '/preview',
+    getParentRoute: () => AdminPromotionsCampaignsIdRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -468,6 +553,7 @@ export interface FileRoutesByFullPath {
   '/admin/network': typeof AdminNetworkRoute
   '/admin/offers': typeof AdminOffersRouteWithChildren
   '/admin/payments': typeof AdminPaymentsRoute
+  '/admin/promotions': typeof AdminPromotionsRouteWithChildren
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/users': typeof AdminUsersRoute
   '/admin/withdrawals': typeof AdminWithdrawalsRoute
@@ -479,6 +565,7 @@ export interface FileRoutesByFullPath {
   '/app/merchant': typeof AppMerchantRoute
   '/app/network': typeof AppNetworkRoute
   '/app/onboarding': typeof AppOnboardingRoute
+  '/app/promotions': typeof AppPromotionsRouteWithChildren
   '/app/qualification': typeof AppQualificationRoute
   '/app/settings': typeof AppSettingsRoute
   '/app/transactions': typeof AppTransactionsRoute
@@ -498,22 +585,33 @@ export interface FileRoutesByFullPath {
   '/admin/merchant/requests': typeof AdminMerchantRequestsRoute
   '/admin/offers/$slug': typeof AdminOffersSlugRouteWithChildren
   '/admin/offers/new': typeof AdminOffersNewRoute
+  '/admin/promotions/campaigns': typeof AdminPromotionsCampaignsRouteWithChildren
+  '/admin/promotions/qualifications': typeof AdminPromotionsQualificationsRoute
+  '/admin/promotions/rewards': typeof AdminPromotionsRewardsRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/app/book/$slug': typeof AppBookSlugRoute
   '/app/bookings/$id': typeof AppBookingsIdRoute
+  '/app/promotions/$id': typeof AppPromotionsIdRoute
   '/admin/career/': typeof AdminCareerIndexRoute
   '/admin/leadership-rewards/': typeof AdminLeadershipRewardsIndexRoute
   '/admin/merchant/': typeof AdminMerchantIndexRoute
   '/admin/offers/': typeof AdminOffersIndexRoute
+  '/admin/promotions/': typeof AdminPromotionsIndexRoute
+  '/app/promotions/': typeof AppPromotionsIndexRoute
   '/admin/career/$slug/preview': typeof AdminCareerSlugPreviewRoute
   '/admin/merchant/accounts/$userId': typeof AdminMerchantAccountsUserIdRoute
   '/admin/merchant/bundles/$id': typeof AdminMerchantBundlesIdRoute
   '/admin/merchant/bundles/new': typeof AdminMerchantBundlesNewRoute
   '/admin/offers/$slug/preview': typeof AdminOffersSlugPreviewRoute
+  '/admin/promotions/campaigns/$id': typeof AdminPromotionsCampaignsIdRouteWithChildren
+  '/admin/promotions/campaigns/new': typeof AdminPromotionsCampaignsNewRoute
   '/admin/career/$slug/': typeof AdminCareerSlugIndexRoute
   '/admin/merchant/accounts/': typeof AdminMerchantAccountsIndexRoute
   '/admin/merchant/bundles/': typeof AdminMerchantBundlesIndexRoute
   '/admin/offers/$slug/': typeof AdminOffersSlugIndexRoute
+  '/admin/promotions/campaigns/': typeof AdminPromotionsCampaignsIndexRoute
+  '/admin/promotions/campaigns/$id/preview': typeof AdminPromotionsCampaignsIdPreviewRoute
+  '/admin/promotions/campaigns/$id/': typeof AdminPromotionsCampaignsIdIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -559,22 +657,31 @@ export interface FileRoutesByTo {
   '/admin/merchant/ledger': typeof AdminMerchantLedgerRoute
   '/admin/merchant/requests': typeof AdminMerchantRequestsRoute
   '/admin/offers/new': typeof AdminOffersNewRoute
+  '/admin/promotions/qualifications': typeof AdminPromotionsQualificationsRoute
+  '/admin/promotions/rewards': typeof AdminPromotionsRewardsRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/app/book/$slug': typeof AppBookSlugRoute
   '/app/bookings/$id': typeof AppBookingsIdRoute
+  '/app/promotions/$id': typeof AppPromotionsIdRoute
   '/admin/career': typeof AdminCareerIndexRoute
   '/admin/leadership-rewards': typeof AdminLeadershipRewardsIndexRoute
   '/admin/merchant': typeof AdminMerchantIndexRoute
   '/admin/offers': typeof AdminOffersIndexRoute
+  '/admin/promotions': typeof AdminPromotionsIndexRoute
+  '/app/promotions': typeof AppPromotionsIndexRoute
   '/admin/career/$slug/preview': typeof AdminCareerSlugPreviewRoute
   '/admin/merchant/accounts/$userId': typeof AdminMerchantAccountsUserIdRoute
   '/admin/merchant/bundles/$id': typeof AdminMerchantBundlesIdRoute
   '/admin/merchant/bundles/new': typeof AdminMerchantBundlesNewRoute
   '/admin/offers/$slug/preview': typeof AdminOffersSlugPreviewRoute
+  '/admin/promotions/campaigns/new': typeof AdminPromotionsCampaignsNewRoute
   '/admin/career/$slug': typeof AdminCareerSlugIndexRoute
   '/admin/merchant/accounts': typeof AdminMerchantAccountsIndexRoute
   '/admin/merchant/bundles': typeof AdminMerchantBundlesIndexRoute
   '/admin/offers/$slug': typeof AdminOffersSlugIndexRoute
+  '/admin/promotions/campaigns': typeof AdminPromotionsCampaignsIndexRoute
+  '/admin/promotions/campaigns/$id/preview': typeof AdminPromotionsCampaignsIdPreviewRoute
+  '/admin/promotions/campaigns/$id': typeof AdminPromotionsCampaignsIdIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -603,6 +710,7 @@ export interface FileRoutesById {
   '/admin/network': typeof AdminNetworkRoute
   '/admin/offers': typeof AdminOffersRouteWithChildren
   '/admin/payments': typeof AdminPaymentsRoute
+  '/admin/promotions': typeof AdminPromotionsRouteWithChildren
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/users': typeof AdminUsersRoute
   '/admin/withdrawals': typeof AdminWithdrawalsRoute
@@ -614,6 +722,7 @@ export interface FileRoutesById {
   '/app/merchant': typeof AppMerchantRoute
   '/app/network': typeof AppNetworkRoute
   '/app/onboarding': typeof AppOnboardingRoute
+  '/app/promotions': typeof AppPromotionsRouteWithChildren
   '/app/qualification': typeof AppQualificationRoute
   '/app/settings': typeof AppSettingsRoute
   '/app/transactions': typeof AppTransactionsRoute
@@ -633,22 +742,33 @@ export interface FileRoutesById {
   '/admin/merchant/requests': typeof AdminMerchantRequestsRoute
   '/admin/offers/$slug': typeof AdminOffersSlugRouteWithChildren
   '/admin/offers/new': typeof AdminOffersNewRoute
+  '/admin/promotions/campaigns': typeof AdminPromotionsCampaignsRouteWithChildren
+  '/admin/promotions/qualifications': typeof AdminPromotionsQualificationsRoute
+  '/admin/promotions/rewards': typeof AdminPromotionsRewardsRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/app/book/$slug': typeof AppBookSlugRoute
   '/app/bookings/$id': typeof AppBookingsIdRoute
+  '/app/promotions/$id': typeof AppPromotionsIdRoute
   '/admin/career/': typeof AdminCareerIndexRoute
   '/admin/leadership-rewards/': typeof AdminLeadershipRewardsIndexRoute
   '/admin/merchant/': typeof AdminMerchantIndexRoute
   '/admin/offers/': typeof AdminOffersIndexRoute
+  '/admin/promotions/': typeof AdminPromotionsIndexRoute
+  '/app/promotions/': typeof AppPromotionsIndexRoute
   '/admin/career/$slug/preview': typeof AdminCareerSlugPreviewRoute
   '/admin/merchant/accounts/$userId': typeof AdminMerchantAccountsUserIdRoute
   '/admin/merchant/bundles/$id': typeof AdminMerchantBundlesIdRoute
   '/admin/merchant/bundles/new': typeof AdminMerchantBundlesNewRoute
   '/admin/offers/$slug/preview': typeof AdminOffersSlugPreviewRoute
+  '/admin/promotions/campaigns/$id': typeof AdminPromotionsCampaignsIdRouteWithChildren
+  '/admin/promotions/campaigns/new': typeof AdminPromotionsCampaignsNewRoute
   '/admin/career/$slug/': typeof AdminCareerSlugIndexRoute
   '/admin/merchant/accounts/': typeof AdminMerchantAccountsIndexRoute
   '/admin/merchant/bundles/': typeof AdminMerchantBundlesIndexRoute
   '/admin/offers/$slug/': typeof AdminOffersSlugIndexRoute
+  '/admin/promotions/campaigns/': typeof AdminPromotionsCampaignsIndexRoute
+  '/admin/promotions/campaigns/$id/preview': typeof AdminPromotionsCampaignsIdPreviewRoute
+  '/admin/promotions/campaigns/$id/': typeof AdminPromotionsCampaignsIdIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -678,6 +798,7 @@ export interface FileRouteTypes {
     | '/admin/network'
     | '/admin/offers'
     | '/admin/payments'
+    | '/admin/promotions'
     | '/admin/settings'
     | '/admin/users'
     | '/admin/withdrawals'
@@ -689,6 +810,7 @@ export interface FileRouteTypes {
     | '/app/merchant'
     | '/app/network'
     | '/app/onboarding'
+    | '/app/promotions'
     | '/app/qualification'
     | '/app/settings'
     | '/app/transactions'
@@ -708,22 +830,33 @@ export interface FileRouteTypes {
     | '/admin/merchant/requests'
     | '/admin/offers/$slug'
     | '/admin/offers/new'
+    | '/admin/promotions/campaigns'
+    | '/admin/promotions/qualifications'
+    | '/admin/promotions/rewards'
     | '/api/auth/$'
     | '/app/book/$slug'
     | '/app/bookings/$id'
+    | '/app/promotions/$id'
     | '/admin/career/'
     | '/admin/leadership-rewards/'
     | '/admin/merchant/'
     | '/admin/offers/'
+    | '/admin/promotions/'
+    | '/app/promotions/'
     | '/admin/career/$slug/preview'
     | '/admin/merchant/accounts/$userId'
     | '/admin/merchant/bundles/$id'
     | '/admin/merchant/bundles/new'
     | '/admin/offers/$slug/preview'
+    | '/admin/promotions/campaigns/$id'
+    | '/admin/promotions/campaigns/new'
     | '/admin/career/$slug/'
     | '/admin/merchant/accounts/'
     | '/admin/merchant/bundles/'
     | '/admin/offers/$slug/'
+    | '/admin/promotions/campaigns/'
+    | '/admin/promotions/campaigns/$id/preview'
+    | '/admin/promotions/campaigns/$id/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -769,22 +902,31 @@ export interface FileRouteTypes {
     | '/admin/merchant/ledger'
     | '/admin/merchant/requests'
     | '/admin/offers/new'
+    | '/admin/promotions/qualifications'
+    | '/admin/promotions/rewards'
     | '/api/auth/$'
     | '/app/book/$slug'
     | '/app/bookings/$id'
+    | '/app/promotions/$id'
     | '/admin/career'
     | '/admin/leadership-rewards'
     | '/admin/merchant'
     | '/admin/offers'
+    | '/admin/promotions'
+    | '/app/promotions'
     | '/admin/career/$slug/preview'
     | '/admin/merchant/accounts/$userId'
     | '/admin/merchant/bundles/$id'
     | '/admin/merchant/bundles/new'
     | '/admin/offers/$slug/preview'
+    | '/admin/promotions/campaigns/new'
     | '/admin/career/$slug'
     | '/admin/merchant/accounts'
     | '/admin/merchant/bundles'
     | '/admin/offers/$slug'
+    | '/admin/promotions/campaigns'
+    | '/admin/promotions/campaigns/$id/preview'
+    | '/admin/promotions/campaigns/$id'
   id:
     | '__root__'
     | '/'
@@ -812,6 +954,7 @@ export interface FileRouteTypes {
     | '/admin/network'
     | '/admin/offers'
     | '/admin/payments'
+    | '/admin/promotions'
     | '/admin/settings'
     | '/admin/users'
     | '/admin/withdrawals'
@@ -823,6 +966,7 @@ export interface FileRouteTypes {
     | '/app/merchant'
     | '/app/network'
     | '/app/onboarding'
+    | '/app/promotions'
     | '/app/qualification'
     | '/app/settings'
     | '/app/transactions'
@@ -842,22 +986,33 @@ export interface FileRouteTypes {
     | '/admin/merchant/requests'
     | '/admin/offers/$slug'
     | '/admin/offers/new'
+    | '/admin/promotions/campaigns'
+    | '/admin/promotions/qualifications'
+    | '/admin/promotions/rewards'
     | '/api/auth/$'
     | '/app/book/$slug'
     | '/app/bookings/$id'
+    | '/app/promotions/$id'
     | '/admin/career/'
     | '/admin/leadership-rewards/'
     | '/admin/merchant/'
     | '/admin/offers/'
+    | '/admin/promotions/'
+    | '/app/promotions/'
     | '/admin/career/$slug/preview'
     | '/admin/merchant/accounts/$userId'
     | '/admin/merchant/bundles/$id'
     | '/admin/merchant/bundles/new'
     | '/admin/offers/$slug/preview'
+    | '/admin/promotions/campaigns/$id'
+    | '/admin/promotions/campaigns/new'
     | '/admin/career/$slug/'
     | '/admin/merchant/accounts/'
     | '/admin/merchant/bundles/'
     | '/admin/offers/$slug/'
+    | '/admin/promotions/campaigns/'
+    | '/admin/promotions/campaigns/$id/preview'
+    | '/admin/promotions/campaigns/$id/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -1062,6 +1217,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminPaymentsRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/promotions': {
+      id: '/admin/promotions'
+      path: '/promotions'
+      fullPath: '/admin/promotions'
+      preLoaderRoute: typeof AdminPromotionsRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/settings': {
       id: '/admin/settings'
       path: '/settings'
@@ -1144,6 +1306,13 @@ declare module '@tanstack/react-router' {
       path: '/onboarding'
       fullPath: '/app/onboarding'
       preLoaderRoute: typeof AppOnboardingRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/promotions': {
+      id: '/app/promotions'
+      path: '/promotions'
+      fullPath: '/app/promotions'
+      preLoaderRoute: typeof AppPromotionsRouteImport
       parentRoute: typeof AppRoute
     }
     '/app/qualification': {
@@ -1293,6 +1462,34 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminOffersNewRouteImport
       parentRoute: typeof AdminOffersRoute
     }
+    '/admin/promotions/': {
+      id: '/admin/promotions/'
+      path: '/'
+      fullPath: '/admin/promotions/'
+      preLoaderRoute: typeof AdminPromotionsIndexRouteImport
+      parentRoute: typeof AdminPromotionsRoute
+    }
+    '/admin/promotions/campaigns': {
+      id: '/admin/promotions/campaigns'
+      path: '/campaigns'
+      fullPath: '/admin/promotions/campaigns'
+      preLoaderRoute: typeof AdminPromotionsCampaignsRouteImport
+      parentRoute: typeof AdminPromotionsRoute
+    }
+    '/admin/promotions/qualifications': {
+      id: '/admin/promotions/qualifications'
+      path: '/qualifications'
+      fullPath: '/admin/promotions/qualifications'
+      preLoaderRoute: typeof AdminPromotionsQualificationsRouteImport
+      parentRoute: typeof AdminPromotionsRoute
+    }
+    '/admin/promotions/rewards': {
+      id: '/admin/promotions/rewards'
+      path: '/rewards'
+      fullPath: '/admin/promotions/rewards'
+      preLoaderRoute: typeof AdminPromotionsRewardsRouteImport
+      parentRoute: typeof AdminPromotionsRoute
+    }
     '/api/auth/$': {
       id: '/api/auth/$'
       path: '/api/auth/$'
@@ -1313,6 +1510,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/app/bookings/$id'
       preLoaderRoute: typeof AppBookingsIdRouteImport
       parentRoute: typeof AppBookingsRoute
+    }
+    '/app/promotions/': {
+      id: '/app/promotions/'
+      path: '/'
+      fullPath: '/app/promotions/'
+      preLoaderRoute: typeof AppPromotionsIndexRouteImport
+      parentRoute: typeof AppPromotionsRoute
+    }
+    '/app/promotions/$id': {
+      id: '/app/promotions/$id'
+      path: '/$id'
+      fullPath: '/app/promotions/$id'
+      preLoaderRoute: typeof AppPromotionsIdRouteImport
+      parentRoute: typeof AppPromotionsRoute
     }
     '/admin/career/$slug/': {
       id: '/admin/career/$slug/'
@@ -1376,6 +1587,41 @@ declare module '@tanstack/react-router' {
       fullPath: '/admin/offers/$slug/preview'
       preLoaderRoute: typeof AdminOffersSlugPreviewRouteImport
       parentRoute: typeof AdminOffersSlugRoute
+    }
+    '/admin/promotions/campaigns/': {
+      id: '/admin/promotions/campaigns/'
+      path: '/'
+      fullPath: '/admin/promotions/campaigns/'
+      preLoaderRoute: typeof AdminPromotionsCampaignsIndexRouteImport
+      parentRoute: typeof AdminPromotionsCampaignsRoute
+    }
+    '/admin/promotions/campaigns/$id': {
+      id: '/admin/promotions/campaigns/$id'
+      path: '/$id'
+      fullPath: '/admin/promotions/campaigns/$id'
+      preLoaderRoute: typeof AdminPromotionsCampaignsIdRouteImport
+      parentRoute: typeof AdminPromotionsCampaignsRoute
+    }
+    '/admin/promotions/campaigns/new': {
+      id: '/admin/promotions/campaigns/new'
+      path: '/new'
+      fullPath: '/admin/promotions/campaigns/new'
+      preLoaderRoute: typeof AdminPromotionsCampaignsNewRouteImport
+      parentRoute: typeof AdminPromotionsCampaignsRoute
+    }
+    '/admin/promotions/campaigns/$id/': {
+      id: '/admin/promotions/campaigns/$id/'
+      path: '/'
+      fullPath: '/admin/promotions/campaigns/$id/'
+      preLoaderRoute: typeof AdminPromotionsCampaignsIdIndexRouteImport
+      parentRoute: typeof AdminPromotionsCampaignsIdRoute
+    }
+    '/admin/promotions/campaigns/$id/preview': {
+      id: '/admin/promotions/campaigns/$id/preview'
+      path: '/preview'
+      fullPath: '/admin/promotions/campaigns/$id/preview'
+      preLoaderRoute: typeof AdminPromotionsCampaignsIdPreviewRouteImport
+      parentRoute: typeof AdminPromotionsCampaignsIdRoute
     }
   }
 }
@@ -1508,6 +1754,60 @@ const AdminOffersRouteWithChildren = AdminOffersRoute._addFileChildren(
   AdminOffersRouteChildren,
 )
 
+interface AdminPromotionsCampaignsIdRouteChildren {
+  AdminPromotionsCampaignsIdPreviewRoute: typeof AdminPromotionsCampaignsIdPreviewRoute
+  AdminPromotionsCampaignsIdIndexRoute: typeof AdminPromotionsCampaignsIdIndexRoute
+}
+
+const AdminPromotionsCampaignsIdRouteChildren: AdminPromotionsCampaignsIdRouteChildren =
+  {
+    AdminPromotionsCampaignsIdPreviewRoute:
+      AdminPromotionsCampaignsIdPreviewRoute,
+    AdminPromotionsCampaignsIdIndexRoute: AdminPromotionsCampaignsIdIndexRoute,
+  }
+
+const AdminPromotionsCampaignsIdRouteWithChildren =
+  AdminPromotionsCampaignsIdRoute._addFileChildren(
+    AdminPromotionsCampaignsIdRouteChildren,
+  )
+
+interface AdminPromotionsCampaignsRouteChildren {
+  AdminPromotionsCampaignsIdRoute: typeof AdminPromotionsCampaignsIdRouteWithChildren
+  AdminPromotionsCampaignsNewRoute: typeof AdminPromotionsCampaignsNewRoute
+  AdminPromotionsCampaignsIndexRoute: typeof AdminPromotionsCampaignsIndexRoute
+}
+
+const AdminPromotionsCampaignsRouteChildren: AdminPromotionsCampaignsRouteChildren =
+  {
+    AdminPromotionsCampaignsIdRoute:
+      AdminPromotionsCampaignsIdRouteWithChildren,
+    AdminPromotionsCampaignsNewRoute: AdminPromotionsCampaignsNewRoute,
+    AdminPromotionsCampaignsIndexRoute: AdminPromotionsCampaignsIndexRoute,
+  }
+
+const AdminPromotionsCampaignsRouteWithChildren =
+  AdminPromotionsCampaignsRoute._addFileChildren(
+    AdminPromotionsCampaignsRouteChildren,
+  )
+
+interface AdminPromotionsRouteChildren {
+  AdminPromotionsCampaignsRoute: typeof AdminPromotionsCampaignsRouteWithChildren
+  AdminPromotionsQualificationsRoute: typeof AdminPromotionsQualificationsRoute
+  AdminPromotionsRewardsRoute: typeof AdminPromotionsRewardsRoute
+  AdminPromotionsIndexRoute: typeof AdminPromotionsIndexRoute
+}
+
+const AdminPromotionsRouteChildren: AdminPromotionsRouteChildren = {
+  AdminPromotionsCampaignsRoute: AdminPromotionsCampaignsRouteWithChildren,
+  AdminPromotionsQualificationsRoute: AdminPromotionsQualificationsRoute,
+  AdminPromotionsRewardsRoute: AdminPromotionsRewardsRoute,
+  AdminPromotionsIndexRoute: AdminPromotionsIndexRoute,
+}
+
+const AdminPromotionsRouteWithChildren = AdminPromotionsRoute._addFileChildren(
+  AdminPromotionsRouteChildren,
+)
+
 interface AdminRouteChildren {
   AdminActivationRoute: typeof AdminActivationRoute
   AdminBookingsRoute: typeof AdminBookingsRoute
@@ -1520,6 +1820,7 @@ interface AdminRouteChildren {
   AdminNetworkRoute: typeof AdminNetworkRoute
   AdminOffersRoute: typeof AdminOffersRouteWithChildren
   AdminPaymentsRoute: typeof AdminPaymentsRoute
+  AdminPromotionsRoute: typeof AdminPromotionsRouteWithChildren
   AdminSettingsRoute: typeof AdminSettingsRoute
   AdminUsersRoute: typeof AdminUsersRoute
   AdminWithdrawalsRoute: typeof AdminWithdrawalsRoute
@@ -1538,6 +1839,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminNetworkRoute: AdminNetworkRoute,
   AdminOffersRoute: AdminOffersRouteWithChildren,
   AdminPaymentsRoute: AdminPaymentsRoute,
+  AdminPromotionsRoute: AdminPromotionsRouteWithChildren,
   AdminSettingsRoute: AdminSettingsRoute,
   AdminUsersRoute: AdminUsersRoute,
   AdminWithdrawalsRoute: AdminWithdrawalsRoute,
@@ -1558,6 +1860,20 @@ const AppBookingsRouteWithChildren = AppBookingsRoute._addFileChildren(
   AppBookingsRouteChildren,
 )
 
+interface AppPromotionsRouteChildren {
+  AppPromotionsIdRoute: typeof AppPromotionsIdRoute
+  AppPromotionsIndexRoute: typeof AppPromotionsIndexRoute
+}
+
+const AppPromotionsRouteChildren: AppPromotionsRouteChildren = {
+  AppPromotionsIdRoute: AppPromotionsIdRoute,
+  AppPromotionsIndexRoute: AppPromotionsIndexRoute,
+}
+
+const AppPromotionsRouteWithChildren = AppPromotionsRoute._addFileChildren(
+  AppPromotionsRouteChildren,
+)
+
 interface AppRouteChildren {
   AppActivationRoute: typeof AppActivationRoute
   AppBookingsRoute: typeof AppBookingsRouteWithChildren
@@ -1567,6 +1883,7 @@ interface AppRouteChildren {
   AppMerchantRoute: typeof AppMerchantRoute
   AppNetworkRoute: typeof AppNetworkRoute
   AppOnboardingRoute: typeof AppOnboardingRoute
+  AppPromotionsRoute: typeof AppPromotionsRouteWithChildren
   AppQualificationRoute: typeof AppQualificationRoute
   AppSettingsRoute: typeof AppSettingsRoute
   AppTransactionsRoute: typeof AppTransactionsRoute
@@ -1583,6 +1900,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppMerchantRoute: AppMerchantRoute,
   AppNetworkRoute: AppNetworkRoute,
   AppOnboardingRoute: AppOnboardingRoute,
+  AppPromotionsRoute: AppPromotionsRouteWithChildren,
   AppQualificationRoute: AppQualificationRoute,
   AppSettingsRoute: AppSettingsRoute,
   AppTransactionsRoute: AppTransactionsRoute,

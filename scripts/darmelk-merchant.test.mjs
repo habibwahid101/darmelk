@@ -72,7 +72,6 @@ test("user and admin screens use Merchant naming", () => {
   assert.match(read("src/routes/admin/merchant.index.tsx"), /Merchant Management/);
   assert.doesNotMatch(read("src/routes/app/merchant.tsx"), /Marchant/);
   assert.doesNotMatch(read("src/routes/admin/merchant.accounts.\$userId.tsx"), /Set Merchant Balance/);
-  assert.doesNotMatch(read("src/components/layout/admin-shell.tsx"), /Promotion Management/);
 });
 
 test("existing commission, leadership, career, and booking rules remain intact", () => {

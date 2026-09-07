@@ -334,6 +334,102 @@ export type MerchantOverview = {
   recent: Array<{ id: string; merchant_user_id: string; entry_type: string; amount: number; created_at: string }>;
 };
 
+export type PromotionReward = {
+  id?: string;
+  name: string;
+  description: string;
+  quantity: number;
+  value_amount: number | null;
+  instructions: string | null;
+  display_order: number;
+};
+export type PromotionOfferRef = { slug: string; title: string };
+export type PromotionLifecycle = "draft" | "upcoming" | "active" | "expired" | "closed";
+export type Promotion = {
+  id: string;
+  title: string;
+  short_description: string;
+  description: string;
+  start_at: string;
+  end_at: string;
+  offer_scope: "all" | "selected";
+  terms: string;
+  terms_version: number;
+  version: number;
+  has_banner: boolean;
+  status: "draft" | "published" | "closed";
+  lifecycle: PromotionLifecycle;
+  display_order: number;
+  created_at: string;
+  updated_at: string;
+  offers: PromotionOfferRef[];
+  rewards: PromotionReward[];
+};
+export type PromotionFulfillment = {
+  id: string;
+  qualification_id: string;
+  promotion_id: string;
+  user_id: string;
+  reward_name: string;
+  reward_description: string;
+  quantity: number;
+  value_amount: number | null;
+  instructions: string | null;
+  display_order: number;
+  status: "eligible" | "approved" | "fulfilled" | "cancelled" | "reversed";
+  created_at: string;
+  updated_at: string;
+  notes: string | null;
+  events?: Array<{
+    id: string;
+    previous_status: string | null;
+    new_status: string;
+    reason: string | null;
+    actor_user_id: string | null;
+    created_at: string;
+  }>;
+  user_name?: string;
+  user_email?: string;
+  promotion_title?: string;
+  booking_id?: string;
+};
+export type PromotionQualification = {
+  id: string;
+  promotion_id: string;
+  user_id: string;
+  booking_id: string;
+  offer_slug: string;
+  offer_title: string;
+  booking_confirmed_at: string;
+  qualified_at: string;
+  promotion_title: string;
+  promotion_version: number;
+  terms_snapshot: string;
+  terms_version: number;
+  rewards_snapshot: PromotionReward[];
+  start_at: string;
+  end_at: string;
+  user_name?: string;
+  user_email?: string;
+  fulfillments?: PromotionFulfillment[];
+};
+export type PromotionOverview = {
+  serverNow: string;
+  active: number;
+  draft: number;
+  upcoming: number;
+  expired: number;
+  closed: number;
+  qualified_members: number;
+  pending_fulfillment: number;
+};
+export type PromotionDashboard = {
+  serverNow: string;
+  primary: Promotion | null;
+  more: Promotion[];
+  qualifications: PromotionQualification[];
+};
+
 export type Transaction = {
   id: string;
   type: "booking" | "commission" | "activation" | "withdrawal";
@@ -379,6 +475,7 @@ export const api = {
     }>("/api/me/network"),
   myQualification: () => request<QualificationStatus & { ownBooking: Booking | null }>("/api/me/qualification"),
   myLeadershipReward: () => request<{ leadership: LeadershipSnapshot }>("/api/me/leadership-reward"),
+  myPromotions: () => request<PromotionDashboard>("/api/me/promotions"),
   myCommissions: () => request<{ totals: CommissionTotals; commissions: Commission[] }>("/api/me/commissions"),
   myTransactions: () => request<{ transactions: Transaction[] }>("/api/me/transactions"),
   myBookings: () => request<{ bookings: Booking[] }>("/api/me/bookings"),
@@ -394,6 +491,13 @@ export const api = {
     post<{ booking: Booking }>("/api/bookings", { offerSlug }, idempotencyKey),
   requestMerchantPay: (bookingId: string, merchantUserId: string, idempotencyKey: string) =>
     post<{ request: MerchantPaymentRequest }>(`/api/bookings/${bookingId}/merchant-pay`, { merchantUserId }, idempotencyKey),
+
+  promotions: () => request<{ promotions: Promotion[]; serverNow: string }>("/api/promotions"),
+  promotion: (id: string) =>
+    request<{ promotion: Promotion; myQualification: PromotionQualification | null; serverNow: string }>(
+      `/api/promotions/${encodeURIComponent(id)}`,
+    ),
+  promotionBannerUrl: (id: string) => `${API_URL}/api/promotions/${encodeURIComponent(id)}/banner`,
 
   merchantBundles: () => request<{ bundles: MerchantBundle[] }>("/api/merchant-bundles"),
   myMerchant: () => request<MerchantDashboard>("/api/me/merchant"),
@@ -496,5 +600,28 @@ export const api = {
       request<{ gifts: MerchantGiftFulfillment[] }>(`/api/admin/merchant/gifts${status ? `?status=${encodeURIComponent(status)}` : ""}`),
     setMerchantGiftStatus: (id: string, status: "pending" | "fulfilled" | "cancelled", notes?: string) =>
       post<{ gift: MerchantGiftFulfillment }>(`/api/admin/merchant/gifts/${encodeURIComponent(id)}/status`, { status, notes }),
+
+    promotionOverview: () => request<{ overview: PromotionOverview }>("/api/admin/promotions/overview"),
+    promotions: () => request<{ promotions: Promotion[]; serverNow: string }>("/api/admin/promotions"),
+    promotion: (id: string) => request<{ promotion: Promotion; serverNow: string }>(`/api/admin/promotions/${encodeURIComponent(id)}`),
+    createPromotion: (body: Record<string, unknown>) => post<{ promotion: Promotion }>("/api/admin/promotions", body),
+    updatePromotion: (id: string, body: Record<string, unknown>) =>
+      post<{ promotion: Promotion }>(`/api/admin/promotions/${encodeURIComponent(id)}`, body),
+    setPromotionStatus: (id: string, status: "draft" | "published" | "closed") =>
+      post<{ promotion: Promotion }>(`/api/admin/promotions/${encodeURIComponent(id)}/status`, { status }),
+    setPromotionBanner: (id: string, data: { filename: string; mime: string; bytesBase64: string }) =>
+      post<{ promotion: Promotion }>(`/api/admin/promotions/${encodeURIComponent(id)}/banner`, data),
+    promotionQualifications: (promotionId?: string) =>
+      request<{ qualifications: PromotionQualification[] }>(
+        `/api/admin/promotions/qualifications${promotionId ? `?promotionId=${encodeURIComponent(promotionId)}` : ""}`,
+      ),
+    promotionQualification: (id: string) =>
+      request<{ qualification: PromotionQualification }>(`/api/admin/promotions/qualifications/${encodeURIComponent(id)}`),
+    promotionRewards: (status?: string) =>
+      request<{ rewards: PromotionFulfillment[] }>(
+        `/api/admin/promotions/rewards${status ? `?status=${encodeURIComponent(status)}` : ""}`,
+      ),
+    setPromotionRewardStatus: (id: string, status: PromotionFulfillment["status"], reason?: string) =>
+      post<{ reward: PromotionFulfillment }>(`/api/admin/promotions/rewards/${encodeURIComponent(id)}/status`, { status, reason }),
   },
 };
