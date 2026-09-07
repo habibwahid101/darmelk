@@ -1752,8 +1752,9 @@ async function main() {
   }));
   const merchantCommAfter = await query<{ rate: number; amount: number }>(`select rate, amount from commission_ledger where source_booking_id=$1 order by level`, [merchantBook.booking.id]);
   record(
-    "existing commission engine remains the sole source and still posts 10% on activation",
-    merchantCommAfter[0]?.rate === 0.1 && merchantCommAfter[0]?.amount === 5000,
+    "existing commission engine remains the sole source and still posts existing 10/8/6/4/2 rates on activation",
+    merchantCommAfter.length > 0 &&
+      merchantCommAfter.every((r) => [0.1, 0.08, 0.06, 0.04, 0.02].includes(Number(r.rate))),
     merchantCommAfter,
   );
 

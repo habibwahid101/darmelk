@@ -239,8 +239,19 @@ async function loadRewards(client: PoolClient, promotionId: string): Promise<Pro
 }
 
 async function hydrate(client: PoolClient, row: Omit<Promotion, "offers" | "rewards" | "lifecycle">, now?: Date): Promise<Promotion> {
-  const [offers, rewards] = await Promise.all([loadOffers(client, row.id), loadRewards(client, row.id)]);
+  const offers = await loadOffers(client, row.id);
+  const rewards = await loadRewards(client, row.id);
   return withLifecycle({ ...row, offers, rewards } as Promotion, now);
+}
+
+async function hydrateAll(
+  client: PoolClient,
+  rows: Array<Omit<Promotion, "offers" | "rewards" | "lifecycle">>,
+  now?: Date,
+): Promise<Promotion[]> {
+  const promotions: Promotion[] = [];
+  for (const row of rows) promotions.push(await hydrate(client, row, now));
+  return promotions;
 }
 
 export async function listAdminPromotions(client: PoolClient): Promise<Promotion[]> {
@@ -248,7 +259,7 @@ export async function listAdminPromotions(client: PoolClient): Promise<Promotion
     `select ${PROMO_COLS} from promotions order by display_order asc, updated_at desc`,
   );
   const now = new Date();
-  return Promise.all(rows.map((row) => hydrate(client, row, now)));
+  return hydrateAll(client, rows, now);
 }
 
 export async function listPublicPromotions(client: PoolClient): Promise<Promotion[]> {
@@ -258,7 +269,7 @@ export async function listPublicPromotions(client: PoolClient): Promise<Promotio
       order by display_order asc, end_at asc`,
   );
   const now = new Date();
-  return Promise.all(rows.map((row) => hydrate(client, row, now)));
+  return hydrateAll(client, rows, now);
 }
 
 export async function listDashboardPromotions(client: PoolClient, userId: string) {
