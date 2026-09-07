@@ -20,6 +20,7 @@ import { getCommissionTotals } from "./engine/commissions.js";
 import { completeOnboarding, ensureMember, logAdminAction, requireAdmin } from "./engine/members.js";
 import { createContactRequest, listContactRequests, updateContactRequestStatus } from "./engine/contact.js";
 import { getQualificationStatus, PERSONAL_SPONSOR_TARGET, TOTAL_POSITIONS } from "./engine/network.js";
+import { listLeadershipRewardSummaries, syncLeadershipReward } from "./engine/leadership.js";
 import { decideWithdrawal, markWithdrawalPaid, requestWithdrawal } from "./engine/withdrawals.js";
 import { createPaymentSubmission, finalizePayment, getPaymentProof, markPaymentUnderReview, PAYMENT_DESTINATIONS, type PaymentMethod, type PaymentTarget } from "./engine/payments.js";
 import { uid } from "./ids.js";
@@ -225,6 +226,12 @@ app.get("/api/me/qualification", async (c) => {
     [userId],
   );
   return c.json({ ...status, ownBooking: ownBooking ?? null });
+});
+
+app.get("/api/me/leadership-reward", async (c) => {
+  const userId = c.get("userId");
+  const snapshot = await withTransaction((client) => syncLeadershipReward(client, userId));
+  return c.json({ leadership: snapshot });
 });
 
 app.get("/api/me/commissions", async (c) => {
@@ -851,6 +858,33 @@ app.post("/api/admin/jobs/:slug", async (c) => {
     return result;
   });
   return c.json({ job });
+});
+
+app.get("/api/admin/leadership-rewards", async (c) => {
+  const adminId = c.get("userId");
+  const rows = await withTransaction(async (client) => {
+    await requireAdmin(client, adminId);
+    return listLeadershipRewardSummaries(client);
+  });
+  return c.json({ rewards: rows });
+});
+
+app.get("/api/admin/leadership-rewards/:userId", async (c) => {
+  const adminId = c.get("userId");
+  const targetId = c.req.param("userId");
+  const result = await withTransaction(async (client) => {
+    await requireAdmin(client, adminId);
+    const member = await client.query<{ name: string; email: string; referral_code: string }>(
+      `select u.name, u.email, m.referral_code
+         from members m join "user" u on u.id = m.user_id
+        where m.user_id = $1`,
+      [targetId],
+    );
+    if (!member.rows[0]) throw notFound("Member not found");
+    const snapshot = await syncLeadershipReward(client, targetId);
+    return { member: { userId: targetId, ...member.rows[0] }, leadership: snapshot };
+  });
+  return c.json(result);
 });
 
 app.onError((err, c) => {

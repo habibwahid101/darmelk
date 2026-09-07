@@ -30,6 +30,7 @@ import { Route as AdminCareerRouteImport } from './routes/admin/career'
 import { Route as AdminCommissionRouteImport } from './routes/admin/commission'
 import { Route as AdminContactRequestsRouteImport } from './routes/admin/contact-requests'
 import { Route as AdminDocumentsRouteImport } from './routes/admin/documents'
+import { Route as AdminLeadershipRewardsRouteImport } from './routes/admin/leadership-rewards'
 import { Route as AdminNetworkRouteImport } from './routes/admin/network'
 import { Route as AdminOffersRouteImport } from './routes/admin/offers'
 import { Route as AdminPaymentsRouteImport } from './routes/admin/payments'
@@ -41,6 +42,7 @@ import { Route as AppActivationRouteImport } from './routes/app/activation'
 import { Route as AppBookingsRouteImport } from './routes/app/bookings'
 import { Route as AppCommissionRouteImport } from './routes/app/commission'
 import { Route as AppDocumentsRouteImport } from './routes/app/documents'
+import { Route as AppLeadershipRewardRouteImport } from './routes/app/leadership-reward'
 import { Route as AppNetworkRouteImport } from './routes/app/network'
 import { Route as AppOnboardingRouteImport } from './routes/app/onboarding'
 import { Route as AppQualificationRouteImport } from './routes/app/qualification'
@@ -53,6 +55,8 @@ import { Route as PropertiesSlugRouteImport } from './routes/properties.$slug'
 import { Route as AdminCareerIndexRouteImport } from './routes/admin/career.index'
 import { Route as AdminCareerSlugRouteImport } from './routes/admin/career.$slug'
 import { Route as AdminCareerNewRouteImport } from './routes/admin/career.new'
+import { Route as AdminLeadershipRewardsIndexRouteImport } from './routes/admin/leadership-rewards.index'
+import { Route as AdminLeadershipRewardsUserIdRouteImport } from './routes/admin/leadership-rewards.$userId'
 import { Route as AdminOffersIndexRouteImport } from './routes/admin/offers.index'
 import { Route as AdminOffersSlugRouteImport } from './routes/admin/offers.$slug'
 import { Route as AdminOffersNewRouteImport } from './routes/admin/offers.new'
@@ -169,6 +173,11 @@ const AdminDocumentsRoute = AdminDocumentsRouteImport.update({
   path: '/documents',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminLeadershipRewardsRoute = AdminLeadershipRewardsRouteImport.update({
+  id: '/leadership-rewards',
+  path: '/leadership-rewards',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminNetworkRoute = AdminNetworkRouteImport.update({
   id: '/network',
   path: '/network',
@@ -222,6 +231,11 @@ const AppCommissionRoute = AppCommissionRouteImport.update({
 const AppDocumentsRoute = AppDocumentsRouteImport.update({
   id: '/documents',
   path: '/documents',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppLeadershipRewardRoute = AppLeadershipRewardRouteImport.update({
+  id: '/leadership-reward',
+  path: '/leadership-reward',
   getParentRoute: () => AppRoute,
 } as any)
 const AppNetworkRoute = AppNetworkRouteImport.update({
@@ -284,6 +298,18 @@ const AdminCareerNewRoute = AdminCareerNewRouteImport.update({
   path: '/new',
   getParentRoute: () => AdminCareerRoute,
 } as any)
+const AdminLeadershipRewardsIndexRoute =
+  AdminLeadershipRewardsIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AdminLeadershipRewardsRoute,
+  } as any)
+const AdminLeadershipRewardsUserIdRoute =
+  AdminLeadershipRewardsUserIdRouteImport.update({
+    id: '/$userId',
+    path: '/$userId',
+    getParentRoute: () => AdminLeadershipRewardsRoute,
+  } as any)
 const AdminOffersIndexRoute = AdminOffersIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -356,6 +382,7 @@ export interface FileRoutesByFullPath {
   '/admin/commission': typeof AdminCommissionRoute
   '/admin/contact-requests': typeof AdminContactRequestsRoute
   '/admin/documents': typeof AdminDocumentsRoute
+  '/admin/leadership-rewards': typeof AdminLeadershipRewardsRouteWithChildren
   '/admin/network': typeof AdminNetworkRoute
   '/admin/offers': typeof AdminOffersRouteWithChildren
   '/admin/payments': typeof AdminPaymentsRoute
@@ -366,6 +393,7 @@ export interface FileRoutesByFullPath {
   '/app/bookings': typeof AppBookingsRouteWithChildren
   '/app/commission': typeof AppCommissionRoute
   '/app/documents': typeof AppDocumentsRoute
+  '/app/leadership-reward': typeof AppLeadershipRewardRoute
   '/app/network': typeof AppNetworkRoute
   '/app/onboarding': typeof AppOnboardingRoute
   '/app/qualification': typeof AppQualificationRoute
@@ -379,12 +407,14 @@ export interface FileRoutesByFullPath {
   '/properties/': typeof PropertiesIndexRoute
   '/admin/career/$slug': typeof AdminCareerSlugRouteWithChildren
   '/admin/career/new': typeof AdminCareerNewRoute
+  '/admin/leadership-rewards/$userId': typeof AdminLeadershipRewardsUserIdRoute
   '/admin/offers/$slug': typeof AdminOffersSlugRouteWithChildren
   '/admin/offers/new': typeof AdminOffersNewRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/app/book/$slug': typeof AppBookSlugRoute
   '/app/bookings/$id': typeof AppBookingsIdRoute
   '/admin/career/': typeof AdminCareerIndexRoute
+  '/admin/leadership-rewards/': typeof AdminLeadershipRewardsIndexRoute
   '/admin/offers/': typeof AdminOffersIndexRoute
   '/admin/career/$slug/preview': typeof AdminCareerSlugPreviewRoute
   '/admin/offers/$slug/preview': typeof AdminOffersSlugPreviewRoute
@@ -416,6 +446,7 @@ export interface FileRoutesByTo {
   '/app/bookings': typeof AppBookingsRouteWithChildren
   '/app/commission': typeof AppCommissionRoute
   '/app/documents': typeof AppDocumentsRoute
+  '/app/leadership-reward': typeof AppLeadershipRewardRoute
   '/app/network': typeof AppNetworkRoute
   '/app/onboarding': typeof AppOnboardingRoute
   '/app/qualification': typeof AppQualificationRoute
@@ -428,11 +459,13 @@ export interface FileRoutesByTo {
   '/career': typeof CareerIndexRoute
   '/properties': typeof PropertiesIndexRoute
   '/admin/career/new': typeof AdminCareerNewRoute
+  '/admin/leadership-rewards/$userId': typeof AdminLeadershipRewardsUserIdRoute
   '/admin/offers/new': typeof AdminOffersNewRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/app/book/$slug': typeof AppBookSlugRoute
   '/app/bookings/$id': typeof AppBookingsIdRoute
   '/admin/career': typeof AdminCareerIndexRoute
+  '/admin/leadership-rewards': typeof AdminLeadershipRewardsIndexRoute
   '/admin/offers': typeof AdminOffersIndexRoute
   '/admin/career/$slug/preview': typeof AdminCareerSlugPreviewRoute
   '/admin/offers/$slug/preview': typeof AdminOffersSlugPreviewRoute
@@ -461,6 +494,7 @@ export interface FileRoutesById {
   '/admin/commission': typeof AdminCommissionRoute
   '/admin/contact-requests': typeof AdminContactRequestsRoute
   '/admin/documents': typeof AdminDocumentsRoute
+  '/admin/leadership-rewards': typeof AdminLeadershipRewardsRouteWithChildren
   '/admin/network': typeof AdminNetworkRoute
   '/admin/offers': typeof AdminOffersRouteWithChildren
   '/admin/payments': typeof AdminPaymentsRoute
@@ -471,6 +505,7 @@ export interface FileRoutesById {
   '/app/bookings': typeof AppBookingsRouteWithChildren
   '/app/commission': typeof AppCommissionRoute
   '/app/documents': typeof AppDocumentsRoute
+  '/app/leadership-reward': typeof AppLeadershipRewardRoute
   '/app/network': typeof AppNetworkRoute
   '/app/onboarding': typeof AppOnboardingRoute
   '/app/qualification': typeof AppQualificationRoute
@@ -484,12 +519,14 @@ export interface FileRoutesById {
   '/properties/': typeof PropertiesIndexRoute
   '/admin/career/$slug': typeof AdminCareerSlugRouteWithChildren
   '/admin/career/new': typeof AdminCareerNewRoute
+  '/admin/leadership-rewards/$userId': typeof AdminLeadershipRewardsUserIdRoute
   '/admin/offers/$slug': typeof AdminOffersSlugRouteWithChildren
   '/admin/offers/new': typeof AdminOffersNewRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/app/book/$slug': typeof AppBookSlugRoute
   '/app/bookings/$id': typeof AppBookingsIdRoute
   '/admin/career/': typeof AdminCareerIndexRoute
+  '/admin/leadership-rewards/': typeof AdminLeadershipRewardsIndexRoute
   '/admin/offers/': typeof AdminOffersIndexRoute
   '/admin/career/$slug/preview': typeof AdminCareerSlugPreviewRoute
   '/admin/offers/$slug/preview': typeof AdminOffersSlugPreviewRoute
@@ -519,6 +556,7 @@ export interface FileRouteTypes {
     | '/admin/commission'
     | '/admin/contact-requests'
     | '/admin/documents'
+    | '/admin/leadership-rewards'
     | '/admin/network'
     | '/admin/offers'
     | '/admin/payments'
@@ -529,6 +567,7 @@ export interface FileRouteTypes {
     | '/app/bookings'
     | '/app/commission'
     | '/app/documents'
+    | '/app/leadership-reward'
     | '/app/network'
     | '/app/onboarding'
     | '/app/qualification'
@@ -542,12 +581,14 @@ export interface FileRouteTypes {
     | '/properties/'
     | '/admin/career/$slug'
     | '/admin/career/new'
+    | '/admin/leadership-rewards/$userId'
     | '/admin/offers/$slug'
     | '/admin/offers/new'
     | '/api/auth/$'
     | '/app/book/$slug'
     | '/app/bookings/$id'
     | '/admin/career/'
+    | '/admin/leadership-rewards/'
     | '/admin/offers/'
     | '/admin/career/$slug/preview'
     | '/admin/offers/$slug/preview'
@@ -579,6 +620,7 @@ export interface FileRouteTypes {
     | '/app/bookings'
     | '/app/commission'
     | '/app/documents'
+    | '/app/leadership-reward'
     | '/app/network'
     | '/app/onboarding'
     | '/app/qualification'
@@ -591,11 +633,13 @@ export interface FileRouteTypes {
     | '/career'
     | '/properties'
     | '/admin/career/new'
+    | '/admin/leadership-rewards/$userId'
     | '/admin/offers/new'
     | '/api/auth/$'
     | '/app/book/$slug'
     | '/app/bookings/$id'
     | '/admin/career'
+    | '/admin/leadership-rewards'
     | '/admin/offers'
     | '/admin/career/$slug/preview'
     | '/admin/offers/$slug/preview'
@@ -623,6 +667,7 @@ export interface FileRouteTypes {
     | '/admin/commission'
     | '/admin/contact-requests'
     | '/admin/documents'
+    | '/admin/leadership-rewards'
     | '/admin/network'
     | '/admin/offers'
     | '/admin/payments'
@@ -633,6 +678,7 @@ export interface FileRouteTypes {
     | '/app/bookings'
     | '/app/commission'
     | '/app/documents'
+    | '/app/leadership-reward'
     | '/app/network'
     | '/app/onboarding'
     | '/app/qualification'
@@ -646,12 +692,14 @@ export interface FileRouteTypes {
     | '/properties/'
     | '/admin/career/$slug'
     | '/admin/career/new'
+    | '/admin/leadership-rewards/$userId'
     | '/admin/offers/$slug'
     | '/admin/offers/new'
     | '/api/auth/$'
     | '/app/book/$slug'
     | '/app/bookings/$id'
     | '/admin/career/'
+    | '/admin/leadership-rewards/'
     | '/admin/offers/'
     | '/admin/career/$slug/preview'
     | '/admin/offers/$slug/preview'
@@ -826,6 +874,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminDocumentsRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/leadership-rewards': {
+      id: '/admin/leadership-rewards'
+      path: '/leadership-rewards'
+      fullPath: '/admin/leadership-rewards'
+      preLoaderRoute: typeof AdminLeadershipRewardsRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/network': {
       id: '/admin/network'
       path: '/network'
@@ -901,6 +956,13 @@ declare module '@tanstack/react-router' {
       path: '/documents'
       fullPath: '/app/documents'
       preLoaderRoute: typeof AppDocumentsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/leadership-reward': {
+      id: '/app/leadership-reward'
+      path: '/leadership-reward'
+      fullPath: '/app/leadership-reward'
+      preLoaderRoute: typeof AppLeadershipRewardRouteImport
       parentRoute: typeof AppRoute
     }
     '/app/network': {
@@ -986,6 +1048,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/admin/career/new'
       preLoaderRoute: typeof AdminCareerNewRouteImport
       parentRoute: typeof AdminCareerRoute
+    }
+    '/admin/leadership-rewards/': {
+      id: '/admin/leadership-rewards/'
+      path: '/'
+      fullPath: '/admin/leadership-rewards/'
+      preLoaderRoute: typeof AdminLeadershipRewardsIndexRouteImport
+      parentRoute: typeof AdminLeadershipRewardsRoute
+    }
+    '/admin/leadership-rewards/$userId': {
+      id: '/admin/leadership-rewards/$userId'
+      path: '/$userId'
+      fullPath: '/admin/leadership-rewards/$userId'
+      preLoaderRoute: typeof AdminLeadershipRewardsUserIdRouteImport
+      parentRoute: typeof AdminLeadershipRewardsRoute
     }
     '/admin/offers/': {
       id: '/admin/offers/'
@@ -1090,6 +1166,22 @@ const AdminCareerRouteWithChildren = AdminCareerRoute._addFileChildren(
   AdminCareerRouteChildren,
 )
 
+interface AdminLeadershipRewardsRouteChildren {
+  AdminLeadershipRewardsUserIdRoute: typeof AdminLeadershipRewardsUserIdRoute
+  AdminLeadershipRewardsIndexRoute: typeof AdminLeadershipRewardsIndexRoute
+}
+
+const AdminLeadershipRewardsRouteChildren: AdminLeadershipRewardsRouteChildren =
+  {
+    AdminLeadershipRewardsUserIdRoute: AdminLeadershipRewardsUserIdRoute,
+    AdminLeadershipRewardsIndexRoute: AdminLeadershipRewardsIndexRoute,
+  }
+
+const AdminLeadershipRewardsRouteWithChildren =
+  AdminLeadershipRewardsRoute._addFileChildren(
+    AdminLeadershipRewardsRouteChildren,
+  )
+
 interface AdminOffersSlugRouteChildren {
   AdminOffersSlugPreviewRoute: typeof AdminOffersSlugPreviewRoute
   AdminOffersSlugIndexRoute: typeof AdminOffersSlugIndexRoute
@@ -1127,6 +1219,7 @@ interface AdminRouteChildren {
   AdminCommissionRoute: typeof AdminCommissionRoute
   AdminContactRequestsRoute: typeof AdminContactRequestsRoute
   AdminDocumentsRoute: typeof AdminDocumentsRoute
+  AdminLeadershipRewardsRoute: typeof AdminLeadershipRewardsRouteWithChildren
   AdminNetworkRoute: typeof AdminNetworkRoute
   AdminOffersRoute: typeof AdminOffersRouteWithChildren
   AdminPaymentsRoute: typeof AdminPaymentsRoute
@@ -1143,6 +1236,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminCommissionRoute: AdminCommissionRoute,
   AdminContactRequestsRoute: AdminContactRequestsRoute,
   AdminDocumentsRoute: AdminDocumentsRoute,
+  AdminLeadershipRewardsRoute: AdminLeadershipRewardsRouteWithChildren,
   AdminNetworkRoute: AdminNetworkRoute,
   AdminOffersRoute: AdminOffersRouteWithChildren,
   AdminPaymentsRoute: AdminPaymentsRoute,
@@ -1171,6 +1265,7 @@ interface AppRouteChildren {
   AppBookingsRoute: typeof AppBookingsRouteWithChildren
   AppCommissionRoute: typeof AppCommissionRoute
   AppDocumentsRoute: typeof AppDocumentsRoute
+  AppLeadershipRewardRoute: typeof AppLeadershipRewardRoute
   AppNetworkRoute: typeof AppNetworkRoute
   AppOnboardingRoute: typeof AppOnboardingRoute
   AppQualificationRoute: typeof AppQualificationRoute
@@ -1185,6 +1280,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppBookingsRoute: AppBookingsRouteWithChildren,
   AppCommissionRoute: AppCommissionRoute,
   AppDocumentsRoute: AppDocumentsRoute,
+  AppLeadershipRewardRoute: AppLeadershipRewardRoute,
   AppNetworkRoute: AppNetworkRoute,
   AppOnboardingRoute: AppOnboardingRoute,
   AppQualificationRoute: AppQualificationRoute,

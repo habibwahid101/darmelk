@@ -1,5 +1,6 @@
 import { Link, Outlet, useRouterState } from "@tanstack/react-router";
 import {
+  Award,
   BadgeCheck,
   Building2,
   FileText,
@@ -28,6 +29,7 @@ type AppPath =
   | "/app/network"
   | "/app/qualification"
   | "/app/commission"
+  | "/app/leadership-reward"
   | "/app/transactions"
   | "/app/documents"
   | "/app/activation"
@@ -45,6 +47,7 @@ const PRIMARY: NavItem[] = [
   { to: "/app/network", label: "Network", icon: GitFork },
   { to: "/app/qualification", label: "Qualification", icon: ShieldCheck },
   { to: "/app/commission", label: "Commission", icon: Wallet },
+  { to: "/app/leadership-reward", label: "Leadership Reward", icon: Award },
 ];
 
 const MORE: NavItem[] = [

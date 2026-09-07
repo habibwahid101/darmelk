@@ -108,6 +108,64 @@ export type QualificationStatus = {
   qualified: boolean;
 };
 
+export type LeadershipEvidence = { user_id: string; eligible_at: string; name?: string; email?: string };
+
+export type LeadershipSnapshot = {
+  eligible: boolean;
+  level5Complete: boolean;
+  level5CompletedAt: string | null;
+  qualification: QualificationStatus;
+  cycle: null | {
+    id: string;
+    startMonth: string;
+    endMonth: string;
+    phase: "upcoming" | "active" | "completed";
+    currentMonthNumber: number | null;
+    currentTier: number | null;
+    nextTier: number | null;
+    nextTierProgress: { count: number; target: number };
+    nextRequirement: string | null;
+    monthsCompleted: number;
+    monthsRemaining: number;
+    totalEarned: number;
+    finalTier: number;
+  };
+  entitlements: Array<{
+    id: string;
+    rewardMonth: string;
+    cycleMonth: number;
+    tier: number;
+    amount: number;
+    status: string;
+    createdAt: string;
+    paidAt: string | null;
+  }>;
+  projected: Array<{ rewardMonth: string; cycleMonth: number; tier: number; amount: number; status: "upcoming" }>;
+  evidence: { tier50: LeadershipEvidence[]; tier100: LeadershipEvidence[] };
+  tierEvents: Array<{
+    tier: number;
+    eligibleAt: string;
+    effectiveMonth: string;
+    appliesInCycle: boolean;
+    evidence: LeadershipEvidence[];
+  }>;
+};
+
+export type LeadershipRewardSummary = {
+  userId: string;
+  name: string;
+  email: string;
+  cycleId: string;
+  startMonth: string;
+  endMonth: string;
+  phase: "upcoming" | "active" | "completed";
+  currentMonthNumber: number | null;
+  currentTier: number;
+  totalEarned: number;
+  monthsEarned: number;
+  level5CompletedAt: string;
+};
+
 export type AnnualActivation = {
   id: string;
   user_id: string;
@@ -187,6 +245,7 @@ export const api = {
       sponsorTarget: number;
     }>("/api/me/network"),
   myQualification: () => request<QualificationStatus & { ownBooking: Booking | null }>("/api/me/qualification"),
+  myLeadershipReward: () => request<{ leadership: LeadershipSnapshot }>("/api/me/leadership-reward"),
   myCommissions: () => request<{ totals: CommissionTotals; commissions: Commission[] }>("/api/me/commissions"),
   myTransactions: () => request<{ transactions: Transaction[] }>("/api/me/transactions"),
   myBookings: () => request<{ bookings: Booking[] }>("/api/me/bookings"),
@@ -257,5 +316,12 @@ export const api = {
       post<{ job: ApiJob }>(`/api/admin/jobs/${encodeURIComponent(slug)}`, job),
     setJobStatus: (slug: string, status: "draft" | "published" | "closed" | "unpublish") =>
       post<{ job: ApiJob }>(`/api/admin/jobs/${encodeURIComponent(slug)}/status`, { status }),
+
+    leadershipRewards: () => request<{ rewards: LeadershipRewardSummary[] }>("/api/admin/leadership-rewards"),
+    leadershipReward: (userId: string) =>
+      request<{
+        member: { userId: string; name: string; email: string; referral_code: string };
+        leadership: LeadershipSnapshot;
+      }>(`/api/admin/leadership-rewards/${encodeURIComponent(userId)}`),
   },
 };
