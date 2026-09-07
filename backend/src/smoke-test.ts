@@ -15,6 +15,18 @@ async function main() {
   const { postCommissionsForBooking } = await import("./engine/commissions.js");
   const { completeOnboarding, ensureMember } = await import("./engine/members.js");
   const { getQualificationStatus } = await import("./engine/network.js");
+  const {
+    addMonths,
+    cycleBounds,
+    effectiveMonthFor,
+    followingMonth,
+    nthTimestamp,
+    syncLeadershipReward,
+    TIER_100K,
+    TIER_25K,
+    TIER_50K,
+    tierOnMonth,
+  } = await import("./engine/leadership.js");
   const json = async (res: Response): Promise<any> => res.json();
   const results: Array<{ step: string; ok: boolean; detail?: unknown }> = [];
   const record = (step: string, ok: boolean, detail?: unknown) => {
@@ -462,7 +474,7 @@ async function main() {
   const level5WithoutSponsor3 = await withTransaction(async (client) => {
     await client.query(`update members set sponsor_user_id=null where user_id like 'darmelk_qa_matrix_%'`);
     const status = await getQualificationStatus(client, matrixRootId);
-    await client.query(`update members set sponsor_user_id=$1 where user_id like 'darmelk_qa_matrix_%' and user_id <> 'darmelk_qa_matrix_364'`, [matrixRootId]);
+    await client.query(`update members set sponsor_user_id=$1 where user_id like 'darmelk_qa_matrix_%' and user_id <> 'darmelk_qa_matrix_364' and user_id <> $1`, [matrixRootId]);
     return status;
   });
   record(
@@ -810,6 +822,117 @@ async function main() {
   );
   const closedJobDetail = await json(await app.request("/api/jobs/member-operations-associate"));
   record("closed job detail remains readable and closed", closedJobDetail.job?.status === "closed", closedJobDetail.job);
+
+  const dec1 = new Date("2026-12-01T12:00:00+06:00");
+  const dec15 = new Date("2026-12-15T12:00:00+06:00");
+  const dec31 = new Date("2026-12-31T23:30:00+06:00");
+  record("CASE 1/2/3 Level 5 in December starts January regardless of day",
+    followingMonth(dec1) === "2027-01-01" && followingMonth(dec15) === "2027-01-01" && followingMonth(dec31) === "2027-01-01");
+  const bounds = cycleBounds(dec15);
+  record("CASE 7/12/16 cycle is a fixed January–December window", bounds.start === "2027-01-01" && bounds.end === "2027-12-01");
+  const novUpgrade = effectiveMonthFor(new Date("2027-11-10T12:00:00+06:00"), "2027-12-01");
+  const decUpgrade = effectiveMonthFor(new Date("2027-12-20T12:00:00+06:00"), "2027-12-01");
+  record("CASE 14 November upgrade may apply in December", novUpgrade.month === "2027-12-01" && novUpgrade.applies === true);
+  record("CASE 15 December upgrade does not create Month 13", decUpgrade.month === "2028-01-01" && decUpgrade.applies === false);
+  record("CASE 5/6 any 3 of 5 is enough and 2 is not",
+    nthTimestamp(["2027-01-01", "2027-02-01", "2027-04-01", "2027-06-01", "2027-08-01"], 3) === "2027-04-01"
+    && nthTimestamp(["2027-01-01", "2027-02-01"], 3) === null);
+  const sampleEvents = [
+    { tier: TIER_50K, effective_month: "2027-05-01", applies_in_cycle: true },
+    { tier: TIER_100K, effective_month: "2027-09-01", applies_in_cycle: true },
+  ];
+  record("CASE 11/13 later upgrade does not rewrite January",
+    tierOnMonth("2027-01-01", "2027-12-01", sampleEvents, "2027-01-01") === TIER_25K
+    && tierOnMonth("2027-01-01", "2027-12-01", sampleEvents, "2027-05-01") === TIER_50K
+    && tierOnMonth("2027-01-01", "2027-12-01", sampleEvents, "2027-09-01") === TIER_100K
+    && addMonths("2027-01-01", 12) === "2028-01-01");
+
+  await query(`update bookings set activated_at = timestamptz '2026-12-15 12:00:00+06' where user_id like 'darmelk_qa_matrix_%'`);
+  const janAsOf = new Date("2027-01-15T12:00:00+06:00");
+  const firstSync = await withTransaction((client) => syncLeadershipReward(client, matrixRootId, janAsOf));
+  record(
+    "CASE 1 matrix root Level 5 in December creates January 25K entitlement",
+    firstSync.eligible === true && firstSync.cycle?.startMonth === "2027-01-01" && firstSync.cycle?.endMonth === "2027-12-01"
+      && firstSync.entitlements.length === 1 && firstSync.entitlements[0]?.amount === TIER_25K
+      && firstSync.entitlements[0]?.rewardMonth === "2027-01-01" && firstSync.cycle?.currentTier === TIER_25K
+      && firstSync.entitlements[0]?.status === "earned" && firstSync.entitlements[0]?.paidAt === null,
+    firstSync.cycle,
+  );
+  const retrySync = await withTransaction((client) => syncLeadershipReward(client, matrixRootId, janAsOf));
+  const entitlementCount = await query<any>(`select count(*)::int as n from leadership_reward_entitlements where user_id=$1`, [matrixRootId]);
+  const cycleCount = await query<any>(`select count(*)::int as n from leadership_reward_cycles where user_id=$1`, [matrixRootId]);
+  record("CASE 17 retry does not duplicate cycle or month", retrySync.entitlements.length === 1 && entitlementCount[0]?.n === 1 && cycleCount[0]?.n === 1);
+  await Promise.all([
+    withTransaction((client) => syncLeadershipReward(client, matrixRootId, janAsOf)),
+    withTransaction((client) => syncLeadershipReward(client, matrixRootId, janAsOf)),
+  ]);
+  const concurrentCount = await query<any>(`select count(*)::int as n from leadership_reward_entitlements where user_id=$1`, [matrixRootId]);
+  const concurrentCycles = await query<any>(`select count(*)::int as n from leadership_reward_cycles where user_id=$1`, [matrixRootId]);
+  record("CASE 18 concurrent evaluation does not duplicate cycle, month, or upgrade", concurrentCount[0]?.n === 1 && concurrentCycles[0]?.n === 1);
+
+  await query(
+    `insert into leadership_reward_cycles (id, user_id, level5_completed_at, cycle_start_month, cycle_end_month)
+     values ('lrc_qa_d1','darmelk_qa_matrix_001', timestamptz '2027-04-08 12:00:00+06', '2027-05-01', '2028-04-01'),
+            ('lrc_qa_d2','darmelk_qa_matrix_002', timestamptz '2027-04-09 12:00:00+06', '2027-05-01', '2028-04-01')`,
+  );
+  const twoDirects = await withTransaction((client) => syncLeadershipReward(client, matrixRootId, new Date("2027-04-15T12:00:00+06:00")));
+  record("CASE 6 only 2 qualifying directs does not unlock 50K",
+    twoDirects.cycle?.currentTier === TIER_25K && twoDirects.cycle?.nextTierProgress.count === 2, twoDirects.cycle?.nextTierProgress);
+
+  await query(
+    `insert into leadership_reward_cycles (id, user_id, level5_completed_at, cycle_start_month, cycle_end_month)
+     values ('lrc_qa_d3','darmelk_qa_matrix_003', timestamptz '2027-04-10 12:00:00+06', '2027-05-01', '2028-04-01'),
+            ('lrc_qa_d4','darmelk_qa_matrix_004', timestamptz '2027-04-20 12:00:00+06', '2027-05-01', '2028-04-01'),
+            ('lrc_qa_d5','darmelk_qa_matrix_005', timestamptz '2027-06-01 12:00:00+06', '2027-07-01', '2028-06-01')`,
+  );
+  const maySync = await withTransaction((client) => syncLeadershipReward(client, matrixRootId, new Date("2027-05-15T12:00:00+06:00")));
+  const janRow = maySync.entitlements.find((e) => e.rewardMonth === "2027-01-01");
+  const mayRow = maySync.entitlements.find((e) => e.rewardMonth === "2027-05-01");
+  record("CASE 4/5/9 any 3 of 5 directs unlock 50K from the following month",
+    maySync.cycle?.currentTier === TIER_50K && mayRow?.amount === TIER_50K && maySync.cycle?.startMonth === "2027-01-01"
+    && maySync.cycle?.endMonth === "2027-12-01", maySync.cycle);
+  record("CASE 11 January 25K remains 25K after the May upgrade", janRow?.amount === TIER_25K, janRow);
+  record("CASE 12/13 upgrade does not restart or extend the original round",
+    maySync.cycle?.startMonth === "2027-01-01" && maySync.cycle?.endMonth === "2027-12-01");
+
+  await query(
+    `insert into leadership_reward_tier_events (id, cycle_id, user_id, tier, eligible_at, effective_month, applies_in_cycle, evidence)
+     values ('lrt_qa_50_1','lrc_qa_d1','darmelk_qa_matrix_001',50000, timestamptz '2027-08-08 12:00:00+06', '2027-09-01', true, '[]'::jsonb),
+            ('lrt_qa_50_2','lrc_qa_d2','darmelk_qa_matrix_002',50000, timestamptz '2027-08-09 12:00:00+06', '2027-09-01', true, '[]'::jsonb)`,
+  );
+  const twoFifty = await withTransaction((client) => syncLeadershipReward(client, matrixRootId, new Date("2027-08-15T12:00:00+06:00")));
+  record("CASE 8 only 2 directs at 50K does not unlock 100K", twoFifty.cycle?.currentTier === TIER_50K, twoFifty.cycle);
+
+  await query(
+    `insert into leadership_reward_tier_events (id, cycle_id, user_id, tier, eligible_at, effective_month, applies_in_cycle, evidence)
+     values ('lrt_qa_50_3','lrc_qa_d3','darmelk_qa_matrix_003',50000, timestamptz '2027-08-10 12:00:00+06', '2027-09-01', true, '[]'::jsonb)`,
+  );
+  const sepSync = await withTransaction((client) => syncLeadershipReward(client, matrixRootId, new Date("2027-09-15T12:00:00+06:00")));
+  const sepRow = sepSync.entitlements.find((e) => e.rewardMonth === "2027-09-01");
+  record("CASE 7/10 any 3 directs at 50K unlock 100K from the following month",
+    sepSync.cycle?.currentTier === TIER_100K && sepRow?.amount === TIER_100K, sepSync.cycle);
+  record("CASE 11 historical months stay at their original tier after 100K",
+    sepSync.entitlements.find((e) => e.rewardMonth === "2027-01-01")?.amount === TIER_25K
+    && sepSync.entitlements.find((e) => e.rewardMonth === "2027-05-01")?.amount === TIER_50K);
+
+  const done = await withTransaction((client) => syncLeadershipReward(client, matrixRootId, new Date("2028-01-15T12:00:00+06:00")));
+  record("CASE 16 Month 12 ends the round with no Month 13",
+    done.cycle?.phase === "completed" && done.entitlements.length === 12
+    && done.entitlements.every((e) => e.cycleMonth <= 12) && done.projected.length === 0, { n: done.entitlements.length, phase: done.cycle?.phase });
+
+  const memberLeadership = await json(await app.request("/api/me/leadership-reward", { headers: { cookie: memberCookie } }));
+  record("CASE 20 unqualified member sees pre-eligibility state",
+    memberLeadership.leadership?.eligible === false && memberLeadership.leadership?.cycle === null, memberLeadership.leadership);
+  const memberAdminLr = await app.request("/api/admin/leadership-rewards", { headers: { cookie: memberCookie } });
+  record("CASE 19 non-admin cannot list Leadership Rewards", memberAdminLr.status === 403, memberAdminLr.status);
+  const anonAdminLr = await app.request("/api/admin/leadership-rewards");
+  record("anonymous cannot list Leadership Rewards", anonAdminLr.status === 401, anonAdminLr.status);
+  const adminListLr = await json(await app.request("/api/admin/leadership-rewards", { headers: { cookie: adminCookie } }));
+  record("admin can inspect Leadership Reward rounds",
+    Array.isArray(adminListLr.rewards) && adminListLr.rewards.some((r: { userId: string }) => r.userId === matrixRootId), adminListLr.rewards?.length);
+  const adminDetailLr = await json(await app.request(`/api/admin/leadership-rewards/${matrixRootId}`, { headers: { cookie: adminCookie } }));
+  record("admin audit view includes qualifying evidence and monthly history",
+    adminDetailLr.leadership?.evidence?.tier50?.length >= 3 && adminDetailLr.leadership?.entitlements?.length === 12, adminDetailLr.leadership?.evidence);
 
   const failed = results.filter((r) => !r.ok);
   console.log(`\n${results.length - failed.length}/${results.length} checks passed`);

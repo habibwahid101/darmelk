@@ -30,6 +30,10 @@ const MAP: Record<string, { label: string; tone: keyof typeof TONES }> = {
   new: { label: "New", tone: "pending" },
   reviewed: { label: "Reviewed", tone: "ok" },
   closed: { label: "Closed", tone: "muted" },
+  earned: { label: "Earned", tone: "ok" },
+  upcoming: { label: "Upcoming", tone: "pending" },
+  completed: { label: "Completed", tone: "ok" },
+  "in-progress": { label: "In progress", tone: "pending" },
 };
 
 export function StatusBadge({
