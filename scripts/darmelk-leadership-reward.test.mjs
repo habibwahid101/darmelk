@@ -72,7 +72,6 @@ test("leadership reward does not mix merchant credit or promotion", () => {
   assert.doesNotMatch(engine, /Promotion Reward/);
   assert.doesNotMatch(engine, /promotional gifts/i);
   assert.doesNotMatch(read("src/routes/app/leadership-reward.tsx"), /Pay by Merchant/);
-  assert.doesNotMatch(read("src/components/layout/admin-shell.tsx"), /Promotion Management/);
 });
 
 test("batch 1 career, footer, and hero remain intact", () => {

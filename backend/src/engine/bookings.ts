@@ -8,6 +8,10 @@ import {
   reverseMerchantPaymentForBooking,
   settleMerchantPaymentForBooking,
 } from "./merchant.js";
+import {
+  evaluatePromotionsForConfirmedBooking,
+  reversePromotionRewardsForBooking,
+} from "./promotions.js";
 
 export type Booking = {
   id: string;
@@ -84,6 +88,7 @@ export async function confirmBooking(client: PoolClient, bookingId: string, admi
     [bookingId, adminUserId],
   );
   await settleMerchantPaymentForBooking(client, bookingId);
+  await evaluatePromotionsForConfirmedBooking(client, bookingId, adminUserId);
   return updated[0]!;
 }
 
@@ -160,6 +165,7 @@ export async function reverseBooking(
   }
   const commissionsReversed = await reverseCommissionsForBooking(client, bookingId, opts);
   await reverseMerchantPaymentForBooking(client, bookingId, opts.adminUserId);
+  await reversePromotionRewardsForBooking(client, bookingId, opts.adminUserId, opts.reason);
   const { rows: updated } = await client.query<Booking>(
     `update bookings set status = 'reversed', cancelled_at = now(), cancelled_by_admin_id = $2 where id = $1 returning *`,
     [bookingId, opts.adminUserId],

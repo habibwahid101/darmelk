@@ -9,6 +9,7 @@ import {
   Inbox,
   LayoutDashboard,
   Menu,
+  Megaphone,
   Settings,
   Store,
   Users,
@@ -37,6 +38,7 @@ type AdminPath =
   | "/admin/settings"
   | "/admin/payments"
   | "/admin/merchant"
+  | "/admin/promotions"
   | "/admin/withdrawals"
   | "/admin/contact-requests"
   | "/admin/career"
@@ -54,6 +56,7 @@ const NAV: NavItem[] = [
   { to: "/admin/bookings", label: "Bookings", icon: FileText },
   { to: "/admin/payments", label: "Payments", icon: CreditCard },
   { to: "/admin/merchant", label: "Merchant Management", icon: Store },
+  { to: "/admin/promotions", label: "Promotion Management", icon: Megaphone },
   { to: "/admin/withdrawals", label: "Withdrawals", icon: Wallet },
   { to: "/admin/users", label: "Users", icon: Users },
   { to: "/admin/contact-requests", label: "Contact Requests", icon: Inbox },
@@ -66,7 +69,7 @@ const NAV: NavItem[] = [
   { to: "/admin/settings", label: "Settings", icon: Settings },
 ];
 
-const MOBILE_TABS = [NAV[0], NAV[2], NAV[3], NAV[5]];
+const MOBILE_TABS = [NAV[0], NAV[2], NAV[3], NAV[6]];
 
 function isActive(pathname: string, to: string) {
   if (to === "/admin") return pathname === "/admin";

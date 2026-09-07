@@ -39,6 +39,7 @@ const MAP: Record<string, { label: string; tone: keyof typeof TONES }> = {
   reserved: { label: "Reserved", tone: "pending" },
   settled: { label: "Settled", tone: "ok" },
   fulfilled: { label: "Fulfilled", tone: "ok" },
+  eligible: { label: "Eligible", tone: "pending" },
   suspended: { label: "Suspended", tone: "danger" },
   submitted: { label: "Submitted", tone: "pending" },
   under_review: { label: "Under review", tone: "pending" },

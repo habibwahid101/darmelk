@@ -9,9 +9,10 @@ function extractCookie(res: Response): string {
 async function main() {
   process.env.ADMIN_EMAILS = "admin@example.com";
   const { app } = await import("./router.js");
-  const { query, withTransaction } = await import("./db.js");
+  const { query, queryOne, withTransaction } = await import("./db.js");
   const { approveActivation, requestActivation } = await import("./engine/activation.js");
   const { activateBooking, confirmBooking, createBooking, reverseBooking } = await import("./engine/bookings.js");
+  const { evaluatePromotionsForConfirmedBooking } = await import("./engine/promotions.js");
   const { postCommissionsForBooking } = await import("./engine/commissions.js");
   const { completeOnboarding, ensureMember } = await import("./engine/members.js");
   const { getQualificationStatus } = await import("./engine/network.js");
@@ -1333,6 +1334,445 @@ async function main() {
   record("Merchant Credit is not mixed into commission wallet totals", typeof withdrawalsStill.totals?.available === "number");
   record("existing commission engine rates remain 10/8/6/4/2", commAfterActivate[0]?.rate === 0.1);
   record("Leadership Reward APIs remain available after Merchant batch", Array.isArray(adminListLr.rewards));
+
+  // ---- Batch 4 Promotion Management --------------------------------------
+  const promoNow = Date.now();
+  const promoWindow = {
+    startAt: new Date(promoNow - 60_000).toISOString(),
+    endAt: new Date(promoNow + 30 * 86_400_000).toISOString(),
+  };
+  const createPromo = async (body: Record<string, unknown>) =>
+    json(await app.request("/api/admin/promotions", {
+      method: "POST",
+      headers: { cookie: adminCookie, "content-type": "application/json" },
+      body: JSON.stringify(body),
+    }));
+  const publishPromo = async (id: string) =>
+    json(await app.request(`/api/admin/promotions/${id}/status`, {
+      method: "POST",
+      headers: { cookie: adminCookie, "content-type": "application/json" },
+      body: JSON.stringify({ status: "published" }),
+    }));
+
+  const unauthPromos = await app.request("/api/admin/promotions");
+  record("unauthenticated admin promotion list is 401", unauthPromos.status === 401, unauthPromos.status);
+  const unauthMePromos = await app.request("/api/me/promotions");
+  record("unauthenticated member promotions is 401", unauthMePromos.status === 401, unauthMePromos.status);
+  const memberCreatePromo = await app.request("/api/admin/promotions", {
+    method: "POST",
+    headers: { cookie: memberCookie, "content-type": "application/json" },
+    body: JSON.stringify({ title: "Should fail", ...promoWindow, offerScope: "all", rewards: [{ name: "X", quantity: 1 }] }),
+  });
+  record("non-admin cannot create a promotion", memberCreatePromo.status === 403, memberCreatePromo.status);
+
+  const missingReward = await json(await app.request("/api/admin/promotions", {
+    method: "POST",
+    headers: { cookie: adminCookie, "content-type": "application/json" },
+    body: JSON.stringify({ title: "No rewards", ...promoWindow, offerScope: "all", rewards: [] }),
+  }));
+  record("promotion requires at least one reward", missingReward.error?.code === "rewards_required" || missingReward.status === 400, missingReward);
+  const missingOffers = await json(await app.request("/api/admin/promotions", {
+    method: "POST",
+    headers: { cookie: adminCookie, "content-type": "application/json" },
+    body: JSON.stringify({ title: "No offers", ...promoWindow, offerScope: "selected", offerSlugs: [], rewards: [{ name: "Gift", quantity: 1 }] }),
+  }));
+  record("selected-scope promotion requires at least one offer", missingOffers.error?.code === "offers_required" || missingOffers.status === 400, missingOffers);
+  const badWindow = await json(await app.request("/api/admin/promotions", {
+    method: "POST",
+    headers: { cookie: adminCookie, "content-type": "application/json" },
+    body: JSON.stringify({
+      title: "Bad window",
+      startAt: promoWindow.endAt,
+      endAt: promoWindow.startAt,
+      offerScope: "all",
+      rewards: [{ name: "Gift", quantity: 1 }],
+    }),
+  }));
+  record("end cannot be before start", badWindow.error?.code === "invalid_window" || badWindow.status === 400, badWindow);
+
+  const draftPromo = await createPromo({
+    title: "QA Draft Campaign",
+    shortDescription: "Draft only",
+    description: "Not public",
+    ...promoWindow,
+    offerScope: "selected",
+    offerSlugs: ["five-star-hotel-share"],
+    rewards: [{ name: "QA Gift A", description: "Primary gift", quantity: 1 }, { name: "QA Gift B", description: "Second gift", quantity: 1 }],
+    terms: "QA terms version 1",
+  });
+  record(
+    "admin creates a draft promotion with multiple rewards",
+    draftPromo.promotion?.status === "draft" && draftPromo.promotion?.rewards?.length === 2,
+    draftPromo.promotion,
+  );
+  const publicDraftList = await json(await app.request("/api/promotions"));
+  record(
+    "draft promotion is not public",
+    Array.isArray(publicDraftList.promotions) && !publicDraftList.promotions.some((p: { id: string }) => p.id === draftPromo.promotion?.id),
+    publicDraftList.promotions?.map((p: { id: string }) => p.id),
+  );
+  const promoPublicDraftGet = await app.request(`/api/promotions/${draftPromo.promotion.id}`);
+  record("draft promotion is not publicly fetchable", promoPublicDraftGet.status === 404, promoPublicDraftGet.status);
+  const adminPreview = await json(await app.request(`/api/admin/promotions/${draftPromo.promotion.id}`, { headers: { cookie: adminCookie } }));
+  record("admin can preview a draft campaign", adminPreview.promotion?.id === draftPromo.promotion.id && adminPreview.promotion?.status === "draft");
+
+  const editedDraft = await json(await app.request(`/api/admin/promotions/${draftPromo.promotion.id}`, {
+    method: "POST",
+    headers: { cookie: adminCookie, "content-type": "application/json" },
+    body: JSON.stringify({ title: "QA Multi Reward Campaign", shortDescription: "Confirmed booking gift" }),
+  }));
+  record("admin can edit a draft promotion", editedDraft.promotion?.title === "QA Multi Reward Campaign", editedDraft.promotion?.title);
+
+  const memberPublish = await app.request(`/api/admin/promotions/${draftPromo.promotion.id}/status`, {
+    method: "POST",
+    headers: { cookie: memberCookie, "content-type": "application/json" },
+    body: JSON.stringify({ status: "published" }),
+  });
+  record("non-admin cannot publish a promotion", memberPublish.status === 403, memberPublish.status);
+
+  const publishedMulti = await publishPromo(draftPromo.promotion.id);
+  record("admin can publish a promotion", publishedMulti.promotion?.status === "published" && publishedMulti.promotion?.lifecycle === "active", publishedMulti.promotion);
+  const promoPublicAfterPublish = await json(await app.request("/api/promotions"));
+  record(
+    "published active promotion appears in the public list",
+    promoPublicAfterPublish.promotions?.some((p: { id: string }) => p.id === draftPromo.promotion.id) && Boolean(promoPublicAfterPublish.serverNow),
+    promoPublicAfterPublish.promotions?.map((p: { id: string }) => p.id),
+  );
+
+  const stackPromo = await createPromo({
+    title: "QA Stack Campaign",
+    shortDescription: "Independent campaign",
+    ...promoWindow,
+    offerScope: "selected",
+    offerSlugs: ["five-star-hotel-share"],
+    rewards: [{ name: "QA Stack Gift", quantity: 1 }],
+    terms: "Stack terms",
+  });
+  await publishPromo(stackPromo.promotion.id);
+
+  const secondOffer = await json(await app.request("/api/admin/offers", {
+    method: "POST",
+    headers: { cookie: adminCookie, "content-type": "application/json" },
+    body: JSON.stringify({
+      title: "QA Property B",
+      categorySlug: "land-plots",
+      location: "Dhaka",
+      summary: "Second property for promotion offer-scope tests",
+      image: "/images/flagship-suite.jpg",
+      retailValue: 300000,
+      bookingAmount: 20000,
+      qualificationBenefit: 280000,
+      commissionEligibleAmount: 20000,
+      status: "published",
+    }),
+  }));
+  record("second published offer exists for scope tests", Boolean(secondOffer.offer?.slug), secondOffer.offer?.slug);
+  const wrongScopePromo = await createPromo({
+    title: "QA Other Property Campaign",
+    ...promoWindow,
+    offerScope: "selected",
+    offerSlugs: [secondOffer.offer.slug],
+    rewards: [{ name: "Other Gift", quantity: 1 }],
+    terms: "Other property only",
+  });
+  await publishPromo(wrongScopePromo.promotion.id);
+
+  const upcomingPromo = await createPromo({
+    title: "QA Upcoming Campaign",
+    startAt: new Date(promoNow + 86_400_000).toISOString(),
+    endAt: new Date(promoNow + 10 * 86_400_000).toISOString(),
+    offerScope: "selected",
+    offerSlugs: ["five-star-hotel-share"],
+    rewards: [{ name: "Future Gift", quantity: 1 }],
+  });
+  await publishPromo(upcomingPromo.promotion.id);
+
+  const closedPromo = await createPromo({
+    title: "QA Closed Campaign",
+    ...promoWindow,
+    offerScope: "selected",
+    offerSlugs: ["five-star-hotel-share"],
+    rewards: [{ name: "Closed Gift", quantity: 1 }],
+  });
+  await publishPromo(closedPromo.promotion.id);
+  const closedRes = await json(await app.request(`/api/admin/promotions/${closedPromo.promotion.id}/status`, {
+    method: "POST",
+    headers: { cookie: adminCookie, "content-type": "application/json" },
+    body: JSON.stringify({ status: "closed" }),
+  }));
+  record("admin can close a promotion", closedRes.promotion?.status === "closed" && closedRes.promotion?.lifecycle === "closed", closedRes.promotion);
+  const memberClose = await app.request(`/api/admin/promotions/${stackPromo.promotion.id}/status`, {
+    method: "POST",
+    headers: { cookie: memberCookie, "content-type": "application/json" },
+    body: JSON.stringify({ status: "closed" }),
+  });
+  record("non-admin cannot close a promotion", memberClose.status === 403, memberClose.status);
+
+  const expiredPromo = await createPromo({
+    title: "QA Expired Campaign",
+    ...promoWindow,
+    offerScope: "selected",
+    offerSlugs: ["five-star-hotel-share"],
+    rewards: [{ name: "Expired Gift", quantity: 1 }],
+  });
+  await publishPromo(expiredPromo.promotion.id);
+  await query(`update promotions set start_at = now() - interval '3 days', end_at = now() - interval '1 hour' where id = $1`, [expiredPromo.promotion.id]);
+
+  const pu1 = await signupOnboardActivate("promo-user-1@example.com", "Promo One", adminMe.member.referral_code);
+  const pu2 = await signupOnboardActivate("promo-user-2@example.com", "Promo Two", adminMe.member.referral_code);
+  const pu3 = await signupOnboardActivate("promo-user-3@example.com", "Promo Three", adminMe.member.referral_code);
+  const pu4 = await signupOnboardActivate("promo-user-4@example.com", "Promo Four", adminMe.member.referral_code);
+  const pu5 = await signupOnboardActivate("promo-user-5@example.com", "Promo Five", adminMe.member.referral_code);
+  const pu6 = await signupOnboardActivate("promo-user-6@example.com", "Promo Six", adminMe.member.referral_code);
+
+  const pendingBook = await withTransaction((client) => createBooking(client, pu1.member.user_id, "five-star-hotel-share"));
+  const pendingQual = await query(`select id from promotion_qualifications where user_id=$1`, [pu1.member.user_id]);
+  record("booking creation / pending booking does not qualify", pendingBook.status === "pending" && pendingQual.length === 0, { status: pendingBook.status, quals: pendingQual.length });
+
+  const confirmBody = await app.request(`/api/admin/bookings/${pendingBook.id}/confirm`, {
+    method: "POST",
+    headers: { cookie: adminCookie, "content-type": "application/json" },
+    body: JSON.stringify({ confirmedAt: "2010-01-01T00:00:00.000Z" }),
+  });
+  record("HTTP confirm without approved payment is rejected and ignores client timestamps", confirmBody.status === 400, confirmBody.status);
+
+  const commBeforeConfirm = await query(`select id from commission_ledger where source_booking_id=$1`, [pendingBook.id]);
+  await withTransaction(async (client) => {
+    await confirmBooking(client, pendingBook.id, adminMe.member.user_id);
+  });
+  const confirmedBook = await queryOne<{ status: string; confirmed_at: string }>(`select status, confirmed_at from bookings where id=$1`, [pendingBook.id]);
+  const pu1Quals = await query<{ id: string; promotion_id: string; promotion_title: string; rewards_snapshot: unknown; terms_snapshot: string; booking_id: string }>(
+    `select id, promotion_id, promotion_title, rewards_snapshot, terms_snapshot, booking_id from promotion_qualifications where user_id=$1 order by promotion_title`,
+    [pu1.member.user_id],
+  );
+  const promoCommAfterConfirm = await query(`select id from commission_ledger where source_booking_id=$1`, [pendingBook.id]);
+  record("eligible confirmed booking inside the window qualifies", pu1Quals.some((q) => q.promotion_id === draftPromo.promotion.id), pu1Quals.map((q) => q.promotion_id));
+  record("different valid promotions independently qualify from the same booking", pu1Quals.some((q) => q.promotion_id === stackPromo.promotion.id) && pu1Quals.length >= 2, pu1Quals.map((q) => q.promotion_id));
+  record("promotion qualification creates no commission", commBeforeConfirm.length === 0 && promoCommAfterConfirm.length === 0);
+  record("qualification uses server confirmed_at, not a client-supplied time", Boolean(confirmedBook?.confirmed_at) && new Date(confirmedBook!.confirmed_at).getFullYear() > 2010, confirmedBook?.confirmed_at);
+
+  await withTransaction(async (client) => {
+    await evaluatePromotionsForConfirmedBooking(client, pendingBook.id, adminMe.member.user_id);
+    await evaluatePromotionsForConfirmedBooking(client, pendingBook.id, adminMe.member.user_id);
+  });
+  const afterRetry = await query(`select id from promotion_qualifications where booking_id=$1`, [pendingBook.id]);
+  record("same booking retry does not duplicate qualification", afterRetry.length === pu1Quals.length, afterRetry.length);
+
+  const secondBook = await withTransaction(async (client) => {
+    const created = await createBooking(client, pu1.member.user_id, "five-star-hotel-share");
+    await confirmBooking(client, created.id, adminMe.member.user_id);
+    return created;
+  });
+  const pu1AfterSecond = await query(`select id, booking_id from promotion_qualifications where user_id=$1 and promotion_id=$2`, [pu1.member.user_id, draftPromo.promotion.id]);
+  record("one user gets one qualification per promotion", pu1AfterSecond.length === 1 && pu1AfterSecond[0]?.booking_id === pendingBook.id, pu1AfterSecond);
+
+  const fulfillments = await query<{ id: string; reward_name: string; status: string }>(
+    `select id, reward_name, status from promotion_reward_fulfillments where user_id=$1 and promotion_id=$2 order by display_order`,
+    [pu1.member.user_id, draftPromo.promotion.id],
+  );
+  record(
+    "qualified rewards start eligible and are tracked individually",
+    fulfillments.length === 2 && fulfillments.every((f) => f.status === "eligible"),
+    fulfillments,
+  );
+  const memberFulfill = await app.request(`/api/admin/promotions/rewards/${fulfillments[0]!.id}/status`, {
+    method: "POST",
+    headers: { cookie: memberCookie, "content-type": "application/json" },
+    body: JSON.stringify({ status: "fulfilled" }),
+  });
+  record("user cannot mark own rewards fulfilled", memberFulfill.status === 403, memberFulfill.status);
+  const approveA = await json(await app.request(`/api/admin/promotions/rewards/${fulfillments[0]!.id}/status`, {
+    method: "POST",
+    headers: { cookie: adminCookie, "content-type": "application/json" },
+    body: JSON.stringify({ status: "approved", reason: "QA approve" }),
+  }));
+  record("admin can approve a legitimate reward", approveA.reward?.status === "approved", approveA.reward);
+  const fulfillA = await json(await app.request(`/api/admin/promotions/rewards/${fulfillments[0]!.id}/status`, {
+    method: "POST",
+    headers: { cookie: adminCookie, "content-type": "application/json" },
+    body: JSON.stringify({ status: "fulfilled", reason: "QA delivered" }),
+  }));
+  record("admin can mark a reward fulfilled", fulfillA.reward?.status === "fulfilled", fulfillA.reward);
+  const stillB = await queryOne<{ status: string }>(`select status from promotion_reward_fulfillments where id=$1`, [fulfillments[1]!.id]);
+  record("multiple rewards keep separate fulfillment statuses", stillB?.status === "eligible" && fulfillA.reward?.status === "fulfilled", stillB);
+  const silentOverwrite = await json(await app.request(`/api/admin/promotions/rewards/${fulfillments[0]!.id}/status`, {
+    method: "POST",
+    headers: { cookie: adminCookie, "content-type": "application/json" },
+    body: JSON.stringify({ status: "eligible" }),
+  }));
+  record("historical fulfillment cannot be silently overwritten", silentOverwrite.error || silentOverwrite.status === 409, silentOverwrite);
+  const cancelNoReason = await app.request(`/api/admin/promotions/rewards/${fulfillments[1]!.id}/status`, {
+    method: "POST",
+    headers: { cookie: adminCookie, "content-type": "application/json" },
+    body: JSON.stringify({ status: "cancelled" }),
+  });
+  record("cancellation without a reason is rejected", cancelNoReason.status === 400, cancelNoReason.status);
+  const events = await query<{ id: string; previous_status: string | null; new_status: string; reason: string | null; actor_user_id: string | null }>(`select id, previous_status, new_status, reason, actor_user_id from promotion_reward_events where fulfillment_id=$1 order by created_at`, [fulfillments[0]!.id]);
+  record("fulfillment stores actor, timestamp, and auditable history", events.length >= 3 && events.every((e) => Boolean(e.actor_user_id)), events);
+
+  const snapBefore = pu1Quals.find((q) => q.promotion_id === draftPromo.promotion.id);
+  await json(await app.request(`/api/admin/promotions/${draftPromo.promotion.id}`, {
+    method: "POST",
+    headers: { cookie: adminCookie, "content-type": "application/json" },
+    body: JSON.stringify({
+      title: "QA Multi Reward Campaign EDITED",
+      terms: "QA terms version 2 — should not rewrite history",
+      rewards: [{ name: "Replacement Gift", quantity: 9 }],
+    }),
+  }));
+  const snapAfter = await queryOne<{ promotion_title: string; terms_snapshot: string; rewards_snapshot: unknown }>(
+    `select promotion_title, terms_snapshot, rewards_snapshot from promotion_qualifications where id=$1`,
+    [snapBefore!.id],
+  );
+  record(
+    "qualified reward snapshot survives later campaign edit",
+    snapAfter?.promotion_title === "QA Multi Reward Campaign" && snapAfter?.terms_snapshot === "QA terms version 1" && JSON.stringify(snapAfter.rewards_snapshot).includes("QA Gift A"),
+    snapAfter,
+  );
+
+  const promoPublicDetail = await json(await app.request(`/api/promotions/${draftPromo.promotion.id}`, { headers: { cookie: pu2.cookie } }));
+  record("one user cannot inspect another user's qualification state", promoPublicDetail.myQualification == null, promoPublicDetail.myQualification);
+  const ownDetail = await json(await app.request(`/api/promotions/${draftPromo.promotion.id}`, { headers: { cookie: pu1.cookie } }));
+  record("authenticated member sees only their own qualification on details", ownDetail.myQualification?.user_id === pu1.member.user_id, ownDetail.myQualification?.user_id);
+  const dash = await json(await app.request("/api/me/promotions", { headers: { cookie: pu1.cookie } }));
+  record(
+    "dashboard returns a primary active campaign, more promotions, and serverNow",
+    Boolean(dash.primary) && Boolean(dash.serverNow) && Array.isArray(dash.more),
+    { primary: dash.primary?.title, more: dash.more?.length, serverNow: dash.serverNow },
+  );
+
+  const markQualified = await app.request("/api/admin/promotions/qualify", {
+    method: "POST",
+    headers: { cookie: adminCookie, "content-type": "application/json" },
+    body: JSON.stringify({ userId: pu2.member.user_id, promotionId: draftPromo.promotion.id }),
+  });
+  record("no unaudited Mark User Qualified endpoint", markQualified.status === 404 || markQualified.status === 405, markQualified.status);
+
+  const wrongBook = await withTransaction(async (client) => {
+    const created = await createBooking(client, pu2.member.user_id, secondOffer.offer.slug);
+    await confirmBooking(client, created.id, adminMe.member.user_id);
+    return created;
+  });
+  const wrongQual = await query(`select id from promotion_qualifications where user_id=$1 and promotion_id=$2`, [pu2.member.user_id, draftPromo.promotion.id]);
+  const otherQual = await query(`select id from promotion_qualifications where user_id=$1 and promotion_id=$2`, [pu2.member.user_id, wrongScopePromo.promotion.id]);
+  record("wrong offer does not qualify for a selected-scope campaign", wrongQual.length === 0, wrongQual);
+  record("matching offer on a different campaign still qualifies independently", otherQual.length === 1, otherQual);
+
+  const upcomingBook = await withTransaction(async (client) => {
+    const created = await createBooking(client, pu3.member.user_id, "five-star-hotel-share");
+    await confirmBooking(client, created.id, adminMe.member.user_id);
+    return created;
+  });
+  const upcomingQual = await query(`select id from promotion_qualifications where user_id=$1 and promotion_id=$2`, [pu3.member.user_id, upcomingPromo.promotion.id]);
+  record("booking confirmed before start does not qualify", upcomingQual.length === 0, { booking: upcomingBook.id });
+
+  const expiredBook = await withTransaction(async (client) => {
+    const created = await createBooking(client, pu4.member.user_id, "five-star-hotel-share");
+    await confirmBooking(client, created.id, adminMe.member.user_id);
+    return created;
+  });
+  const expiredQual = await query(`select id from promotion_qualifications where user_id=$1 and promotion_id=$2`, [pu4.member.user_id, expiredPromo.promotion.id]);
+  record("booking confirmed after end does not qualify", expiredQual.length === 0, { booking: expiredBook.id });
+
+  const closedBook = await withTransaction(async (client) => {
+    const created = await createBooking(client, pu5.member.user_id, "five-star-hotel-share");
+    await confirmBooking(client, created.id, adminMe.member.user_id);
+    return created;
+  });
+  const closedQual = await query(`select id from promotion_qualifications where user_id=$1 and promotion_id=$2`, [pu5.member.user_id, closedPromo.promotion.id]);
+  const closedHistory = await query(`select id from promotions where id=$1`, [closedPromo.promotion.id]);
+  record("closed promotion cannot create new qualification", closedQual.length === 0, { booking: closedBook.id });
+  record("historical campaign records remain after close", closedHistory.length === 1);
+
+  const promoReversed = await withTransaction(async (client) => reverseBooking(client, pendingBook.id, { reason: "Promotion QA reversal", adminUserId: adminMe.member.user_id }));
+  const qualAfterReverse = await queryOne<{ id: string }>(`select id from promotion_qualifications where booking_id=$1 and promotion_id=$2`, [pendingBook.id, draftPromo.promotion.id]);
+  const rewardsAfterReverse = await query<{ reward_name: string; status: string }>(
+    `select reward_name, status from promotion_reward_fulfillments where qualification_id=$1 order by display_order`,
+    [qualAfterReverse!.id],
+  );
+  record("reversed booking preserves historical qualification", Boolean(qualAfterReverse) && promoReversed.booking.status === "reversed", promoReversed.booking);
+  record(
+    "eligible/approved rewards reverse audibly while fulfilled rewards stay until explicit reverse",
+    rewardsAfterReverse.some((r) => r.reward_name === "QA Gift A" && r.status === "fulfilled") &&
+      rewardsAfterReverse.some((r) => r.reward_name === "QA Gift B" && r.status === "reversed"),
+    rewardsAfterReverse,
+  );
+
+  const promoMerchant = await signupOnboardActivate("promo-merchant@example.com", "Promo Merchant", adminMe.member.referral_code);
+  const promoBundle = await json(await app.request("/api/admin/merchant/bundles", {
+    method: "POST",
+    headers: { cookie: adminCookie, "content-type": "application/json" },
+    body: JSON.stringify({
+      name: "Promo Merchant Bundle",
+      purchaseAmount: 50000,
+      purchasedCredit: 50000,
+      bonusCredit: 10000,
+      terms: "Promotion merchant QA.",
+      status: "active",
+    }),
+  }));
+  const promoPurchase = await json(await app.request("/api/me/merchant/purchases", {
+    method: "POST",
+    headers: { cookie: promoMerchant.cookie, "content-type": "application/json", "Idempotency-Key": "promo-mbp" },
+    body: JSON.stringify({ bundleId: promoBundle.bundle.id, termsAccepted: true }),
+  }));
+  await submitAndApprovePayment(promoMerchant.cookie, "merchant_bundle", promoPurchase.purchase.id, "promo-merchant-pay");
+  const merchantBook = await json(await app.request("/api/bookings", {
+    method: "POST",
+    headers: { cookie: pu6.cookie, "content-type": "application/json", "Idempotency-Key": "promo-m-book" },
+    body: JSON.stringify({ offerSlug: "five-star-hotel-share" }),
+  }));
+  const merchantReq = await json(await app.request(`/api/bookings/${merchantBook.booking.id}/merchant-pay`, {
+    method: "POST",
+    headers: { cookie: pu6.cookie, "content-type": "application/json", "Idempotency-Key": "promo-m-pay" },
+    body: JSON.stringify({ merchantUserId: promoMerchant.member.user_id }),
+  }));
+  const merchantAppr = await json(await app.request(`/api/me/merchant/requests/${merchantReq.request.id}/approve`, {
+    method: "POST", headers: { cookie: promoMerchant.cookie, "Idempotency-Key": "promo-m-appr" },
+  }));
+  const merchantQualBefore = await query(`select id from promotion_qualifications where booking_id=$1`, [merchantBook.booking.id]);
+  record(
+    "Merchant approval alone does not qualify for a promotion",
+    merchantAppr.request?.status === "approved" && merchantQualBefore.length === 0,
+    { request: merchantAppr.request?.status, quals: merchantQualBefore.length },
+  );
+  const merchantConfirm = await json(await app.request(`/api/admin/bookings/${merchantBook.booking.id}/confirm`, {
+    method: "POST", headers: { cookie: adminCookie },
+  }));
+  const merchantQualAfter = await query(`select id from promotion_qualifications where booking_id=$1 and user_id=$2`, [merchantBook.booking.id, pu6.member.user_id]);
+  record(
+    "Merchant-funded booking qualifies only after existing confirmation",
+    merchantConfirm.booking?.status === "confirmed" && merchantQualAfter.length > 0,
+    { status: merchantConfirm.booking?.status, quals: merchantQualAfter.length },
+  );
+  const merchantComm = await query(`select id from commission_ledger where source_booking_id=$1`, [merchantBook.booking.id]);
+  record("confirmed-but-not-activated promotion booking still has no commission", merchantComm.length === 0);
+  await json(await app.request(`/api/admin/bookings/${merchantBook.booking.id}/activate`, {
+    method: "POST", headers: { cookie: adminCookie },
+  }));
+  const merchantCommAfter = await query<{ rate: number; amount: number }>(`select rate, amount from commission_ledger where source_booking_id=$1 order by level`, [merchantBook.booking.id]);
+  record(
+    "existing commission engine remains the sole source and still posts existing 10/8/6/4/2 rates on activation",
+    merchantCommAfter.length > 0 &&
+      merchantCommAfter.every((r) => [0.1, 0.08, 0.06, 0.04, 0.02].includes(Number(r.rate))),
+    merchantCommAfter,
+  );
+
+  const economics = await queryOne<{ booking_amount: number; qualification_benefit: number; retail_value: number }>(
+    `select booking_amount, qualification_benefit, retail_value from bookings where id=$1`,
+    [merchantBook.booking.id],
+  );
+  record(
+    "promotion does not change booking economics",
+    economics?.booking_amount === 50000 && economics?.qualification_benefit === 600000 && economics?.retail_value === 650000,
+    economics,
+  );
+  const snapshot = await query(`select id from booking_snapshots where booking_id=$1`, [merchantBook.booking.id]);
+  record("promotion does not mutate booking snapshots", snapshot.length === 1);
+  const lrStill = await json(await app.request("/api/admin/leadership-rewards", { headers: { cookie: adminCookie } }));
+  record("Leadership Reward remains available after Promotion batch", Array.isArray(lrStill.rewards));
+  const merchantStill = await json(await app.request("/api/me/merchant", { headers: { cookie: promoMerchant.cookie } }));
+  record("Merchant Credit remains available after Promotion batch", typeof merchantStill.merchant?.available === "number");
 
   const failed = results.filter((r) => !r.ok);
   console.log(`\n${results.length - failed.length}/${results.length} checks passed`);

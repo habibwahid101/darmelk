@@ -7,6 +7,7 @@ import {
   GitFork,
   LayoutDashboard,
   List,
+  Megaphone,
   Menu,
   Settings,
   ShieldCheck,
@@ -32,6 +33,7 @@ type AppPath =
   | "/app/commission"
   | "/app/leadership-reward"
   | "/app/merchant"
+  | "/app/promotions"
   | "/app/transactions"
   | "/app/documents"
   | "/app/activation"
@@ -53,6 +55,7 @@ const PRIMARY: NavItem[] = [
 ];
 
 const MORE: NavItem[] = [
+  { to: "/app/promotions", label: "Promotions", icon: Megaphone },
   { to: "/app/transactions", label: "Transactions", icon: List },
   { to: "/app/documents", label: "Documents", icon: FileText },
   { to: "/app/activation", label: "Activation", icon: BadgeCheck },
