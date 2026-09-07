@@ -133,6 +133,10 @@ function parsePositiveInt(value: unknown, label: string): number {
 }
 
 function parseTime(value: unknown, label: string): Date {
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) throw badRequest(`${label} is not a valid date`);
+    return value;
+  }
   if (typeof value !== "string" || !value.trim()) throw badRequest(`${label} is required`);
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) throw badRequest(`${label} is not a valid date`);
