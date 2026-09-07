@@ -1,6 +1,7 @@
 import { Link, Outlet, useRouterState } from "@tanstack/react-router";
 import {
   BadgeCheck,
+  Briefcase,
   Building2,
   FileText,
   GitFork,
@@ -34,7 +35,8 @@ type AdminPath =
   | "/admin/settings"
   | "/admin/payments"
   | "/admin/withdrawals"
-  | "/admin/contact-requests";
+  | "/admin/contact-requests"
+  | "/admin/career";
 
 type NavItem = {
   to: AdminPath;
@@ -50,6 +52,7 @@ const NAV: NavItem[] = [
   { to: "/admin/withdrawals", label: "Withdrawals", icon: Wallet },
   { to: "/admin/users", label: "Users", icon: Users },
   { to: "/admin/contact-requests", label: "Contact Requests", icon: Inbox },
+  { to: "/admin/career", label: "Career Management", icon: Briefcase },
   { to: "/admin/network", label: "Network", icon: GitFork },
   { to: "/admin/commission", label: "Commission", icon: Wallet },
   { to: "/admin/activation", label: "Activation", icon: BadgeCheck },

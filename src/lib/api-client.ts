@@ -9,6 +9,7 @@
  * URL. Every call sends cookies (`credentials: "include"`) since Better Auth
  * sessions live there.
  */
+import type { ApiJob } from "@/lib/jobs";
 import type { ApiOffer, OfferStatus } from "@/lib/offers";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "";
@@ -174,6 +175,8 @@ export const api = {
 
   offers: () => request<{ offers: Offer[] }>("/api/offers"),
   offer: (slug: string) => request<{ offer: Offer }>(`/api/offers/${slug}`),
+  jobs: () => request<{ jobs: ApiJob[] }>("/api/jobs"),
+  job: (slug: string) => request<{ job: ApiJob }>(`/api/jobs/${encodeURIComponent(slug)}`),
 
   myNetwork: () =>
     request<{
@@ -246,5 +249,13 @@ export const api = {
     ) => post<{ offer: Offer; src: string; id: string }>(`/api/admin/offers/${encodeURIComponent(slug)}/media`, data),
     removeOfferMedia: (slug: string, id: string) =>
       post<{ offer: Offer }>(`/api/admin/offers/${encodeURIComponent(slug)}/media/${encodeURIComponent(id)}/remove`),
+
+    jobs: () => request<{ jobs: ApiJob[] }>("/api/admin/jobs"),
+    job: (slug: string) => request<{ job: ApiJob }>(`/api/admin/jobs/${encodeURIComponent(slug)}`),
+    createJob: (job: Record<string, unknown>) => post<{ job: ApiJob }>("/api/admin/jobs", job),
+    updateJob: (slug: string, job: Record<string, unknown>) =>
+      post<{ job: ApiJob }>(`/api/admin/jobs/${encodeURIComponent(slug)}`, job),
+    setJobStatus: (slug: string, status: "draft" | "published" | "closed" | "unpublish") =>
+      post<{ job: ApiJob }>(`/api/admin/jobs/${encodeURIComponent(slug)}/status`, { status }),
   },
 };

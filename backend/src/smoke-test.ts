@@ -728,6 +728,89 @@ async function main() {
   });
   record("closed offer blocks new booking initiation", closedBooking.ok === false, closedBooking);
 
+  const memberCreateJob = await app.request("/api/admin/jobs", {
+    method: "POST",
+    headers: { cookie: memberCookie, "content-type": "application/json" },
+    body: JSON.stringify({ title: "Should fail", department: "Operations", location: "Dhaka", employmentType: "Full-time" }),
+  });
+  record("non-admin cannot create jobs", memberCreateJob.status === 403, memberCreateJob.status);
+  const anonCreateJob = await app.request("/api/admin/jobs", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ title: "Should fail", department: "Operations", location: "Dhaka", employmentType: "Full-time" }),
+  });
+  record("anonymous cannot create jobs", anonCreateJob.status === 401, anonCreateJob.status);
+
+  const draftJob = await json(await app.request("/api/admin/jobs", {
+    method: "POST",
+    headers: { cookie: adminCookie, "content-type": "application/json" },
+    body: JSON.stringify({
+      title: "Member Operations Associate",
+      department: "Operations",
+      location: "Dhaka",
+      employmentType: "Full-time",
+      status: "draft",
+    }),
+  }));
+  record(
+    "admin can create a draft job",
+    draftJob.job?.status === "draft" && draftJob.job?.slug === "member-operations-associate",
+    draftJob.job,
+  );
+  const publicJobsAfterDraft = await json(await app.request("/api/jobs"));
+  record(
+    "draft job is not in the public career list",
+    Array.isArray(publicJobsAfterDraft.jobs) && !publicJobsAfterDraft.jobs.some((j: { slug: string }) => j.slug === "member-operations-associate"),
+    publicJobsAfterDraft.jobs,
+  );
+  const publicDraftJob = await app.request("/api/jobs/member-operations-associate");
+  record("draft job is not publicly fetchable", publicDraftJob.status === 404, publicDraftJob.status);
+
+  const jobEdit = await json(await app.request("/api/admin/jobs/member-operations-associate", {
+    method: "POST",
+    headers: { cookie: adminCookie, "content-type": "application/json" },
+    body: JSON.stringify({
+      description: "Support member operations with clear, documented processes.",
+      applicationEmail: "careers@darmelk.com",
+      responsibilities: ["Review member records", "Coordinate with property operations"],
+    }),
+  }));
+  record("admin can edit a draft job", jobEdit.job?.application_email === "careers@darmelk.com" && jobEdit.job?.description?.includes("Support member"), jobEdit.job);
+
+  const publishJob = await json(await app.request("/api/admin/jobs/member-operations-associate/status", {
+    method: "POST",
+    headers: { cookie: adminCookie, "content-type": "application/json" },
+    body: JSON.stringify({ status: "published" }),
+  }));
+  record("admin can publish a job", publishJob.job?.status === "published", publishJob.job);
+  const publicJobs = await json(await app.request("/api/jobs"));
+  record(
+    "published job appears in the public career list",
+    publicJobs.jobs?.some((j: { slug: string }) => j.slug === "member-operations-associate"),
+    publicJobs.jobs?.map((j: { slug: string }) => j.slug),
+  );
+  const publicJob = await json(await app.request("/api/jobs/member-operations-associate"));
+  record(
+    "published job detail includes application email",
+    publicJob.job?.application_email === "careers@darmelk.com" && publicJob.job?.title === "Member Operations Associate",
+    publicJob.job,
+  );
+
+  const closeJob = await json(await app.request("/api/admin/jobs/member-operations-associate/status", {
+    method: "POST",
+    headers: { cookie: adminCookie, "content-type": "application/json" },
+    body: JSON.stringify({ status: "closed" }),
+  }));
+  record("admin can close a job", closeJob.job?.status === "closed", closeJob.job);
+  const publicAfterClose = await json(await app.request("/api/jobs"));
+  record(
+    "closed job is not listed as an open vacancy",
+    !publicAfterClose.jobs?.some((j: { slug: string }) => j.slug === "member-operations-associate"),
+    publicAfterClose.jobs,
+  );
+  const closedJobDetail = await json(await app.request("/api/jobs/member-operations-associate"));
+  record("closed job detail remains readable and closed", closedJobDetail.job?.status === "closed", closedJobDetail.job);
+
   const failed = results.filter((r) => !r.ok);
   console.log(`\n${results.length - failed.length}/${results.length} checks passed`);
   if (failed.length) {
