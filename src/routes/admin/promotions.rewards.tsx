@@ -68,24 +68,24 @@ function AdminPromotionRewards() {
                 value={reason[row.id] ?? ""}
                 onChange={(e) => setReason((current) => ({ ...current, [row.id]: e.target.value }))}
               />
-              <div className="mt-3 flex flex-wrap gap-2">
+              <div className="mt-3 flex flex-wrap items-center gap-2">
                 {row.status === "eligible" ? (
-                  <Button size="sm" disabled={busy === `${row.id}:approved`} onClick={() => void setStatus(row.id, "approved")}>
+                  <Button size="sm" className="shrink-0" disabled={busy === `${row.id}:approved`} onClick={() => void setStatus(row.id, "approved")}>
                     Approve
                   </Button>
                 ) : null}
                 {row.status === "approved" ? (
-                  <Button size="sm" disabled={busy === `${row.id}:fulfilled`} onClick={() => void setStatus(row.id, "fulfilled")}>
+                  <Button size="sm" className="shrink-0" disabled={busy === `${row.id}:fulfilled`} onClick={() => void setStatus(row.id, "fulfilled")}>
                     Mark fulfilled
                   </Button>
                 ) : null}
                 {row.status === "eligible" || row.status === "approved" ? (
-                  <Button size="sm" variant="secondary" disabled={busy === `${row.id}:cancelled`} onClick={() => void setStatus(row.id, "cancelled")}>
+                  <Button size="sm" variant="secondary" className="shrink-0" disabled={busy === `${row.id}:cancelled`} onClick={() => void setStatus(row.id, "cancelled")}>
                     Cancel
                   </Button>
                 ) : null}
                 {row.status === "fulfilled" || row.status === "approved" || row.status === "eligible" ? (
-                  <Button size="sm" variant="secondary" disabled={busy === `${row.id}:reversed`} onClick={() => void setStatus(row.id, "reversed")}>
+                  <Button size="sm" variant="secondary" className="shrink-0" disabled={busy === `${row.id}:reversed`} onClick={() => void setStatus(row.id, "reversed")}>
                     Reverse
                   </Button>
                 ) : null}
