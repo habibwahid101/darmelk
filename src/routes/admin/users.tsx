@@ -24,16 +24,20 @@ function AdminUsers() {
         <Surface className="p-0 sm:p-0">
           <ul className="divide-y divide-line">
             {members.map((m) => (
-              <li key={m.user_id} className="space-y-2 px-5 py-4">
-                <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
-                  <p className="font-medium">{m.name}</p>
-                  <StatusBadge status={m.role} />
-                  <StatusBadge status={m.activation_status} />
+              <li key={m.user_id} className="px-5 py-4">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0">
+                    <p className="truncate font-medium">{m.name}</p>
+                    <p className="truncate text-sm text-muted">{m.email || "No email"}</p>
+                    <p className="mt-1.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs text-subtle">
+                      <StatusBadge status={m.role} />
+                      <span>
+                        Code {m.referral_code} · Sponsor {m.sponsor_user_id ? "assigned" : "none"}
+                      </span>
+                    </p>
+                  </div>
+                  <StatusBadge status={m.activation_status} className="self-start" />
                 </div>
-                <p className="text-sm text-muted">{m.email || "No email"}</p>
-                <p className="text-xs text-subtle">
-                  Code {m.referral_code} · Sponsor {m.sponsor_user_id ? "assigned" : "none"}
-                </p>
               </li>
             ))}
           </ul>

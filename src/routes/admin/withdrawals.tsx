@@ -64,9 +64,9 @@ function WithdrawalCard({
 
   return (
     <li className="space-y-3 px-5 py-4">
-      <div className="flex flex-col gap-2 sm:flex-row sm:justify-between">
-        <div>
-          <p className="font-medium">{w.user_name ?? w.user_id}</p>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <p className="truncate font-medium">{w.user_name ?? w.user_id}</p>
           <p className="text-sm text-muted">
             Requested {formatBdt(w.amount)} · fee {formatBdt(w.fee_amount)} · net {formatBdt(w.net_amount)}
           </p>
@@ -79,17 +79,18 @@ function WithdrawalCard({
             {w.own_booking_eligible ? "confirmed" : "missing"}
           </p>
         </div>
-        <StatusBadge status={w.status} />
+        <StatusBadge status={w.status} className="self-start" />
       </div>
       <div className="flex flex-col gap-3">
         {w.status === "requested" ? (
-          <div className="flex flex-wrap gap-2">
-            <Button size="sm" disabled={busy} onClick={() => void run(w.id, () => api.admin.decideWithdrawal(w.id, "approve"))}>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button size="sm" className="shrink-0" disabled={busy} onClick={() => void run(w.id, () => api.admin.decideWithdrawal(w.id, "approve"))}>
               Approve
             </Button>
             <Button
               size="sm"
               variant="secondary"
+              className="shrink-0"
               disabled={busy}
               onClick={() => void run(w.id, () => api.admin.decideWithdrawal(w.id, "reject"))}
             >
@@ -108,9 +109,10 @@ function WithdrawalCard({
                 autoComplete="off"
               />
             </Field>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <Button
                 size="sm"
+                className="shrink-0"
                 disabled={busy || !canPay}
                 onClick={() => void run(w.id, () => api.admin.decideWithdrawal(w.id, "mark-paid", reference.trim()))}
               >
@@ -119,6 +121,7 @@ function WithdrawalCard({
               <Button
                 size="sm"
                 variant="secondary"
+                className="shrink-0"
                 disabled={busy}
                 onClick={() => void run(w.id, () => api.admin.decideWithdrawal(w.id, "reject"))}
               >

@@ -21,7 +21,8 @@ function QualificationPage() {
   const qualified = data?.qualified ?? false;
   const own = data?.ownBooking ?? null;
   const l5 = COMMISSION_LEVELS[4];
-  const remainingDirects = Math.max(0, PERSONAL_SPONSOR_TARGET - (data?.sponsorCount ?? 0));
+  const sponsorCount = data?.sponsorCount ?? 0;
+  const remainingDirects = Math.max(0, PERSONAL_SPONSOR_TARGET - sponsorCount);
   const remainingL5 = Math.max(0, l5.positions - (counts[5] ?? 0));
 
   return (
@@ -33,9 +34,57 @@ function QualificationPage() {
         action={<StatusBadge status={qualified ? "qualified" : "not-qualified"} />}
       />
 
-      <Surface><p className="text-xs font-medium uppercase tracking-wide text-subtle">Gate 1 — Personal Sponsors</p><div className="mt-3 flex items-baseline justify-between"><h2 className="font-display text-2xl font-semibold">{data?.sponsorCount??0} / {PERSONAL_SPONSOR_TARGET} confirmed</h2><StatusBadge status={remainingDirects?"in-progress":"complete"}/></div><div className="mt-5 grid grid-cols-3 gap-3">{[0,1,2].map(i=><div key={i} className="rounded-xl bg-mist p-4 text-center text-sm">{i<(data?.sponsorCount??0)?"Confirmed member":"Waiting on a personal confirmed member/booking"}</div>)}</div></Surface>
+      <Surface>
+        <p className="text-xs font-medium uppercase tracking-wide text-subtle">Gate 1 — Personal Sponsors</p>
+        <div className="mt-3 flex items-start justify-between gap-3">
+          <h2 className="min-w-0 font-display text-2xl font-semibold">
+            {sponsorCount} / {PERSONAL_SPONSOR_TARGET} confirmed
+          </h2>
+          <StatusBadge status={remainingDirects ? "in-progress" : "complete"} />
+        </div>
+        <div className="mt-5 grid grid-cols-3 gap-1 sm:gap-3">
+          {Array.from({ length: PERSONAL_SPONSOR_TARGET }, (_, i) => {
+            const confirmed = i < sponsorCount;
+            return (
+              <div
+                key={i}
+                className="flex min-h-12 min-w-0 items-center justify-center rounded-xl bg-mist px-0.5 py-2.5 text-center sm:min-h-16 sm:px-3 sm:py-4"
+              >
+                <p className="whitespace-nowrap text-[10px] font-medium leading-none tracking-tight text-ink sm:text-sm">
+                  {i + 1} · {confirmed ? "Confirmed" : "Waiting"}
+                </p>
+              </div>
+            );
+          })}
+        </div>
+      </Surface>
 
-      <Surface><p className="text-xs font-medium uppercase tracking-wide text-subtle">Gate 2 — Five-Level Progress</p><div className="mt-4 overflow-x-auto"><table className="w-full min-w-[24rem] text-left text-sm"><thead><tr className="border-b border-line text-xs uppercase tracking-wide text-subtle"><th className="py-3">Level</th><th className="py-3 text-right">Filled</th><th className="py-3 text-right">Capacity</th></tr></thead><tbody>{COMMISSION_LEVELS.map(level=><tr key={level.level} className="border-b border-line last:border-0"><td className="py-3 font-medium">Level {level.level}</td><td className="py-3 text-right tabular-nums">{counts[level.level]??0}</td><td className="py-3 text-right tabular-nums">{level.positions}</td></tr>)}</tbody></table></div><p className="mt-4 text-sm text-muted">Status: <span className="font-medium text-ink">{qualified?"Qualified":"In Progress"}</span></p></Surface>
+      <Surface>
+        <p className="text-xs font-medium uppercase tracking-wide text-subtle">Gate 2 — Five-Level Progress</p>
+        <div className="mt-4 min-w-0">
+          <table className="w-full table-fixed text-left text-sm">
+            <thead>
+              <tr className="border-b border-line text-[11px] uppercase tracking-wide text-subtle sm:text-xs">
+                <th className="w-[40%] py-2.5 pr-2 font-medium sm:py-3">Level</th>
+                <th className="w-[30%] py-2.5 px-1 text-right font-medium sm:py-3">Filled</th>
+                <th className="w-[30%] py-2.5 pl-2 text-right font-medium sm:py-3">Capacity</th>
+              </tr>
+            </thead>
+            <tbody>
+              {COMMISSION_LEVELS.map((level) => (
+                <tr key={level.level} className="border-b border-line last:border-0">
+                  <td className="py-2.5 pr-2 font-medium sm:py-3">Level {level.level}</td>
+                  <td className="py-2.5 px-1 text-right tabular-nums sm:py-3">{counts[level.level] ?? 0}</td>
+                  <td className="py-2.5 pl-2 text-right tabular-nums sm:py-3">{level.positions}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p className="mt-4 text-sm text-muted">
+          Status: <span className="font-medium text-ink">{qualified ? "Qualified" : "In Progress"}</span>
+        </p>
+      </Surface>
 
       <Surface>
         <h2 className="font-display text-xl font-semibold">Attached benefit</h2>

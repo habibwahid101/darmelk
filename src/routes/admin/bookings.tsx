@@ -48,7 +48,7 @@ function AdminBookings() {
             {bookings.map((b) => (
               <li key={b.id} className="space-y-3 px-5 py-4">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                  <div>
+                  <div className="min-w-0">
                     <p className="font-medium">{b.offer_title ?? b.offer_slug}</p>
                     <p className="text-sm text-muted">
                       {formatBdt(b.booking_amount)} · {formatWhen(b.created_at)}
@@ -56,28 +56,30 @@ function AdminBookings() {
                   </div>
                   <StatusBadge status={b.status} />
                 </div>
-                <div className="flex flex-wrap gap-2">
+                {b.status === "pending" ? (
+                  <p className="text-sm text-muted">
+                    {b.merchant_request_status === "approved"
+                      ? "Merchant Credit is reserved. Confirming settles it and does not post commission until activation."
+                      : b.merchant_request_status === "pending"
+                        ? "Awaiting Merchant approval."
+                        : "Awaiting payment review."}
+                  </p>
+                ) : null}
+                <div className="flex flex-wrap items-center gap-2">
                   {b.status === "pending" && b.merchant_request_status === "approved" ? (
                     <Button
                       size="sm"
+                      className="shrink-0"
                       disabled={busyId === b.id}
                       onClick={() => void run(b.id, () => api.admin.confirmBooking(b.id))}
                     >
                       Confirm Merchant payment
                     </Button>
                   ) : null}
-                  {b.status === "pending" ? (
-                    <p className="text-sm text-muted">
-                      {b.merchant_request_status === "approved"
-                        ? "Merchant Credit is reserved. Confirming settles it and does not post commission until activation."
-                        : b.merchant_request_status === "pending"
-                          ? "Awaiting Merchant approval."
-                          : "Awaiting payment review."}
-                    </p>
-                  ) : null}
                   {b.status === "confirmed" ? (
                     <Button
                       size="sm"
+                      className="shrink-0"
                       disabled={busyId === b.id}
                       onClick={() => void run(b.id, () => api.admin.activateBooking(b.id))}
                     >
@@ -88,6 +90,7 @@ function AdminBookings() {
                     <Button
                       size="sm"
                       variant="secondary"
+                      className="shrink-0"
                       disabled={busyId === b.id}
                       onClick={() => void run(b.id, () => api.admin.cancelBooking(b.id))}
                     >
@@ -98,6 +101,7 @@ function AdminBookings() {
                     <Button
                       size="sm"
                       variant="secondary"
+                      className="shrink-0"
                       disabled={busyId === b.id}
                       onClick={() => {
                         const reason = window.prompt("Reason for reversal");
