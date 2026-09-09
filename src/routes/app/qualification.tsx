@@ -62,19 +62,19 @@ function QualificationPage() {
       <Surface>
         <p className="text-xs font-medium uppercase tracking-wide text-subtle">Gate 2 — Five-Level Progress</p>
         <div className="mt-4 min-w-0">
-          <table className="w-full table-fixed text-left text-sm">
+          <table className="w-full table-fixed text-sm">
             <thead>
               <tr className="border-b border-line text-[11px] uppercase tracking-wide text-subtle sm:text-xs">
-                <th className="w-[40%] py-2.5 pr-2 font-medium sm:py-3">Level</th>
-                <th className="w-[30%] py-2.5 px-1 text-right font-medium sm:py-3">Filled</th>
-                <th className="w-[30%] py-2.5 pl-2 text-right font-medium sm:py-3">Capacity</th>
+                <th className="w-1/3 py-2.5 pr-2 text-left font-medium sm:py-3">Level</th>
+                <th className="w-1/3 py-2.5 px-1 text-center font-medium sm:py-3">Filled</th>
+                <th className="w-1/3 py-2.5 pl-2 text-right font-medium sm:py-3">Capacity</th>
               </tr>
             </thead>
             <tbody>
               {COMMISSION_LEVELS.map((level) => (
                 <tr key={level.level} className="border-b border-line last:border-0">
-                  <td className="py-2.5 pr-2 font-medium sm:py-3">Level {level.level}</td>
-                  <td className="py-2.5 px-1 text-right tabular-nums sm:py-3">{counts[level.level] ?? 0}</td>
+                  <td className="py-2.5 pr-2 text-left font-medium sm:py-3">Level {level.level}</td>
+                  <td className="py-2.5 px-1 text-center tabular-nums sm:py-3">{counts[level.level] ?? 0}</td>
                   <td className="py-2.5 pl-2 text-right tabular-nums sm:py-3">{level.positions}</td>
                 </tr>
               ))}
