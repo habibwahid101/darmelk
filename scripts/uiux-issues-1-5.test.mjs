@@ -29,6 +29,10 @@ test("issue 5: Gate 2 table is table-fixed with no horizontal min-width trap", (
   assert.match(src, />Capacity</);
   assert.match(src, />Filled</);
   assert.match(src, /level\.positions/);
+  assert.match(src, /w-1\/3 py-2\.5 pr-2 text-left/);
+  assert.match(src, /w-1\/3 py-2\.5 px-1 text-center/);
+  assert.match(src, /w-1\/3 py-2\.5 pl-2 text-right/);
+  assert.match(src, /text-center tabular-nums/);
 });
 
 test("issue 2: Cancel and Reverse share compact secondary row-action treatment", () => {
