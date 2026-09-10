@@ -1,26 +1,38 @@
 import type { ReactNode } from "react";
+import { Link } from "@tanstack/react-router";
 import { MapPin } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { applyMailto, isJobOpen, type CareerJob } from "@/lib/jobs";
 import { formatWhen } from "@/lib/platform";
 
-function Block({ title, children }: { title: string; children: ReactNode }) {
+function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section className="min-w-0 rounded-2xl bg-cream p-5 shadow-[var(--shadow-card)] sm:p-6">
+    <section className="min-w-0">
       <h2 className="font-display text-xl font-semibold">{title}</h2>
-      <div className="mt-3 text-sm leading-relaxed text-muted">{children}</div>
+      <div className="mt-4 max-w-prose text-[15px] leading-[1.75] text-muted">{children}</div>
     </section>
   );
 }
 
 function Lines({ items }: { items: string[] }) {
   return (
-    <ul className="list-disc space-y-1 pl-5">
+    <ul className="list-disc space-y-2 pl-5">
       {items.map((item) => (
-        <li key={item}>{item}</li>
+        <li key={item} className="break-words">
+          {item}
+        </li>
       ))}
     </ul>
+  );
+}
+
+function Fact({ label, value }: { label: string; value: ReactNode }) {
+  return (
+    <div className="min-w-0">
+      <dt className="text-[11px] font-medium uppercase tracking-[0.14em] text-subtle">{label}</dt>
+      <dd className="mt-1 break-words text-[15px] leading-relaxed text-ink">{value}</dd>
+    </div>
   );
 }
 
@@ -35,101 +47,131 @@ export function JobMeta({ job }: { job: CareerJob }) {
   );
 }
 
-export function JobArticle({ job, showApply }: { job: CareerJob; showApply?: boolean }) {
+export function JobPlaceMeta({
+  location,
+  deadline,
+}: {
+  location: string;
+  deadline?: string | null;
+}) {
+  return (
+    <div className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-start gap-x-1.5 gap-y-1 text-sm">
+      <MapPin className="mt-0.5 size-3.5 shrink-0 text-muted" aria-hidden="true" />
+      <div className="min-w-0">
+        <p className="text-muted">{location}</p>
+        {deadline ? <p className="mt-1 text-subtle">Apply by {formatWhen(deadline)}</p> : null}
+      </div>
+    </div>
+  );
+}
+
+function BackToOpenings() {
+  return (
+    <Link
+      to="/career"
+      className="inline-flex min-h-11 items-center text-sm font-medium text-ink/70 transition-colors hover:text-ink"
+    >
+      ← Back to all openings
+    </Link>
+  );
+}
+
+export function JobArticle({
+  job,
+  showApply,
+  showBack,
+}: {
+  job: CareerJob;
+  showApply?: boolean;
+  showBack?: boolean;
+}) {
   const open = isJobOpen(job);
   const canApply = job.status === "draft" ? Boolean(applyMailto(job)) : open;
   const mailto = showApply && canApply ? applyMailto(job) : null;
+  const applyLabel = job.applicationEmail
+    ? `Apply via email to ${job.applicationEmail}`
+    : "Apply via Email";
 
   return (
-    <div className="space-y-6">
-      <JobMeta job={job} />
-      <div>
-        <h1 className="font-display text-3xl font-semibold text-pretty sm:text-4xl">{job.title}</h1>
-        <p className="mt-2 flex min-w-0 items-center gap-1.5 text-sm text-muted">
-          <MapPin className="size-3.5 shrink-0" aria-hidden="true" />
-          <span className="min-w-0">{job.location}</span>
-        </p>
-        {job.applicationDeadline ? (
-          <p className="mt-2 text-sm text-muted">Apply by {formatWhen(job.applicationDeadline)}</p>
-        ) : null}
-      </div>
-      {showApply ? (
-        mailto ? (
-          <div className="space-y-2">
-            <Button asChild className="w-full sm:w-auto">
-              <a href={mailto}>Apply via Email</a>
-            </Button>
-            {job.applicationEmail ? (
-              <p className="min-w-0 break-all text-sm text-muted">{job.applicationEmail}</p>
-            ) : null}
+    <article className="min-w-0 space-y-8">
+      <header className="min-w-0 space-y-4">
+        <JobMeta job={job} />
+        <div className="min-w-0">
+          <h1 className="font-display text-3xl font-semibold tracking-tight text-pretty sm:text-4xl">
+            {job.title}
+          </h1>
+          <div className="mt-3">
+            <JobPlaceMeta location={job.location} deadline={job.applicationDeadline} />
           </div>
-        ) : (
-          <p className="rounded-2xl bg-cream px-4 py-3 text-sm text-muted shadow-[var(--shadow-card)]">
-            This role is no longer accepting applications.
-          </p>
-        )
-      ) : null}
+        </div>
+        {showApply ? (
+          mailto ? (
+            <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:gap-5">
+              <Button asChild className="w-full sm:w-auto">
+                <a href={mailto} aria-label={applyLabel}>
+                  Apply via Email
+                </a>
+              </Button>
+              {showBack ? <BackToOpenings /> : null}
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <p className="rounded-2xl bg-cream px-4 py-3 text-sm text-muted shadow-[var(--shadow-card)]">
+                This role is no longer accepting applications.
+              </p>
+              {showBack ? <BackToOpenings /> : null}
+            </div>
+          )
+        ) : showBack ? (
+          <BackToOpenings />
+        ) : null}
+      </header>
+
       {job.description ? (
-        <Block title="Job description">
+        <Section title="Job description">
           <p className="whitespace-pre-wrap text-pretty">{job.description}</p>
-        </Block>
+        </Section>
       ) : null}
       {job.responsibilities?.length ? (
-        <Block title="Responsibilities">
+        <Section title="Responsibilities">
           <Lines items={job.responsibilities} />
-        </Block>
+        </Section>
       ) : null}
       {job.requirements?.length ? (
-        <Block title="Requirements">
+        <Section title="Requirements">
           <Lines items={job.requirements} />
-        </Block>
+        </Section>
       ) : null}
       {job.skills?.length ? (
-        <Block title="Required skills">
+        <Section title="Required skills">
           <Lines items={job.skills} />
-        </Block>
+        </Section>
       ) : null}
+
       {job.education || job.experience || job.compensation || job.workingHours || job.vacancy ? (
-        <Block title="Role information">
-          <dl className="grid gap-3 sm:grid-cols-2">
-            {job.vacancy ? (
-              <div>
-                <dt className="text-xs uppercase tracking-wide text-subtle">Vacancy</dt>
-                <dd>{job.vacancy}</dd>
-              </div>
-            ) : null}
-            {job.compensation ? (
-              <div className="min-w-0">
-                <dt className="text-xs uppercase tracking-wide text-subtle">Salary / compensation</dt>
-                <dd className="break-words">{job.compensation}</dd>
-              </div>
-            ) : null}
-            {job.education ? (
-              <div className="min-w-0">
-                <dt className="text-xs uppercase tracking-wide text-subtle">Education</dt>
-                <dd className="break-words">{job.education}</dd>
-              </div>
-            ) : null}
-            {job.experience ? (
-              <div className="min-w-0">
-                <dt className="text-xs uppercase tracking-wide text-subtle">Experience</dt>
-                <dd className="break-words">{job.experience}</dd>
-              </div>
-            ) : null}
-            {job.workingHours ? (
-              <div className="min-w-0">
-                <dt className="text-xs uppercase tracking-wide text-subtle">Working hours</dt>
-                <dd className="break-words">{job.workingHours}</dd>
-              </div>
-            ) : null}
+        <section className="min-w-0 rounded-2xl bg-cream p-5 shadow-[var(--shadow-card)] sm:p-7">
+          <h2 className="font-display text-xl font-semibold">Role information</h2>
+          <dl className="mt-5 grid grid-cols-1 gap-x-10 gap-y-5 sm:grid-cols-2">
+            {job.vacancy ? <Fact label="Vacancy" value={job.vacancy} /> : null}
+            {job.compensation ? <Fact label="Salary / compensation" value={job.compensation} /> : null}
+            {job.education ? <Fact label="Education" value={job.education} /> : null}
+            {job.experience ? <Fact label="Experience" value={job.experience} /> : null}
+            {job.workingHours ? <Fact label="Working hours" value={job.workingHours} /> : null}
           </dl>
-        </Block>
+        </section>
       ) : null}
+
       {job.benefits?.length ? (
-        <Block title="Benefits">
+        <Section title="Benefits">
           <Lines items={job.benefits} />
-        </Block>
+        </Section>
       ) : null}
-    </div>
+
+      {showBack ? (
+        <p className="border-t border-line pt-6">
+          <BackToOpenings />
+        </p>
+      ) : null}
+    </article>
   );
 }

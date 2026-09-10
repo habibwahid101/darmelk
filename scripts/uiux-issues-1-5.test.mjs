@@ -23,15 +23,16 @@ test("issue 1: slot count stays dynamic 0-3 from sponsorCount", () => {
 
 test("issue 5: Gate 2 table is table-fixed with no horizontal min-width trap", () => {
   const src = read("src/routes/app/qualification.tsx");
-  assert.match(src, /table-fixed/);
+  assert.match(src, /grid-cols-\[minmax\(0,1fr\)_auto_minmax\(0,1fr\)\]/);
   assert.doesNotMatch(src, /min-w-\[24rem\]/);
   assert.doesNotMatch(src, /overflow-x-auto/);
+  assert.doesNotMatch(src, /table-fixed/);
   assert.match(src, />Capacity</);
   assert.match(src, />Filled</);
   assert.match(src, /level\.positions/);
-  assert.match(src, /w-1\/3 py-2\.5 pr-2 text-left/);
-  assert.match(src, /w-1\/3 py-2\.5 px-1 text-center/);
-  assert.match(src, /w-1\/3 py-2\.5 pl-2 text-right/);
+  assert.match(src, /text-left font-medium">Level</);
+  assert.match(src, /min-w-\[4\.5rem\] text-center font-medium">Filled</);
+  assert.match(src, /text-right font-medium">Capacity</);
   assert.match(src, /text-center tabular-nums/);
 });
 
