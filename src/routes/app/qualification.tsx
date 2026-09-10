@@ -62,20 +62,23 @@ function QualificationPage() {
       <Surface>
         <p className="text-xs font-medium uppercase tracking-wide text-subtle">Gate 2 — Five-Level Progress</p>
         <div className="mt-4 min-w-0">
-          <table className="w-full table-fixed text-sm">
-            <thead>
-              <tr className="border-b border-line text-[11px] uppercase tracking-wide text-subtle sm:text-xs">
-                <th className="w-1/3 py-2.5 pr-2 text-left font-medium sm:py-3">Level</th>
-                <th className="w-1/3 py-2.5 px-1 text-center font-medium sm:py-3">Filled</th>
-                <th className="w-1/3 py-2.5 pl-2 text-right font-medium sm:py-3">Capacity</th>
+          <table className="block w-full min-w-0 text-sm">
+            <thead className="block">
+              <tr className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-end gap-x-2 border-b border-line py-2.5 text-[11px] uppercase tracking-wide text-subtle sm:py-3 sm:text-xs">
+                <th className="text-left font-medium">Level</th>
+                <th className="min-w-[4.5rem] text-center font-medium">Filled</th>
+                <th className="text-right font-medium">Capacity</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="block">
               {COMMISSION_LEVELS.map((level) => (
-                <tr key={level.level} className="border-b border-line last:border-0">
-                  <td className="py-2.5 pr-2 text-left font-medium sm:py-3">Level {level.level}</td>
-                  <td className="py-2.5 px-1 text-center tabular-nums sm:py-3">{counts[level.level] ?? 0}</td>
-                  <td className="py-2.5 pl-2 text-right tabular-nums sm:py-3">{level.positions}</td>
+                <tr
+                  key={level.level}
+                  className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-baseline gap-x-2 border-b border-line py-2.5 last:border-0 sm:py-3"
+                >
+                  <td className="min-w-0 text-left font-medium">Level {level.level}</td>
+                  <td className="min-w-[4.5rem] text-center tabular-nums">{counts[level.level] ?? 0}</td>
+                  <td className="text-right tabular-nums">{level.positions}</td>
                 </tr>
               ))}
             </tbody>

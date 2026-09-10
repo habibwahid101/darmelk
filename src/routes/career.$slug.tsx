@@ -1,6 +1,5 @@
-import { createFileRoute, Link, notFound } from "@tanstack/react-router";
+import { createFileRoute, notFound } from "@tanstack/react-router";
 import { JobArticle } from "@/components/job-article";
-import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api-client";
 import { fromApiJob } from "@/lib/jobs";
 
@@ -20,14 +19,11 @@ function JobDetailPage() {
   const { job } = Route.useLoaderData();
 
   return (
-    <div className="container-pg max-w-3xl pb-20 pt-24 md:pt-28">
+    <div className="container-pg max-w-3xl pb-20 pt-10 md:pt-14">
       <p className="text-xs font-medium uppercase tracking-[0.18em] text-pine">Career</p>
-      <div className="mt-6">
-        <JobArticle job={job} showApply />
+      <div className="mt-4">
+        <JobArticle job={job} showApply showBack />
       </div>
-      <Button asChild variant="secondary" className="mt-8">
-        <Link to="/career">All openings</Link>
-      </Button>
     </div>
   );
 }
