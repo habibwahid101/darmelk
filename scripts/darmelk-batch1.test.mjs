@@ -66,7 +66,7 @@ test("hero copy stays two locked lines and headline scale is reduced", () => {
   assert.match(css, /clamp\(1\.05rem, 4\.4vw, 1\.5rem\)/);
   assert.match(css, /clamp\(1\.5rem, 3\.1vw, 2\.65rem\)/);
   assert.doesNotMatch(css, /3\.75rem/);
-  assert.match(src, /hero-platform\.jpg/);
+  assert.match(src, /hero-gateway\.jpg/);
   assert.match(src, /Explore Properties/);
   assert.match(src, /How Darmelk Works/);
 });

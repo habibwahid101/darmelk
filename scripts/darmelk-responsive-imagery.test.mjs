@@ -57,7 +57,9 @@ test("hero is the locked two-line Opportunities composition", () => {
   assert.doesNotMatch(src, /with Clarity and Confidence\./);
   assert.match(css, /\.hero-headline/);
   assert.match(css, /white-space:\s*nowrap/);
-  assert.match(src, /hero-platform\.jpg/);
+  assert.match(src, /hero-gateway\.jpg/);
+  assert.match(src, /hero-gateway-mobile\.webp/);
+  assert.match(src, /<picture>/);
   assert.match(src, /Explore Properties/);
   assert.match(src, /How Darmelk Works/);
 });

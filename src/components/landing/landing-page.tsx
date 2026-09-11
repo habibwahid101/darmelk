@@ -51,12 +51,22 @@ export function LandingPage() {
   return (
     <div>
       <section className="relative min-h-[78svh] overflow-hidden bg-ink">
-        <img
-          src="/images/hero-platform.jpg"
-          alt="Darmelk property opportunities across hospitality, residential, land, and commercial"
-          className="absolute inset-0 size-full object-cover object-[center_35%]"
-        />
+        <picture>
+          <source media="(max-width: 639px)" type="image/webp" srcSet="/images/hero-gateway-mobile.webp" />
+          <source media="(max-width: 639px)" type="image/jpeg" srcSet="/images/hero-gateway-mobile.jpg" />
+          <source type="image/webp" srcSet="/images/hero-gateway.webp" />
+          <img
+            src="/images/hero-gateway.jpg"
+            alt="Professional property consultation reviewing an architectural model and documentation"
+            width={1792}
+            height={1008}
+            fetchPriority="high"
+            decoding="async"
+            className="absolute inset-0 size-full object-cover object-[center_28%] sm:object-[center_46%]"
+          />
+        </picture>
         <div className="absolute inset-0 bg-[linear-gradient(90deg,rgb(40_33_30/.88),rgb(40_33_30/.42)_55%,rgb(40_33_30/.22))]" />
+        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_top,rgb(40_33_30/.5),transparent_52%)] sm:hidden" />
         <div className="container-pg relative flex min-h-[78svh] items-end py-16 pt-28 md:items-center md:py-24">
           <div className="min-w-0 max-w-4xl text-cream">
             <p className="text-xs font-medium uppercase tracking-[.2em] text-cream/70">Your property gateway</p>
