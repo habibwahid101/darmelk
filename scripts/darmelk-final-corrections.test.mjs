@@ -20,7 +20,7 @@ test("landing order is Hero → Flagship → Explore Properties → How Darmelk 
   assert.match(src, /Flats & Apartments/);
   assert.match(src, /Commercial Properties/);
   assert.match(src, /Clear Property Terms\. Documented Activity\./);
-  assert.match(src, /hero-platform\.jpg/);
+  assert.match(src, /hero-gateway\.jpg/);
   assert.doesNotMatch(src, /alt="Five-Star Hotel Share"/);
 });
 
