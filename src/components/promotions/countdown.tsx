@@ -38,10 +38,10 @@ export function PromotionCountdown({
   }, [remain.done, onExpired]);
 
   const cells = [
-    { label: "Days", value: remain.days },
-    { label: "Hours", value: remain.hours },
-    { label: "Minutes", value: remain.minutes },
-    { label: "Seconds", value: remain.seconds },
+    { label: "Days", short: "Days", value: remain.days },
+    { label: "Hours", short: "Hours", value: remain.hours },
+    { label: "Minutes", short: "Min", value: remain.minutes },
+    { label: "Seconds", short: "Sec", value: remain.seconds },
   ];
 
   if (remain.done) {
@@ -49,11 +49,19 @@ export function PromotionCountdown({
   }
 
   return (
-    <div className="grid grid-cols-4 gap-2" aria-label="Time remaining">
+    <div
+      className="grid grid-cols-4 gap-1.5 min-[380px]:gap-3"
+      aria-label={`Time remaining ${remain.days} days ${remain.hours} hours ${remain.minutes} minutes ${remain.seconds} seconds`}
+    >
       {cells.map((cell) => (
-        <div key={cell.label} className="rounded-xl bg-paper px-2 py-3 text-center">
-          <p className="font-display text-xl font-semibold tabular-nums sm:text-2xl">{String(cell.value).padStart(2, "0")}</p>
-          <p className="mt-1 text-[10px] font-medium uppercase tracking-wide text-subtle">{cell.label}</p>
+        <div key={cell.label} className="min-w-0 text-center">
+          <p className="font-display text-[1.45rem] font-semibold leading-none tabular-nums text-ink sm:text-[1.85rem]">
+            <span className="inline-block min-w-[2ch]">{String(cell.value).padStart(2, "0")}</span>
+          </p>
+          <p className="mt-1.5 text-[10px] font-medium uppercase tracking-[0.12em] text-subtle">
+            <span className="sm:hidden">{cell.short}</span>
+            <span className="hidden sm:inline">{cell.label}</span>
+          </p>
         </div>
       ))}
     </div>
