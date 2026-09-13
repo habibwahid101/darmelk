@@ -591,7 +591,11 @@ async function main() {
   const contact = await json(contactRes);
   record(
     "public contact submission persists as new",
-    contactRes.status === 201 && contact.request?.status === "new" && contact.request?.name === "Amina Rahman",
+    contactRes.status === 201 &&
+      contact.request?.status === "new" &&
+      contact.request?.name === "Amina Rahman" &&
+      contact.request?.source === "contact" &&
+      !contact.request?.offer_slug,
     contact,
   );
   const invalidContact = await app.request("/api/contact", {
@@ -611,6 +615,71 @@ async function main() {
     adminList.requests?.length,
   );
   const createdId = adminList.requests?.find((r: { name: string }) => r.name === "Amina Rahman")?.id;
+  const bookingsBeforeRtb = await queryOne<{ count: string }>(`select count(*)::text as count from bookings`);
+  const rtbRes = await app.request("/api/contact", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      name: "Farhan Islam",
+      profession: "Teacher",
+      mobile: "+8801811111111",
+      location: "Chattogram",
+      offerSlug: "five-star-hotel-share",
+      source: "request_to_book",
+    }),
+  });
+  const rtb = await json(rtbRes);
+  record(
+    "guest request-to-book stores property context without creating a booking",
+    rtbRes.status === 201 &&
+      rtb.request?.source === "request_to_book" &&
+      rtb.request?.offer_slug === "five-star-hotel-share" &&
+      Boolean(rtb.request?.offer_title) &&
+      rtb.request?.status === "new",
+    rtb,
+  );
+  const adminListAfterRtb = await json(await app.request("/api/admin/contact-requests", { headers: { cookie: adminCookie } }));
+  record(
+    "admin sees request-to-book property context",
+    Array.isArray(adminListAfterRtb.requests) &&
+      adminListAfterRtb.requests.some(
+        (r: { name: string; offer_slug?: string; source?: string }) =>
+          r.name === "Farhan Islam" && r.offer_slug === "five-star-hotel-share" && r.source === "request_to_book",
+      ) &&
+      adminListAfterRtb.requests.some((r: { name: string; source?: string }) => r.name === "Amina Rahman" && r.source === "contact"),
+    adminListAfterRtb.requests?.length,
+  );
+  const bookingsAfterRtb = await queryOne<{ count: string }>(`select count(*)::text as count from bookings`);
+  record(
+    "request-to-book does not create a booking row",
+    bookingsBeforeRtb?.count === bookingsAfterRtb?.count,
+    { before: bookingsBeforeRtb, after: bookingsAfterRtb },
+  );
+  const unknownRtb = await app.request("/api/contact", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      name: "Unknown Property",
+      profession: "Teacher",
+      mobile: "+8801811111113",
+      location: "Dhaka",
+      offerSlug: "not-a-published-property",
+      source: "request_to_book",
+    }),
+  });
+  record("request-to-book with unknown property is rejected", unknownRtb.status === 400, unknownRtb.status);
+  const badRtb = await app.request("/api/contact", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      name: "No Property",
+      profession: "Teacher",
+      mobile: "+8801811111112",
+      location: "Dhaka",
+      source: "request_to_book",
+    }),
+  });
+  record("request-to-book without a property is rejected", badRtb.status === 400, badRtb.status);
   const statusRes = await app.request(`/api/admin/contact-requests/${createdId}/status`, {
     method: "POST",
     headers: { cookie: adminCookie, "content-type": "application/json" },

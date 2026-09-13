@@ -1,73 +1,46 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Field } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
-import { api, ApiError } from "@/lib/api-client";
+import { createFileRoute } from "@tanstack/react-router";
+import { ContactForm } from "@/components/contact-form";
+import { api } from "@/lib/api-client";
+import { fromApiOffer, getOffer } from "@/lib/offers";
+import { useAsync } from "@/lib/use-async";
+
+type ContactSearch = { intent?: "book"; offer?: string };
 
 export const Route = createFileRoute("/contact")({
+  validateSearch: (s: Record<string, unknown>): ContactSearch => ({
+    intent: s.intent === "book" ? "book" : undefined,
+    offer: typeof s.offer === "string" && s.offer.trim() ? s.offer.trim() : undefined,
+  }),
   component: ContactPage,
 });
 
 function ContactPage() {
-  const [name, setName] = useState("");
-  const [profession, setProfession] = useState("");
-  const [mobile, setMobile] = useState("");
-  const [location, setLocation] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [pending, setPending] = useState(false);
-  const [done, setDone] = useState(false);
-
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
-    setPending(true);
-    try {
-      await api.submitContact({ name, profession, mobile, location });
-      setDone(true);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not send your request. Please try again.");
-    } finally {
-      setPending(false);
-    }
-  }
+  const { intent, offer: offerSlug } = Route.useSearch();
+  const requestToBook = intent === "book" && Boolean(offerSlug);
+  const { data } = useAsync(() => api.offer(offerSlug!), [offerSlug], { enabled: requestToBook });
+  const fallback = offerSlug ? getOffer(offerSlug) : undefined;
+  const property =
+    requestToBook && offerSlug
+      ? {
+          slug: offerSlug,
+          title: (data?.offer ? fromApiOffer(data.offer) : fallback)?.title ?? offerSlug,
+        }
+      : undefined;
 
   return (
     <main className="container-pg max-w-xl py-24 md:py-28">
-      <p className="text-xs font-medium uppercase tracking-[0.18em] text-pine">Contact</p>
-      <h1 className="mt-3 font-display text-4xl font-semibold tracking-tight">Contact Us</h1>
-      <p className="mt-3 text-sm leading-relaxed text-muted text-pretty">
-        Share a few details and the Darmelk team will review your request. This form is stored on your member operations record — it does not send email.
+      <p className="text-xs font-medium uppercase tracking-[0.18em] text-pine">
+        {requestToBook ? "Request to Book" : "Contact"}
       </p>
-
-      {done ? (
-        <div className="mt-8 rounded-2xl bg-cream p-6 shadow-[var(--shadow-card)]">
-          <p className="font-display text-2xl font-semibold">Request received</p>
-          <p className="mt-2 text-sm leading-relaxed text-muted">Thank you. Your details have been recorded.</p>
-          <Button asChild className="mt-6">
-            <Link to="/">Back to home</Link>
-          </Button>
-        </div>
-      ) : (
-        <form onSubmit={onSubmit} className="mt-8 space-y-4 rounded-2xl bg-cream p-6 shadow-[var(--shadow-card)]">
-          <Field label="Name">
-            <Input value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" required />
-          </Field>
-          <Field label="Profession">
-            <Input value={profession} onChange={(e) => setProfession(e.target.value)} required />
-          </Field>
-          <Field label="Mobile">
-            <Input value={mobile} onChange={(e) => setMobile(e.target.value)} autoComplete="tel" inputMode="tel" required />
-          </Field>
-          <Field label="Location">
-            <Input value={location} onChange={(e) => setLocation(e.target.value)} autoComplete="address-level2" required />
-          </Field>
-          {error ? <p className="text-sm text-clay">{error}</p> : null}
-          <Button type="submit" className="w-full" disabled={pending}>
-            {pending ? "Submitting…" : "Submit"}
-          </Button>
-        </form>
-      )}
+      <h1 className="mt-3 font-display text-4xl font-semibold tracking-tight text-pretty">
+        {requestToBook ? "Tell us you are interested" : "Contact Us"}
+      </h1>
+      <p className="mt-3 text-sm leading-relaxed text-muted text-pretty">
+        {requestToBook
+          ? "Share a few details and Darmelk will contact you about this property. This is an enquiry — it does not confirm a booking, reserve the property, or start a payment."
+          : "Share a few details and the Darmelk team will review your request. This form is stored for follow-up — it does not send email."}
+      </p>
+      <ContactForm property={property} />
     </main>
   );
 }

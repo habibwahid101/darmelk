@@ -211,7 +211,14 @@ app.get("/api/referral/:code", async (c) => {
 });
 
 app.post("/api/contact", async (c) => {
-  const body = await jsonBody<{ name?: string; profession?: string; mobile?: string; location?: string }>(c);
+  const body = await jsonBody<{
+    name?: string;
+    profession?: string;
+    mobile?: string;
+    location?: string;
+    offerSlug?: string;
+    source?: string;
+  }>(c);
   const request = await withTransaction((client) => createContactRequest(client, body));
   return c.json({ request }, 201);
 });

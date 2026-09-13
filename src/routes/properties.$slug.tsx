@@ -3,7 +3,7 @@ import { FileText, MapPin } from "lucide-react";
 import { AmountRow } from "@/components/states";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { formatBdt, fromApiOffer, getOffer, isBookable, offerImages } from "@/lib/offers";
+import { fromApiOffer, getOffer, isBookable, offerImages } from "@/lib/offers";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { api } from "@/lib/api-client";
 import { useAsync } from "@/lib/use-async";
@@ -24,16 +24,13 @@ export const Route = createFileRoute("/properties/$slug")({
 
 function PropertyDetail() {
   const { offer } = Route.useLoaderData();
-  const { user, isPending } = useCurrentUserState();
-  const { data: me } = useAsync(() => api.me(), [user?.id], { enabled: Boolean(user) });
-  const active = me?.member.activation_status === "active";
   const images = offerImages(offer);
   const hero = images[0];
   const rest = images.slice(1);
   const bookable = isBookable(offer.status);
 
   return (
-    <main className="pb-16 pt-20 md:pt-24">
+    <div className="pb-16 pt-20 md:pt-24">
       <section className="container-pg grid min-w-0 gap-8 py-8 lg:grid-cols-[1.2fr_.8fr] lg:py-12">
         <div className="min-w-0">
           {hero ? (
@@ -67,7 +64,9 @@ function PropertyDetail() {
           <div className="flex flex-wrap gap-2">
             <Badge>{offer.category}</Badge>
             {offer.flagship ? <Badge tone="pine">Flagship</Badge> : null}
-            <Badge tone={bookable ? "pine" : "cream"}>{bookable ? "Available" : offer.status === "closed" ? "Closed" : "Coming soon"}</Badge>
+            <Badge tone={bookable ? "pine" : "cream"}>
+              {bookable ? "Available" : offer.status === "closed" ? "Closed" : "Coming soon"}
+            </Badge>
           </div>
           <h1 className="mt-4 font-display text-3xl font-semibold text-pretty sm:text-4xl">{offer.title}</h1>
           {offer.location ? (
@@ -78,11 +77,10 @@ function PropertyDetail() {
           ) : null}
           <p className="mt-5 leading-relaxed text-muted text-pretty">{offer.summary}</p>
           <dl className="mt-6 rounded-2xl bg-cream p-5 shadow-[var(--shadow-card)] sm:p-6">
-            <AmountRow label="Property/share value" value={offer.retailValue} />
+            <AmountRow label="Property value" value={offer.retailValue} />
             <AmountRow label="Booking amount" value={offer.bookingAmount} />
-            <AmountRow label="Qualification benefit" value={offer.qualificationBenefit} />
           </dl>
-          <StateCta pending={isPending} user={Boolean(user)} active={active} slug={offer.slug} bookable={bookable} />
+          <PropertyCta slug={offer.slug} bookable={bookable} />
         </div>
       </section>
       <section className="border-y border-line bg-cream section-y">
@@ -91,10 +89,6 @@ function PropertyDetail() {
             {offer.details ||
               `This offer is presented as ${offer.title}. Darmelk does not add ownership, deed, stay, rental-return, or operator-right claims beyond approved offer materials.`}
           </Info>
-          <Info title="Benefits">
-            The approved qualification benefit for this booked offer is {formatBdt(offer.qualificationBenefit)} after the
-            program qualification conditions are met. It is separate from commission.
-          </Info>
           {offer.features?.length ? (
             <Info title="Features">
               {offer.features.join(" · ")}
@@ -102,108 +96,85 @@ function PropertyDetail() {
           ) : null}
           <Info title="Documents" icon>
             <span>
-              Property and booking records are connected to the member’s booking. Sensitive files, when available, are
-              shown in the authenticated Documents area.
+              Approved property materials for this opportunity are presented here. Booking records and payment evidence,
+              when created, remain connected to the related transaction.
             </span>
           </Info>
-          <Info title="Qualification">
-            Personally sponsor 3 eligible members and complete through Level 5.{" "}
-            <Link to="/program-rules" className="font-medium text-pine hover:underline">
-              Read full rules
-            </Link>
-            .
+          <Info title="Next steps">
+            Request to Book is an enquiry. Darmelk reviews the request and contacts you about the property and any
+            following steps. It does not confirm a booking or reserve the property.
           </Info>
         </div>
       </section>
       <section className="section-y">
         <div className="container-pg grid min-w-0 gap-8 lg:grid-cols-2">
           <div className="min-w-0">
-            <p className="text-xs font-medium uppercase tracking-[.18em] text-pine">Booking process</p>
-            <h2 className="mt-3 font-display text-3xl font-semibold text-pretty">From active ID to confirmed booking</h2>
+            <p className="text-xs font-medium uppercase tracking-[.18em] text-pine">How to continue</p>
+            <h2 className="mt-3 font-display text-3xl font-semibold text-pretty">From enquiry to a Darmelk conversation</h2>
             <ol className="mt-6 space-y-3">
-              {["Active ID", "Start Booking", "Manual Payment", "Proof Submission", "Admin Verification", "Confirmed Booking"].map(
-                (s, i) => (
-                  <li key={s} className="flex min-w-0 items-center gap-4 rounded-xl bg-cream p-4">
-                    <span className="shrink-0 font-display text-xl text-pine">{String(i + 1).padStart(2, "0")}</span>
-                    <span className="min-w-0 font-medium">{s}</span>
-                  </li>
-                ),
-              )}
+              {["Review the property", "Request to Book", "Darmelk contacts you", "Discuss next steps"].map((s, i) => (
+                <li key={s} className="flex min-w-0 items-center gap-4 rounded-xl bg-cream p-4">
+                  <span className="shrink-0 font-display text-xl text-pine">{String(i + 1).padStart(2, "0")}</span>
+                  <span className="min-w-0 font-medium">{s}</span>
+                </li>
+              ))}
             </ol>
           </div>
           <div className="min-w-0">
-            <p className="text-xs font-medium uppercase tracking-[.18em] text-pine">Payment, cancellation and terms</p>
-            <h2 className="mt-3 font-display text-3xl font-semibold text-pretty">Review before you book</h2>
+            <p className="text-xs font-medium uppercase tracking-[.18em] text-pine">Terms</p>
+            <h2 className="mt-3 font-display text-3xl font-semibold text-pretty">Review before you continue</h2>
             <div className="mt-6 rounded-2xl bg-cream p-6 text-sm leading-relaxed text-muted">
               <p>
-                Booking payment is manual and does not become approved when submitted. An admin verifies the transaction
-                reference and payment proof.
+                A Request to Book tells Darmelk you are interested in this property. It is not a confirmed booking, a
+                reservation, or a payment.
               </p>
               <p className="mt-4">
-                Booking values are frozen from this offer. Cancellation, rejection, reversal, payment, and audit records
-                remain recorded according to current program behavior.
+                Published property values shown here are the current approved terms for this opportunity.
               </p>
               <div className="mt-5 flex flex-wrap gap-4">
                 <Link to="/terms" className="font-medium text-pine hover:underline">
                   Terms
                 </Link>
-                <Link to="/program-rules" className="font-medium text-pine hover:underline">
-                  Program Rules
+                <Link to="/contact" className="font-medium text-pine hover:underline">
+                  Contact Darmelk
                 </Link>
               </div>
             </div>
           </div>
         </div>
       </section>
-    </main>
+    </div>
   );
 }
 
-function StateCta({
-  pending,
-  user,
-  active,
-  slug,
-  bookable,
-}: {
-  pending: boolean;
-  user: boolean;
-  active: boolean;
-  slug: string;
-  bookable: boolean;
-}) {
-  if (!bookable)
+function PropertyCta({ slug, bookable }: { slug: string; bookable: boolean }) {
+  const { user } = useCurrentUserState();
+  const { data: me } = useAsync(() => api.me(), [user?.id], { enabled: Boolean(user) });
+  const active = me?.member.activation_status === "active";
+
+  if (!bookable) {
     return (
       <Button className="mt-6 w-full" disabled>
         Booking closed
       </Button>
     );
-  if (pending)
-    return (
-      <Button className="mt-6 w-full" disabled>
-        Checking account…
-      </Button>
-    );
-  if (!user)
-    return (
-      <Button asChild className="mt-6 w-full">
-        <Link to="/login" search={{ intent: "book", offer: slug, mode: "create" }}>
-          Create Account to Continue
+  }
+
+  return (
+    <div className="mt-6 flex flex-col gap-3">
+      <Button asChild className="w-full">
+        <Link to="/contact" search={{ intent: "book", offer: slug }}>
+          Request to Book
         </Link>
       </Button>
-    );
-  if (!active)
-    return (
-      <Button asChild className="mt-6 w-full">
-        <Link to="/app/activation">Activate Your ID</Link>
-      </Button>
-    );
-  return (
-    <Button asChild className="mt-6 w-full">
-      <Link to="/app/book/$slug" params={{ slug }}>
-        Start Booking
-      </Link>
-    </Button>
+      {active ? (
+        <Button asChild variant="secondary" className="w-full">
+          <Link to="/app/book/$slug" params={{ slug }}>
+            Start booking
+          </Link>
+        </Button>
+      ) : null}
+    </div>
   );
 }
 

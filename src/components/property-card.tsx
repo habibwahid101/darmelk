@@ -3,7 +3,6 @@ import { MapPin } from "lucide-react";
 import { AmountRow } from "@/components/states";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { type PropertyOffer, isBookable, resolveMediaSrc } from "@/lib/offers";
 import { cn } from "@/lib/utils";
 
@@ -50,9 +49,8 @@ export function PropertyCard({
           ) : null}
         </div>
         <dl className="mt-auto border-t border-line pt-3">
-          <AmountRow compact label="Retail" value={offer.retailValue} />
-          <AmountRow compact label="Booking" value={offer.bookingAmount} />
-          <AmountRow compact label="Benefit" value={offer.qualificationBenefit} />
+          <AmountRow compact label="Property value" value={offer.retailValue} />
+          <AmountRow compact label="Booking amount" value={offer.bookingAmount} />
         </dl>
         <Button asChild variant="secondary" className="w-full">
           <Link to="/properties/$slug" params={{ slug: offer.slug }}>
@@ -65,7 +63,6 @@ export function PropertyCard({
 }
 
 export function FeaturedOffer({ offer }: { offer: PropertyOffer }) {
-  const { user, isPending } = useCurrentUserState();
   const canBook = isBookable(offer.status);
 
   return (
@@ -96,29 +93,16 @@ export function FeaturedOffer({ offer }: { offer: PropertyOffer }) {
         <p className="mt-3 text-sm leading-relaxed text-muted">{offer.summary}</p>
         <p className="mt-2 text-xs text-subtle">Figures below belong to this offer only.</p>
         <dl className="mt-5">
-          <AmountRow label="Retail value" value={offer.retailValue} />
+          <AmountRow label="Property value" value={offer.retailValue} />
           <AmountRow label="Booking amount" value={offer.bookingAmount} />
-          <AmountRow label="Qualification benefit" value={offer.qualificationBenefit} />
         </dl>
         <div className="mt-6 flex flex-col gap-3 lg:flex-row">
           {canBook ? (
-            isPending ? (
-              <Button className="w-full lg:flex-1" disabled>
-                Start booking
-              </Button>
-            ) : user ? (
-              <Button asChild className="w-full lg:flex-1">
-                <Link to="/app/book/$slug" params={{ slug: offer.slug }}>
-                  Start booking
-                </Link>
-              </Button>
-            ) : (
-              <Button asChild className="w-full lg:flex-1">
-                <Link to="/login" search={{ intent: "book", offer: offer.slug }}>
-                  Start booking
-                </Link>
-              </Button>
-            )
+            <Button asChild className="w-full lg:flex-1">
+              <Link to="/contact" search={{ intent: "book", offer: offer.slug }}>
+                Request to Book
+              </Link>
+            </Button>
           ) : (
             <Button className="w-full lg:flex-1" disabled>
               {offer.status === "closed" ? "Closed" : "Coming soon"}

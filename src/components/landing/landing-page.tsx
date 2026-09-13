@@ -31,16 +31,16 @@ const propertyCategories = [
 ] as const;
 
 const steps = [
-  ["01", "Create your account", "Create your Darmelk member profile."],
-  ["02", "Activate your ID", "Pay the annual BDT 1,000 activation fee and receive approval."],
-  ["03", "Choose and book your property", "Review the property, submit payment evidence, and receive booking confirmation."],
-  ["04", "Build your progress", "Personally sponsor 3 and progress through five levels to meet qualification conditions."],
+  ["01", "Explore properties", "Browse currently published property opportunities and their approved terms."],
+  ["02", "Review the details", "Read the property information, booking amount, and supporting materials."],
+  ["03", "Request to Book", "Share your details. This is an enquiry, not a confirmed booking."],
+  ["04", "Darmelk contacts you", "Our team reviews your request and follows up with the next steps."],
 ];
 const faqs = [
-  ["What is Darmelk?", "Darmelk is a property-first platform where property terms, bookings, payments, progress, and financial activity are recorded."],
-  ["How do I start?", "Create an account, complete your profile, pay the annual BDT 1,000 activation fee, and wait for admin approval before booking."],
-  ["What are the qualification conditions?", "Personally sponsor 3 eligible members and complete Level 5. Full details are available in Program Rules."],
-  ["Are commission and the property benefit the same?", "No. Commission is calculated from actual eligible confirmed booking amounts. The qualification benefit belongs to your own booked offer."],
+  ["What is Darmelk?", "Darmelk is a property-first platform where property opportunities are presented with clear terms and a documented path from exploration to booking."],
+  ["How do I start?", "Browse published properties, review the details, and submit a Request to Book. No account is required to enquire."],
+  ["Does Request to Book confirm a booking?", "No. It tells Darmelk you are interested. Our team contacts you about the property and next steps. It does not reserve the property or start a payment."],
+  ["Do I need an account to explore properties?", "No. You can browse properties and submit a Request to Book as a guest."],
 ];
 
 export function LandingPage() {
@@ -103,8 +103,7 @@ export function LandingPage() {
             <p className="mt-4 text-[15px] leading-relaxed text-muted text-pretty">{FLAGSHIP.summary}</p>
             <dl className="mt-6 rounded-2xl bg-cream p-5 shadow-[var(--shadow-card)]">
               <AmountRow label="Property value" value={FLAGSHIP.retailValue} />
-              <AmountRow label="Initial booking" value={FLAGSHIP.bookingAmount} />
-              <AmountRow label="Qualification benefit" value={FLAGSHIP.qualificationBenefit} />
+              <AmountRow label="Booking amount" value={FLAGSHIP.bookingAmount} />
             </dl>
             <Button asChild className="mt-6 w-full">
               <Link to="/properties/$slug" params={{ slug: FLAGSHIP.slug }}>
@@ -177,8 +176,8 @@ export function LandingPage() {
             ))}
           </ol>
           <p className="mt-6 text-center text-sm">
-            <Link to="/program-rules" className="font-medium text-pine hover:underline">
-              See qualification details
+            <Link to="/contact" className="font-medium text-pine hover:underline">
+              Contact Darmelk
             </Link>
           </p>
         </div>
@@ -194,8 +193,8 @@ export function LandingPage() {
             <Trust icon={FileText} title="Documented Transactions">
               Payment, booking, and financial activity remain connected to your member record.
             </Trust>
-            <Trust icon={ShieldCheck} title="Transparent Qualification">
-              Property benefit and commission remain separate and traceable.
+            <Trust icon={ShieldCheck} title="Straightforward next steps">
+              Request to Book is an enquiry. Darmelk reviews it and contacts you about the property.
             </Trust>
           </div>
         </div>
@@ -213,7 +212,7 @@ export function LandingPage() {
           <div className="rounded-2xl bg-paper p-6">
             <p className="font-medium">Before booking</p>
             <p className="mt-2 text-sm text-muted text-pretty">
-              Review property values, the booking process, payment terms, qualification summary, and applicable program rules.
+              Review property values, the booking amount, and how to submit a Request to Book.
             </p>
             <Button asChild variant="secondary" className="mt-5">
               <Link to="/properties/$slug" params={{ slug: FLAGSHIP.slug }}>
@@ -242,7 +241,7 @@ export function LandingPage() {
           </Accordion.Root>
           <p className="mt-5 text-center text-sm">
             <Link to="/faq" className="font-medium text-pine hover:underline">
-              View full FAQ and program mechanics
+              View full FAQ
             </Link>
           </p>
         </div>
@@ -252,7 +251,7 @@ export function LandingPage() {
         <div className="container-pg flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="font-display text-3xl font-semibold text-pretty">Explore the property</h2>
-            <p className="mt-2 text-sm text-pine-fg/75 text-pretty">Review the offer and create your account when you are ready.</p>
+            <p className="mt-2 text-sm text-pine-fg/75 text-pretty">Review the opportunity and request to book when you are ready.</p>
           </div>
           <div className="flex flex-wrap gap-3">
             <Button asChild variant="invert">
@@ -261,8 +260,8 @@ export function LandingPage() {
               </Link>
             </Button>
             <Button asChild variant="invertGhost">
-              <Link to="/login" search={{ mode: "create" }}>
-                Create Account
+              <Link to="/contact" search={{ intent: "book", offer: FLAGSHIP.slug }}>
+                Request to Book
               </Link>
             </Button>
           </div>
