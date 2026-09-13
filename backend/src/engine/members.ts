@@ -56,42 +56,35 @@ export async function ensureMember(
 }
 
 /**
- * Complete onboarding: records the sponsor relationship from a referral code
- * and places the member into the unified 3x5 matrix (spillover under the
- * sponsor if the sponsor's own 3 slots are full).
+ * Complete onboarding: optionally records the sponsor relationship from a
+ * referral code. A valid referral still places the member into the unified
+ * 3x5 matrix (spillover under the sponsor if the sponsor's own 3 slots are
+ * full). A General account may omit the referral: sponsor stays NULL and the
+ * member is NOT placed in the matrix.
  *
- * Normal new members MUST supply a valid sponsor code. The approved
- * root/owner exception remains: the first onboarded member, and admin-role
- * accounts, may complete without a sponsor and become a matrix root.
- * Once a sponsor is bound, it is never replaced.
+ * Referral is optional. If supplied it must be a real, annually-active
+ * member who is not the user themselves. Once onboarding completes — with or
+ * without a sponsor — the relationship is never replaced.
  */
 export async function completeOnboarding(
   client: PoolClient,
   userId: string,
-  data: { phone: string; sponsorCode: string },
+  data: { phone: string; sponsorCode?: string },
 ): Promise<Member> {
   const { rows: existingRows } = await client.query<Member>(`select * from members where user_id = $1`, [userId]);
   const existing = existingRows[0];
   if (!existing) throw conflict("Member not found");
   if (existing.onboarding_complete) return existing;
 
-  const code = data.sponsorCode.trim().toUpperCase();
-  const { rows: countRows } = await client.query<{ n: string }>(
-    `select count(*)::text as n from members where onboarding_complete = true and user_id <> $1`,
-    [userId],
-  );
-  const otherOnboarded = Number(countRows[0]?.n ?? 0);
-  const canSkipSponsor = otherOnboarded === 0 || existing.role === "admin";
+  const code = (data.sponsorCode ?? "").trim().toUpperCase();
 
   let sponsor: Member | undefined;
   if (code) {
     const { rows } = await client.query<Member>(`select * from members where referral_code = $1`, [code]);
     sponsor = rows[0];
-    if (!sponsor) throw badRequest("Sponsor code not found", "sponsor_not_found");
+    if (!sponsor) throw badRequest("Referral ID not found", "sponsor_not_found");
     if (sponsor.user_id === userId) throw badRequest("You cannot sponsor yourself", "self_sponsor");
     await requireActiveMember(client, sponsor.user_id, "Sponsor is not annually active");
-  } else if (!canSkipSponsor) {
-    throw badRequest("Sponsor referral code is required", "sponsor_required");
   }
 
   let networkParentId: string | null = null;
@@ -128,6 +121,7 @@ export async function completeOnboarding(
   }
   return rows[0];
 }
+
 
 /** Refresh a stale active row at the point of use, then enforce the annual
  * activation privilege gate without deleting or rewriting history. */

@@ -105,10 +105,84 @@ async function main() {
     }),
   );
   record(
-    "normal member without sponsor is rejected",
-    noSponsorOnboard.error?.code === "sponsor_required" || noSponsorOnboard.member?.onboarding_complete !== true,
-    noSponsorOnboard,
+    "general member without referral completes onboarding with no sponsor",
+    noSponsorOnboard.member?.onboarding_complete === true &&
+      noSponsorOnboard.member?.sponsor_user_id === null &&
+      noSponsorOnboard.member?.network_parent_user_id === null &&
+      noSponsorOnboard.member?.network_slot === null,
+    noSponsorOnboard.member,
   );
+  const generalId = noSponsorOnboard.member?.user_id as string | undefined;
+  const generalPlacement = await queryOne<{
+    sponsor_user_id: string | null;
+    network_parent_user_id: string | null;
+    network_slot: number | null;
+  }>(
+    `select sponsor_user_id, network_parent_user_id, network_slot from members where user_id = $1`,
+    [generalId],
+  );
+  record(
+    "sponsorless account is not placed into the 3x5 matrix",
+    generalPlacement?.sponsor_user_id == null &&
+      generalPlacement?.network_parent_user_id == null &&
+      generalPlacement?.network_slot == null,
+    generalPlacement,
+  );
+  const generalCommissions = await queryOne<{ n: number }>(
+    `select count(*)::int as n from commission_ledger where source_user_id = $1 or beneficiary_user_id = $1`,
+    [generalId],
+  );
+  record("sponsorless signup creates no commission", generalCommissions?.n === 0, generalCommissions);
+  const generalQual = await withTransaction((client) => getQualificationStatus(client, generalId!));
+  record(
+    "sponsorless signup creates no qualification progress",
+    generalQual.sponsorCount === 0 && generalQual.qualified === false && generalQual.levelCounts[1] === 0,
+    generalQual,
+  );
+  const generalLeadership = await queryOne<{ n: number }>(
+    `select count(*)::int as n from leadership_reward_cycles where user_id = $1`,
+    [generalId],
+  );
+  record("sponsorless signup creates no Leadership entitlement", generalLeadership?.n === 0, generalLeadership);
+  const laterBind = await json(
+    await app.request("/api/me/onboarding", {
+      method: "POST",
+      headers: { cookie: noSponsorCookie, "content-type": "application/json" },
+      body: JSON.stringify({ sponsorCode: adminMe.member.referral_code, termsAccepted: true }),
+    }),
+  );
+  record(
+    "completed general onboarding cannot later bind a sponsor",
+    laterBind.member?.sponsor_user_id === null && laterBind.member?.network_parent_user_id === null,
+    laterBind.member,
+  );
+  const generalSignIn = await app.request("/api/auth/sign-in/email", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ email: "nosponsor@example.com", password: "password123" }),
+  });
+  record("login works for sponsorless account", generalSignIn.status === 200, generalSignIn.status);
+
+  const whitespaceSignUp = await app.request("/api/auth/sign-up/email", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ email: "whitespace-ref@example.com", password: "password123", name: "Whitespace Ref" }),
+  });
+  const whitespaceCookie = extractCookie(whitespaceSignUp);
+  await app.request("/api/me", { headers: { cookie: whitespaceCookie } });
+  const whitespaceOnboard = await json(
+    await app.request("/api/me/onboarding", {
+      method: "POST",
+      headers: { cookie: whitespaceCookie, "content-type": "application/json" },
+      body: JSON.stringify({ name: "Whitespace Ref", sponsorCode: "   ", termsAccepted: true }),
+    }),
+  );
+  record(
+    "whitespace-only referral is treated as omitted",
+    whitespaceOnboard.member?.onboarding_complete === true && whitespaceOnboard.member?.sponsor_user_id === null,
+    whitespaceOnboard.member,
+  );
+
   const noTerms = await json(
     await app.request("/api/me/onboarding", {
       method: "POST",
@@ -117,14 +191,55 @@ async function main() {
     }),
   );
   record("onboarding without terms accepted is rejected", noTerms.error?.code === "terms_required", noTerms);
+
+  const invalidSignUp = await app.request("/api/auth/sign-up/email", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ email: "badref@example.com", password: "password123", name: "Bad Referral" }),
+  });
+  const invalidCookie = extractCookie(invalidSignUp);
+  const invalidMe = await json(await app.request("/api/me", { headers: { cookie: invalidCookie } }));
   const badCode = await json(
     await app.request("/api/me/onboarding", {
       method: "POST",
-      headers: { cookie: noSponsorCookie, "content-type": "application/json" },
+      headers: { cookie: invalidCookie, "content-type": "application/json" },
       body: JSON.stringify({ sponsorCode: "DM-NOTREAL", termsAccepted: true }),
     }),
   );
   record("invalid sponsor code is rejected", badCode.error?.code === "sponsor_not_found", badCode);
+  const invalidAfter = await queryOne<{
+    onboarding_complete: boolean;
+    sponsor_user_id: string | null;
+    network_parent_user_id: string | null;
+    network_slot: number | null;
+  }>(
+    `select onboarding_complete, sponsor_user_id, network_parent_user_id, network_slot from members where user_id = $1`,
+    [invalidMe.member?.user_id],
+  );
+  record(
+    "failed referral validation leaves no network side effect",
+    invalidAfter?.onboarding_complete === false &&
+      invalidAfter?.sponsor_user_id == null &&
+      invalidAfter?.network_parent_user_id == null &&
+      invalidAfter?.network_slot == null,
+    invalidAfter,
+  );
+
+  const selfSignUp = await app.request("/api/auth/sign-up/email", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ email: "selfref@example.com", password: "password123", name: "Self Referral" }),
+  });
+  const selfCookie = extractCookie(selfSignUp);
+  const selfMe = await json(await app.request("/api/me", { headers: { cookie: selfCookie } }));
+  const selfOnboard = await json(
+    await app.request("/api/me/onboarding", {
+      method: "POST",
+      headers: { cookie: selfCookie, "content-type": "application/json" },
+      body: JSON.stringify({ sponsorCode: selfMe.member?.referral_code, termsAccepted: true }),
+    }),
+  );
+  record("self-referral is rejected", selfOnboard.error?.code === "self_sponsor", selfOnboard);
 
   const adminActivationRequest = await json(await app.request("/api/activation/request", {
     method: "POST",
@@ -152,7 +267,9 @@ async function main() {
   const onboarded = await json(onboardRes);
   record(
     "member onboarding places into matrix under admin",
-    onboarded.member?.network_parent_user_id === adminMe.member.user_id && onboarded.member?.network_slot === 1,
+    onboarded.member?.sponsor_user_id === adminMe.member.user_id &&
+      onboarded.member?.network_parent_user_id === adminMe.member.user_id &&
+      onboarded.member?.network_slot === 1,
     onboarded,
   );
 

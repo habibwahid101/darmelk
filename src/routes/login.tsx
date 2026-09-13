@@ -52,10 +52,6 @@ function Login() {
         setError("Enter your name.");
         return;
       }
-      if (!sponsorCode.trim()) {
-        setError("Sponsor referral code is required.");
-        return;
-      }
       if (!termsAccepted) {
         setError("Please accept the Terms & Conditions to continue.");
         return;
@@ -64,8 +60,11 @@ function Login() {
     setPending(true);
     try {
       if (create) {
-        const lookup = await api.lookupSponsor(sponsorCode.trim());
-        if (!lookup.ok) throw new Error("Sponsor code not found.");
+        const trimmedReferral = sponsorCode.trim();
+        if (trimmedReferral) {
+          const lookup = await api.lookupSponsor(trimmedReferral);
+          if (!lookup.ok) throw new Error("Referral ID not found.");
+        }
         const { error: err } = await authClient.signUp.email({
           email,
           password,
@@ -75,14 +74,14 @@ function Login() {
         try {
           await api.onboarding({
             name: name.trim(),
-            sponsorCode: sponsorCode.trim(),
+            sponsorCode: trimmedReferral,
             termsAccepted: true,
           });
         } catch (onboardErr) {
           await authClient.signOut().catch(() => undefined);
           throw onboardErr instanceof ApiError
             ? onboardErr
-            : new Error("Account created, but the sponsor code could not be applied. Sign in and try again.");
+            : new Error("Account created, but registration could not be completed. Sign in and try again.");
         }
       } else {
         const { error: err } = await authClient.signIn.email({ email, password });
@@ -110,7 +109,9 @@ function Login() {
             <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-cream/70">Property first</p>
             <p className="mt-2 font-display text-3xl font-semibold">{create ? "Create your account" : "Welcome back"}</p>
             <p className="mt-3 max-w-sm text-sm text-cream/75 text-pretty">
-              Review offer terms before you book. Progress, commission, and benefit stay separate.
+              {create
+                ? "A Darmelk account is free. Add a referral ID only if you have one."
+                : "Review offer terms before you book. Progress, commission, and benefit stay separate."}
             </p>
           </div>
         </div>
@@ -118,7 +119,9 @@ function Login() {
         <div className="p-6 sm:p-8">
           <h1 className="font-display text-2xl font-semibold tracking-tight">{create ? "Create account" : "Sign in"}</h1>
           <p className="mt-2 text-sm text-muted">
-            {create ? "Register with your sponsor code to open the member dashboard." : "Continue to your member area."}
+            {create
+              ? "Create a Darmelk account to follow property opportunities. A referral ID is optional."
+              : "Continue to your member area."}
           </p>
 
           {selected ? (
@@ -165,7 +168,7 @@ function Login() {
             />
             {create ? (
               <>
-                <Field label="Sponsor Referral Code" hint="Required. This relationship is permanent after registration.">
+                <Field label="Referral ID (Optional)" hint="Have a referral ID? Enter it here.">
                   <Input
                     id="sponsor-code"
                     name="sponsorCode"
@@ -173,7 +176,9 @@ function Login() {
                     onChange={(e) => setSponsorCode(e.target.value.toUpperCase())}
                     autoCapitalize="characters"
                     autoComplete="off"
-                    required
+                    spellCheck={false}
+                    inputMode="text"
+                    aria-required="false"
                   />
                 </Field>
                 <label className="flex items-start gap-3 rounded-xl bg-paper px-3 py-3 text-sm leading-relaxed text-ink">
