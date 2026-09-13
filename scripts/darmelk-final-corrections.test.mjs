@@ -24,9 +24,11 @@ test("landing order is Hero → Flagship → Explore Properties → How Darmelk 
   assert.doesNotMatch(src, /alt="Five-Star Hotel Share"/);
 });
 
-test("registration requires sponsor code and clickable terms", () => {
+test("registration treats referral as optional and keeps clickable terms", () => {
   const src = read("src/routes/login.tsx");
-  assert.match(src, /Sponsor referral code is required/);
+  assert.match(src, /Referral ID \(Optional\)/);
+  assert.match(src, /Have a referral ID\? Enter it here\./);
+  assert.doesNotMatch(src, /Sponsor referral code is required/);
   assert.match(src, /I have read, understood, and agree to the/);
   assert.match(src, /to="\/terms"/);
   assert.match(src, /Terms & Conditions/);
