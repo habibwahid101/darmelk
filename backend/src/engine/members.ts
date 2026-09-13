@@ -12,6 +12,10 @@ function adminEmails(): Set<string> {
   );
 }
 
+function isUniqueViolation(err: unknown): boolean {
+  return Boolean(err && typeof err === "object" && "code" in err && (err as { code: string }).code === "23505");
+}
+
 export type Member = {
   user_id: string;
   referral_code: string;
@@ -122,6 +126,68 @@ export async function completeOnboarding(
   return rows[0];
 }
 
+/**
+ * Bind a sponsor to an existing sponsorless General account when that member
+ * explicitly enters the Growth Program. Not a generic sponsor-edit API:
+ * existing sponsors are never replaced, and binding is atomic with exactly
+ * one matrix placement via the existing 3x5 engine.
+ *
+ * Does not post commission, activate the member, create a booking, or
+ * trigger promotion / qualification / Leadership.
+ */
+export async function bindSponsorForGrowth(
+  client: PoolClient,
+  userId: string,
+  sponsorCode: string,
+): Promise<{ member: Member; alreadyBound: boolean }> {
+  const { rows: locked } = await client.query<Member>(`select * from members where user_id = $1 for update`, [userId]);
+  const existing = locked[0];
+  if (!existing) throw conflict("Member not found");
+
+  if (existing.sponsor_user_id) {
+    return { member: existing, alreadyBound: true };
+  }
+  if (existing.network_parent_user_id != null || existing.network_slot != null) {
+    throw conflict("Account has existing network placement without a sponsor", "inconsistent_network");
+  }
+
+  const code = (sponsorCode ?? "").trim().toUpperCase();
+  if (!code) throw badRequest("Referral ID is required to join the Growth Program", "growth_referral_required");
+
+  const { rows: sponsorRows } = await client.query<Member>(`select * from members where referral_code = $1`, [code]);
+  const sponsor = sponsorRows[0];
+  if (!sponsor) throw badRequest("Referral ID not found", "sponsor_not_found");
+  if (sponsor.user_id === userId) throw badRequest("You cannot sponsor yourself", "self_sponsor");
+  await requireActiveMember(client, sponsor.user_id, "Sponsor is not annually active");
+
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    try {
+      const slot = await findOpenMatrixSlot(client, sponsor.user_id);
+      const { rows } = await client.query<Member>(
+        `update members set
+            sponsor_user_id = $2,
+            network_parent_user_id = $3,
+            network_slot = $4,
+            onboarding_complete = true,
+            updated_at = now()
+          where user_id = $1
+            and sponsor_user_id is null
+            and network_parent_user_id is null
+            and network_slot is null
+          returning *`,
+        [userId, sponsor.user_id, slot.parentUserId, slot.slot],
+      );
+      if (rows[0]) return { member: rows[0], alreadyBound: false };
+      const again = await client.query<Member>(`select * from members where user_id = $1`, [userId]);
+      if (again.rows[0]?.sponsor_user_id) return { member: again.rows[0], alreadyBound: true };
+      throw conflict("Could not bind referral");
+    } catch (err) {
+      if (isUniqueViolation(err) && attempt < 4) continue;
+      throw err;
+    }
+  }
+  throw conflict("Could not bind referral");
+}
 
 /** Refresh a stale active row at the point of use, then enforce the annual
  * activation privilege gate without deleting or rewriting history. */

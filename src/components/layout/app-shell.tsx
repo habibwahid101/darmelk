@@ -24,6 +24,7 @@ import { signOut } from "@/lib/auth/client";
 import { SkeletonBlock } from "@/components/states";
 import { useMemberSession } from "@/components/layout/use-member";
 import { cn } from "@/lib/utils";
+import { isGrowthParticipant } from "@/lib/growth";
 
 type AppPath =
   | "/app"
@@ -37,7 +38,8 @@ type AppPath =
   | "/app/transactions"
   | "/app/documents"
   | "/app/activation"
-  | "/app/settings";
+  | "/app/settings"
+  | "/growth-program";
 
 type NavItem = {
   to: AppPath;
@@ -45,7 +47,12 @@ type NavItem = {
   icon: ComponentType<{ className?: string; strokeWidth?: number }>;
 };
 
-const PRIMARY: NavItem[] = [
+const GENERAL_PRIMARY: NavItem[] = [
+  { to: "/app", label: "Overview", icon: LayoutDashboard },
+  { to: "/app/bookings", label: "Bookings", icon: Building2 },
+];
+
+const GROWTH_PRIMARY: NavItem[] = [
   { to: "/app", label: "Overview", icon: LayoutDashboard },
   { to: "/app/bookings", label: "Bookings", icon: Building2 },
   { to: "/app/network", label: "Network", icon: GitFork },
@@ -54,7 +61,15 @@ const PRIMARY: NavItem[] = [
   { to: "/app/leadership-reward", label: "Leadership Reward", icon: Award },
 ];
 
-const MORE: NavItem[] = [
+const GENERAL_MORE: NavItem[] = [
+  { to: "/growth-program", label: "Growth Program", icon: BadgeCheck },
+  { to: "/app/promotions", label: "Promotions", icon: Megaphone },
+  { to: "/app/transactions", label: "Transactions", icon: List },
+  { to: "/app/documents", label: "Documents", icon: FileText },
+  { to: "/app/settings", label: "Account", icon: Settings },
+];
+
+const GROWTH_MORE: NavItem[] = [
   { to: "/app/promotions", label: "Promotions", icon: Megaphone },
   { to: "/app/transactions", label: "Transactions", icon: List },
   { to: "/app/documents", label: "Documents", icon: FileText },
@@ -62,7 +77,13 @@ const MORE: NavItem[] = [
   { to: "/app/settings", label: "Account", icon: Settings },
 ];
 
-const MOBILE_TABS: NavItem[] = [PRIMARY[0], PRIMARY[1], PRIMARY[2], PRIMARY[4]];
+const GROWTH_LOCKED = [
+  "/app/network",
+  "/app/qualification",
+  "/app/commission",
+  "/app/leadership-reward",
+  "/app/activation",
+];
 
 function isActive(pathname: string, to: string) {
   if (to === "/app") return pathname === "/app";
@@ -72,16 +93,16 @@ function isActive(pathname: string, to: string) {
 export function AppShell() {
   const { user, member, merchant, isPending } = useMemberSession();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const [more, setMore] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
 
-  useEffect(() => setMore(false), [pathname]);
+  useEffect(() => setMenuOpen(false), [pathname]);
   useEffect(() => {
-    document.body.style.overflow = more ? "hidden" : "";
+    document.body.style.overflow = menuOpen ? "hidden" : "";
     return () => {
       document.body.style.overflow = "";
     };
-  }, [more]);
+  }, [menuOpen]);
 
   if (isPending) {
     return (
@@ -113,7 +134,15 @@ export function AppShell() {
     label: merchant?.status === "active" ? "Merchant" : "Become a Merchant",
     icon: Store,
   };
-  const allNav = [...PRIMARY, merchantNav, ...MORE];
+  const inGrowth = isGrowthParticipant(member);
+  const primary = inGrowth ? GROWTH_PRIMARY : GENERAL_PRIMARY;
+  const moreItems = inGrowth ? GROWTH_MORE : GENERAL_MORE;
+  const allNav = [...primary, merchantNav, ...moreItems];
+  const mobileTabs = inGrowth
+    ? [GROWTH_PRIMARY[0], GROWTH_PRIMARY[1], GROWTH_PRIMARY[2], GROWTH_PRIMARY[4]]
+    : [GENERAL_PRIMARY[0], GENERAL_PRIMARY[1], GENERAL_MORE[1], GENERAL_MORE[4]];
+  const growthLocked =
+    !inGrowth && GROWTH_LOCKED.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 
   return (
     <div className="min-h-dvh bg-paper">
@@ -163,15 +192,15 @@ export function AppShell() {
         <button
           type="button"
           className="grid size-11 place-items-center rounded-lg"
-          aria-label={more ? "Close menu" : "Open menu"}
-          aria-expanded={more}
-          onClick={() => setMore((v) => !v)}
+          aria-label={menuOpen ? "Close menu" : "Open menu"}
+          aria-expanded={menuOpen}
+          onClick={() => setMenuOpen((v) => !v)}
         >
-          {more ? <X className="size-5" /> : <Menu className="size-5" />}
+          {menuOpen ? <X className="size-5" /> : <Menu className="size-5" />}
         </button>
       </header>
 
-      {more ? (
+      {menuOpen ? (
         <div className="fixed inset-0 z-30 overflow-y-auto bg-paper pt-14 pb-[var(--darmelk-bottom-nav-clearance)] lg:hidden">
           <nav className="px-4 py-4" aria-label="More">
             {allNav.map((item) => (
@@ -224,9 +253,7 @@ export function AppShell() {
           </div>
         </div>
         <main className="app-main-with-nav px-[var(--darmelk-gutter)] py-6 md:px-8 md:py-8">
-          <div className="mx-auto min-w-0 max-w-6xl">
-            <Outlet />
-          </div>
+          <div className="mx-auto min-w-0 max-w-6xl">{growthLocked ? <JoinGrowthCard /> : <Outlet />}</div>
         </main>
       </div>
 
@@ -235,7 +262,7 @@ export function AppShell() {
         aria-label="Mobile"
       >
         <div className="grid grid-cols-5">
-          {MOBILE_TABS.map((item) => (
+          {mobileTabs.map((item) => (
             <Link
               key={item.to}
               to={item.to}
@@ -250,10 +277,10 @@ export function AppShell() {
           ))}
           <button
             type="button"
-            onClick={() => setMore(true)}
+            onClick={() => setMenuOpen(true)}
             className={cn(
               "flex min-h-14 flex-col items-center justify-center gap-1 text-[10px] font-medium",
-              more ? "text-pine" : "text-muted",
+              menuOpen ? "text-pine" : "text-muted",
             )}
           >
             <Menu className="size-5" />
@@ -261,6 +288,21 @@ export function AppShell() {
           </button>
         </div>
       </nav>
+    </div>
+  );
+}
+
+function JoinGrowthCard() {
+  return (
+    <div className="rounded-2xl bg-cream p-6 shadow-[var(--shadow-card)] sm:p-8">
+      <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-pine">Growth Program</p>
+      <h1 className="mt-3 font-display text-3xl font-semibold">Join to use this area</h1>
+      <p className="mt-3 max-w-xl text-sm leading-relaxed text-muted">
+        Network, qualification, commission, leadership, and activation belong to the Growth Program. A valid Referral ID is required to join.
+      </p>
+      <Button asChild className="mt-6">
+        <Link to="/growth-program">Continue to Growth Program</Link>
+      </Button>
     </div>
   );
 }

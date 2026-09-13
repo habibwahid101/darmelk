@@ -17,6 +17,7 @@ import { Route as CareerRouteImport } from './routes/career'
 import { Route as ContactRouteImport } from './routes/contact'
 import { Route as FaqRouteImport } from './routes/faq'
 import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
+import { Route as GrowthProgramRouteImport } from './routes/growth-program'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as ProgramRulesRouteImport } from './routes/program-rules'
@@ -132,6 +133,11 @@ const FaqRoute = FaqRouteImport.update({
 const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
   id: '/forgot-password',
   path: '/forgot-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GrowthProgramRoute = GrowthProgramRouteImport.update({
+  id: '/growth-program',
+  path: '/growth-program',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -536,6 +542,7 @@ export interface FileRoutesByFullPath {
   '/contact': typeof ContactRoute
   '/faq': typeof FaqRoute
   '/forgot-password': typeof ForgotPasswordRoute
+  '/growth-program': typeof GrowthProgramRoute
   '/login': typeof LoginRoute
   '/privacy': typeof PrivacyRoute
   '/program-rules': typeof ProgramRulesRoute
@@ -619,6 +626,7 @@ export interface FileRoutesByTo {
   '/contact': typeof ContactRoute
   '/faq': typeof FaqRoute
   '/forgot-password': typeof ForgotPasswordRoute
+  '/growth-program': typeof GrowthProgramRoute
   '/login': typeof LoginRoute
   '/privacy': typeof PrivacyRoute
   '/program-rules': typeof ProgramRulesRoute
@@ -693,6 +701,7 @@ export interface FileRoutesById {
   '/contact': typeof ContactRoute
   '/faq': typeof FaqRoute
   '/forgot-password': typeof ForgotPasswordRoute
+  '/growth-program': typeof GrowthProgramRoute
   '/login': typeof LoginRoute
   '/privacy': typeof PrivacyRoute
   '/program-rules': typeof ProgramRulesRoute
@@ -781,6 +790,7 @@ export interface FileRouteTypes {
     | '/contact'
     | '/faq'
     | '/forgot-password'
+    | '/growth-program'
     | '/login'
     | '/privacy'
     | '/program-rules'
@@ -864,6 +874,7 @@ export interface FileRouteTypes {
     | '/contact'
     | '/faq'
     | '/forgot-password'
+    | '/growth-program'
     | '/login'
     | '/privacy'
     | '/program-rules'
@@ -937,6 +948,7 @@ export interface FileRouteTypes {
     | '/contact'
     | '/faq'
     | '/forgot-password'
+    | '/growth-program'
     | '/login'
     | '/privacy'
     | '/program-rules'
@@ -1024,6 +1036,7 @@ export interface RootRouteChildren {
   ContactRoute: typeof ContactRoute
   FaqRoute: typeof FaqRoute
   ForgotPasswordRoute: typeof ForgotPasswordRoute
+  GrowthProgramRoute: typeof GrowthProgramRoute
   LoginRoute: typeof LoginRoute
   PrivacyRoute: typeof PrivacyRoute
   ProgramRulesRoute: typeof ProgramRulesRoute
@@ -1089,6 +1102,13 @@ declare module '@tanstack/react-router' {
       path: '/forgot-password'
       fullPath: '/forgot-password'
       preLoaderRoute: typeof ForgotPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/growth-program': {
+      id: '/growth-program'
+      path: '/growth-program'
+      fullPath: '/growth-program'
+      preLoaderRoute: typeof GrowthProgramRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -1946,6 +1966,7 @@ const rootRouteChildren: RootRouteChildren = {
   ContactRoute: ContactRoute,
   FaqRoute: FaqRoute,
   ForgotPasswordRoute: ForgotPasswordRoute,
+  GrowthProgramRoute: GrowthProgramRoute,
   LoginRoute: LoginRoute,
   PrivacyRoute: PrivacyRoute,
   ProgramRulesRoute: ProgramRulesRoute,
