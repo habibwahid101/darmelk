@@ -17,7 +17,7 @@ import {
   requestActivation,
 } from "./engine/activation.js";
 import { getCommissionTotals } from "./engine/commissions.js";
-import { completeOnboarding, ensureMember, logAdminAction, requireAdmin } from "./engine/members.js";
+import { completeOnboarding, ensureMember, logAdminAction, requireAdmin, bindSponsorForGrowth } from "./engine/members.js";
 import { createContactRequest, listContactRequests, updateContactRequestStatus } from "./engine/contact.js";
 import { getQualificationStatus, PERSONAL_SPONSOR_TARGET, TOTAL_POSITIONS } from "./engine/network.js";
 import { listLeadershipRewardSummaries, syncLeadershipReward } from "./engine/leadership.js";
@@ -281,6 +281,16 @@ app.post("/api/me/onboarding", async (c) => {
     return completeOnboarding(client, userId, { phone: body.phone ?? "", sponsorCode: body.sponsorCode ?? "" });
   });
   return c.json({ member });
+});
+
+app.post("/api/me/growth/sponsor", async (c) => {
+  const userId = c.get("userId");
+  const body = await jsonBody<{ sponsorCode?: string }>(c);
+  const result = await withTransaction(async (client) => {
+    await ensureMember(client, { id: userId, email: c.get("userEmail") });
+    return bindSponsorForGrowth(client, userId, body.sponsorCode ?? "");
+  });
+  return c.json({ member: result.member, alreadyBound: result.alreadyBound });
 });
 
 app.get("/api/me/network", async (c) => {

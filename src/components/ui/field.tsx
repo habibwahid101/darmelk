@@ -22,7 +22,9 @@ export function Field({
       <span className="text-xs font-medium text-ink/80">{label}</span>
       <div className="mt-1">{children}</div>
       {error ? (
-        <span className="mt-1 block text-xs text-clay">{error}</span>
+        <span id={htmlFor ? `${htmlFor}-error` : undefined} className="mt-1 block text-xs text-clay" role="alert">
+          {error}
+        </span>
       ) : hint ? (
         <span className="mt-1 block text-xs text-subtle">{hint}</span>
       ) : null}

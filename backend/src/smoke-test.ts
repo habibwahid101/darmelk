@@ -1960,6 +1960,187 @@ async function main() {
   const merchantStill = await json(await app.request("/api/me/merchant", { headers: { cookie: promoMerchant.cookie } }));
   record("Merchant Credit remains available after Promotion batch", typeof merchantStill.merchant?.available === "number");
 
+  // --- Growth Program: bind sponsor later on an isolated sponsorless tree ---
+  const signupGeneralLater = async (email: string, name: string) => {
+    const signUp = await app.request("/api/auth/sign-up/email", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email, password: "password123", name }),
+    });
+    const cookie = extractCookie(signUp);
+    await app.request("/api/me", { headers: { cookie } });
+    const onboard = await json(
+      await app.request("/api/me/onboarding", {
+        method: "POST",
+        headers: { cookie, "content-type": "application/json" },
+        body: JSON.stringify({ name, sponsorCode: "", termsAccepted: true }),
+      }),
+    );
+    return { cookie, member: onboard.member };
+  };
+  const bindGrowth = (cookie: string, sponsorCode: string) =>
+    app.request("/api/me/growth/sponsor", {
+      method: "POST",
+      headers: { cookie, "content-type": "application/json" },
+      body: JSON.stringify({ sponsorCode }),
+    });
+
+  const unauthBind = await app.request("/api/me/growth/sponsor", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ sponsorCode: "DM-ANY" }),
+  });
+  record("unauthenticated growth bind is rejected", unauthBind.status === 401, unauthBind.status);
+
+  const growthSponsor = await signupGeneralLater("growth-sponsor@example.com", "Growth Sponsor");
+  await withTransaction(async (client) => {
+    await client.query(
+      `update members set activation_status='active', activation_expires_at=now()+interval '365 days' where user_id=$1`,
+      [growthSponsor.member.user_id],
+    );
+  });
+  const growthSponsorMe = await json(await app.request("/api/me", { headers: { cookie: growthSponsor.cookie } }));
+  const growthSponsorCode = growthSponsorMe.member.referral_code as string;
+
+  const joiner = await signupGeneralLater("growth-joiner@example.com", "Growth Joiner");
+  const emptyBind = await json(await bindGrowth(joiner.cookie, ""));
+  record("empty growth referral is rejected", emptyBind.error?.code === "growth_referral_required", emptyBind);
+  const whitespaceBind = await json(await bindGrowth(joiner.cookie, "   "));
+  record("whitespace-only growth referral is rejected", whitespaceBind.error?.code === "growth_referral_required", whitespaceBind);
+  const invalidBind = await json(await bindGrowth(joiner.cookie, "DM-NOTREAL"));
+  record("invalid growth referral is rejected", invalidBind.error?.code === "sponsor_not_found", invalidBind);
+  const selfBind = await json(await bindGrowth(joiner.cookie, joiner.member.referral_code));
+  record("self-referral growth bind is rejected", selfBind.error?.code === "self_sponsor", selfBind);
+
+  const inactiveSponsor = await signupGeneralLater("growth-inactive-sponsor@example.com", "Inactive Growth Sponsor");
+  const inactiveBind = await json(await bindGrowth(joiner.cookie, inactiveSponsor.member.referral_code));
+  record(
+    "inactive sponsor cannot be bound for Growth",
+    inactiveBind.error?.code === "forbidden",
+    inactiveBind,
+  );
+
+  const joinerAfterRejects = await queryOne<{
+    sponsor_user_id: string | null;
+    network_parent_user_id: string | null;
+    network_slot: number | null;
+    activation_status: string;
+  }>(
+    `select sponsor_user_id, network_parent_user_id, network_slot, activation_status from members where user_id = $1`,
+    [joiner.member.user_id],
+  );
+  record(
+    "failed growth binds leave the account sponsorless",
+    joinerAfterRejects?.sponsor_user_id == null &&
+      joinerAfterRejects?.network_parent_user_id == null &&
+      joinerAfterRejects?.network_slot == null &&
+      joinerAfterRejects?.activation_status === "inactive",
+    joinerAfterRejects,
+  );
+
+  const [firstBindRes, secondBindRes] = await Promise.all([
+    bindGrowth(joiner.cookie, growthSponsorCode),
+    bindGrowth(joiner.cookie, growthSponsorCode),
+  ]);
+  const firstBind = await json(firstBindRes);
+  const secondBind = await json(secondBindRes);
+  const bindOutcomes = [firstBind, secondBind];
+  record(
+    "concurrent growth bind places exactly once",
+    bindOutcomes.filter((r) => r.alreadyBound === false && r.member?.sponsor_user_id === growthSponsor.member.user_id).length === 1 &&
+      bindOutcomes.filter((r) => r.alreadyBound === true && r.member?.sponsor_user_id === growthSponsor.member.user_id).length === 1,
+    { first: firstBind, second: secondBind },
+  );
+
+  const placed = await queryOne<{
+    sponsor_user_id: string | null;
+    network_parent_user_id: string | null;
+    network_slot: number | null;
+    activation_status: string;
+    onboarding_complete: boolean;
+  }>(
+    `select sponsor_user_id, network_parent_user_id, network_slot, activation_status, onboarding_complete from members where user_id = $1`,
+    [joiner.member.user_id],
+  );
+  record(
+    "valid growth bind places exactly one 3x5 slot and does not activate",
+    placed?.sponsor_user_id === growthSponsor.member.user_id &&
+      placed?.network_parent_user_id === growthSponsor.member.user_id &&
+      placed?.network_slot === 1 &&
+      placed?.activation_status === "inactive" &&
+      placed?.onboarding_complete === true,
+    placed,
+  );
+
+  const placements = await queryOne<{ n: number }>(
+    `select count(*)::int as n from members where sponsor_user_id = $1`,
+    [growthSponsor.member.user_id],
+  );
+  record("growth sponsor receives exactly one personal sponsee from the bind", placements?.n === 1, placements);
+
+  const already = await json(await bindGrowth(joiner.cookie, growthSponsorCode));
+  record(
+    "repeat growth bind is alreadyBound and does not duplicate placement",
+    already.alreadyBound === true && already.member?.sponsor_user_id === growthSponsor.member.user_id,
+    already,
+  );
+
+  const altSponsor = await signupGeneralLater("growth-alt-sponsor@example.com", "Alt Growth Sponsor");
+  await withTransaction(async (client) => {
+    await client.query(
+      `update members set activation_status='active', activation_expires_at=now()+interval '365 days' where user_id=$1`,
+      [altSponsor.member.user_id],
+    );
+  });
+  const replaceAttempt = await json(await bindGrowth(joiner.cookie, altSponsor.member.referral_code));
+  record(
+    "existing sponsor is never replaced",
+    replaceAttempt.alreadyBound === true && replaceAttempt.member?.sponsor_user_id === growthSponsor.member.user_id,
+    replaceAttempt.member,
+  );
+  const stillOne = await queryOne<{ n: number }>(
+    `select count(*)::int as n from members where sponsor_user_id = $1 or network_parent_user_id = $1`,
+    [altSponsor.member.user_id],
+  );
+  record("rejected replacement creates no placement under the alternate sponsor", stillOne?.n === 0, stillOne);
+
+  const bindCommissions = await queryOne<{ n: number }>(
+    `select count(*)::int as n from commission_ledger where source_user_id = $1 or beneficiary_user_id = $1`,
+    [joiner.member.user_id],
+  );
+  const bindBookings = await queryOne<{ n: number }>(`select count(*)::int as n from bookings where user_id = $1`, [joiner.member.user_id]);
+  const bindActivations = await queryOne<{ n: number }>(
+    `select count(*)::int as n from annual_activations where user_id = $1`,
+    [joiner.member.user_id],
+  );
+  const bindLeadership = await queryOne<{ n: number }>(
+    `select count(*)::int as n from leadership_reward_cycles where user_id = $1`,
+    [joiner.member.user_id],
+  );
+  record("growth bind creates no commission", bindCommissions?.n === 0, bindCommissions);
+  record("growth bind creates no booking", bindBookings?.n === 0, bindBookings);
+  record("growth bind does not request annual activation", bindActivations?.n === 0, bindActivations);
+  record("growth bind creates no Leadership entitlement", bindLeadership?.n === 0, bindLeadership);
+  const joinerQual = await withTransaction((client) => getQualificationStatus(client, joiner.member.user_id));
+  record(
+    "growth bind creates no qualification progress for the joiner",
+    joinerQual.sponsorCount === 0 && joinerQual.qualified === false && joinerQual.levelCounts[1] === 0,
+    joinerQual,
+  );
+  const sponsorQual = await withTransaction((client) => getQualificationStatus(client, growthSponsor.member.user_id));
+  record(
+    "growth bind itself does not count toward sponsor 3 or Level 5",
+    sponsorQual.sponsorCount === 0 && sponsorQual.levelCounts[1] === 0 && sponsorQual.qualified === false,
+    sponsorQual,
+  );
+
+  const stillOptional = await signupGeneralLater("growth-optional-signup@example.com", "Still Optional");
+  record(
+    "general signup remains optional after Growth bind API exists",
+    stillOptional.member?.sponsor_user_id === null && stillOptional.member?.network_parent_user_id === null,
+    stillOptional.member,
+  );
+
   const failed = results.filter((r) => !r.ok);
   console.log(`\n${results.length - failed.length}/${results.length} checks passed`);
   if (failed.length) {

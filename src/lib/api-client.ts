@@ -458,6 +458,8 @@ export const api = {
   me: () => request<{ member: Member; merchant: MerchantSummary | null }>("/api/me"),
   onboarding: (data: { name?: string; phone?: string; sponsorCode?: string; termsAccepted?: boolean }) =>
     post<{ member: Member }>("/api/me/onboarding", data),
+  bindGrowthSponsor: (data: { sponsorCode: string }) =>
+    post<{ member: Member; alreadyBound: boolean }>("/api/me/growth/sponsor", data),
   lookupSponsor: (code: string) =>
     request<{ ok: true; referralCode: string }>(`/api/referral/${encodeURIComponent(code.trim().toUpperCase())}`),
   submitContact: (data: {

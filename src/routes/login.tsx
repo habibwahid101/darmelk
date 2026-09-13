@@ -8,12 +8,14 @@ import { authClient, authEnabled } from "@/lib/auth/client";
 import { api, ApiError } from "@/lib/api-client";
 import { FLAGSHIP, formatBdt, getOffer } from "@/lib/offers";
 import { cn } from "@/lib/utils";
+import { GROWTH_PROGRAM_PATH, safeGrowthReturn } from "@/lib/growth";
 
 type LoginSearch = {
   mode?: "create" | "signin";
   intent?: string;
   offer?: string;
   ref?: string;
+  next?: typeof GROWTH_PROGRAM_PATH;
 };
 
 export const Route = createFileRoute("/login")({
@@ -22,12 +24,13 @@ export const Route = createFileRoute("/login")({
     intent: typeof s.intent === "string" ? s.intent : undefined,
     offer: typeof s.offer === "string" ? s.offer : undefined,
     ref: typeof s.ref === "string" ? s.ref : undefined,
+    next: safeGrowthReturn(s.next),
   }),
   component: Login,
 });
 
 function Login() {
-  const { mode, intent, offer, ref } = Route.useSearch();
+  const { mode, intent, offer, ref, next } = Route.useSearch();
   const navigate = useNavigate();
   const [create, setCreate] = useState(mode === "create");
   const [email, setEmail] = useState("");
@@ -87,7 +90,9 @@ function Login() {
         const { error: err } = await authClient.signIn.email({ email, password });
         if (err) throw new Error(err.message || "Could not sign in");
       }
-      if (intent === "book" && selected) {
+      if (next) {
+        await navigate({ to: next });
+      } else if (intent === "book" && selected) {
         await navigate({ to: "/app/book/$slug", params: { slug: selected.slug } });
       } else {
         await navigate({ to: "/app" });
@@ -121,7 +126,9 @@ function Login() {
           <p className="mt-2 text-sm text-muted">
             {create
               ? "Create a Darmelk account to follow property opportunities. A referral ID is optional."
-              : "Continue to your member area."}
+              : next
+                ? "Sign in to continue."
+                : "Continue to your member area."}
           </p>
 
           {selected ? (
