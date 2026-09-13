@@ -445,6 +445,9 @@ export type ContactRequest = {
   profession: string;
   mobile: string;
   location: string;
+  offer_slug?: string | null;
+  offer_title?: string | null;
+  source?: "contact" | "request_to_book";
   status: "new" | "reviewed" | "closed";
   created_at: string;
   updated_at: string;
@@ -457,8 +460,14 @@ export const api = {
     post<{ member: Member }>("/api/me/onboarding", data),
   lookupSponsor: (code: string) =>
     request<{ ok: true; referralCode: string }>(`/api/referral/${encodeURIComponent(code.trim().toUpperCase())}`),
-  submitContact: (data: { name: string; profession: string; mobile: string; location: string }) =>
-    post<{ request: ContactRequest }>("/api/contact", data),
+  submitContact: (data: {
+    name: string;
+    profession: string;
+    mobile: string;
+    location: string;
+    offerSlug?: string;
+    source?: "contact" | "request_to_book";
+  }) => post<{ request: ContactRequest }>("/api/contact", data),
 
   offers: () => request<{ offers: Offer[] }>("/api/offers"),
   offer: (slug: string) => request<{ offer: Offer }>(`/api/offers/${slug}`),

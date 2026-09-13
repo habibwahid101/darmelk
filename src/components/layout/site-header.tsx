@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 const NAV = [
   { label: "Properties", to: "/properties", hash: "" },
   { label: "How It Works", to: "/", hash: "how-it-works" },
+  { label: "Contact", to: "/contact", hash: "" },
   { label: "FAQ", to: "/faq", hash: "" },
 ] as const;
 

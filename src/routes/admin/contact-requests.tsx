@@ -37,7 +37,7 @@ function AdminContactRequests() {
       <PageHeader
         kicker="Inbox"
         title="Contact Requests"
-        description="Public Contact Us submissions. Update status after review — records are retained."
+        description="Public Contact Us and Request to Book submissions. Update status after review — records are retained."
       />
       {error ? <p className="text-sm text-clay">{error}</p> : null}
       {loading && !data ? (
@@ -50,6 +50,7 @@ function AdminContactRequests() {
             <thead className="border-b border-line text-xs uppercase tracking-wide text-subtle">
               <tr>
                 <th className="px-4 py-3 font-medium">Name</th>
+                <th className="px-4 py-3 font-medium">Property</th>
                 <th className="px-4 py-3 font-medium">Profession</th>
                 <th className="px-4 py-3 font-medium">Mobile</th>
                 <th className="px-4 py-3 font-medium">Location</th>
@@ -62,6 +63,18 @@ function AdminContactRequests() {
               {requests.map((row) => (
                 <tr key={row.id} className="align-top">
                   <td className="px-4 py-3 font-medium">{row.name}</td>
+                  <td className="px-4 py-3 text-muted">
+                    {row.offer_title || row.offer_slug ? (
+                      <span className="text-pretty">
+                        {row.offer_title || row.offer_slug}
+                        {row.source === "request_to_book" ? (
+                          <span className="mt-1 block text-[11px] uppercase tracking-wide text-subtle">Request to Book</span>
+                        ) : null}
+                      </span>
+                    ) : (
+                      "—"
+                    )}
+                  </td>
                   <td className="px-4 py-3 text-muted">{row.profession}</td>
                   <td className="px-4 py-3 whitespace-nowrap">{row.mobile}</td>
                   <td className="px-4 py-3 text-muted">{row.location}</td>
