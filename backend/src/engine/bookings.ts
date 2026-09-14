@@ -2,6 +2,7 @@ import type { PoolClient } from "pg";
 import { badRequest, conflict, notFound } from "../errors.js";
 import { uid } from "../ids.js";
 import { postCommissionsForBooking, reverseCommissionsForBooking } from "./commissions.js";
+import { consumeInventoryForConfirmation, soldForOffer } from "./inventory.js";
 import { requireActiveMember } from "./members.js";
 import {
   releaseMerchantPaymentForBooking,
@@ -22,6 +23,15 @@ export type Booking = {
   qualification_benefit: number;
   commission_eligible_amount?: number;
   offer_version?: number;
+  full_payment_price?: number | null;
+  full_payment_deadline_days?: number | null;
+  installment_enabled?: boolean;
+  installment_count?: number | null;
+  installment_frequency?: string | null;
+  installment_amount?: number | null;
+  installment_duration_months?: number | null;
+  first_installment_due_rule?: string | null;
+  grace_period_days?: number | null;
   status: "pending" | "confirmed" | "activated" | "cancelled" | "reversed";
   created_at: string;
   confirmed_at: string | null;
@@ -29,23 +39,40 @@ export type Booking = {
   cancelled_at: string | null;
 };
 
+type OfferFreeze = {
+  slug: string;
+  retail_value: number;
+  booking_amount: number;
+  qualification_benefit: number;
+  commission_eligible_amount: number | null;
+  version: number | null;
+  status: string;
+  total_quantity: number | null;
+  full_payment_price: number | null;
+  full_payment_deadline_days: number | null;
+  installment_enabled: boolean;
+  installment_count: number | null;
+  installment_frequency: string | null;
+  installment_amount: number | null;
+  installment_duration_months: number | null;
+  first_installment_due_rule: string | null;
+  grace_period_days: number | null;
+};
+
 /** Create a booking, freezing economics from the offer row RIGHT NOW — the
  * booking's amounts never move again even if the offer's price changes later
- * (mixed offers, each keeping its own booked terms). */
+ * (mixed offers, each keeping its own booked terms). Pending does not reserve
+ * inventory. */
 export async function createBooking(client: PoolClient, userId: string, offerSlug: string): Promise<Booking> {
   await requireActiveMember(client, userId, "Annual activation approval is required before booking");
-  const { rows: offerRows } = await client.query<{
-    slug: string;
-    retail_value: number;
-    booking_amount: number;
-    qualification_benefit: number;
-    commission_eligible_amount: number | null;
-    version: number | null;
-    status: string;
-  }>(
+  const { rows: offerRows } = await client.query<OfferFreeze>(
     `select slug, retail_value, booking_amount, qualification_benefit,
             coalesce(commission_eligible_amount, booking_amount) as commission_eligible_amount,
-            coalesce(version, 1) as version, status
+            coalesce(version, 1) as version, status, total_quantity,
+            full_payment_price, full_payment_deadline_days,
+            coalesce(installment_enabled, false) as installment_enabled,
+            installment_count, installment_frequency, installment_amount,
+            installment_duration_months, first_installment_due_rule, grace_period_days
        from offers where slug = $1`,
     [offerSlug],
   );
@@ -54,11 +81,23 @@ export async function createBooking(client: PoolClient, userId: string, offerSlu
   if (offer.status !== "available" && offer.status !== "published") {
     throw badRequest("Offer is not currently available", "offer_unavailable");
   }
+  if (offer.total_quantity != null) {
+    const sold = await soldForOffer(client, offer.slug);
+    if (sold >= offer.total_quantity) {
+      throw conflict("No remaining quantity for this property", "offer_sold_out");
+    }
+  }
 
   const id = uid("bk");
   const { rows } = await client.query<Booking>(
-    `insert into bookings (id, user_id, offer_slug, retail_value, booking_amount, qualification_benefit, commission_eligible_amount, offer_version, status)
-     values ($1, $2, $3, $4, $5, $6, $7, $8, 'pending')
+    `insert into bookings (
+        id, user_id, offer_slug, retail_value, booking_amount, qualification_benefit,
+        commission_eligible_amount, offer_version, status,
+        full_payment_price, full_payment_deadline_days, installment_enabled,
+        installment_count, installment_frequency, installment_amount,
+        installment_duration_months, first_installment_due_rule, grace_period_days
+      )
+     values ($1,$2,$3,$4,$5,$6,$7,$8,'pending',$9,$10,$11,$12,$13,$14,$15,$16,$17)
      returning *`,
     [
       id,
@@ -69,6 +108,15 @@ export async function createBooking(client: PoolClient, userId: string, offerSlu
       offer.qualification_benefit,
       offer.commission_eligible_amount ?? offer.booking_amount,
       offer.version ?? 1,
+      offer.full_payment_price,
+      offer.full_payment_deadline_days,
+      offer.installment_enabled,
+      offer.installment_count,
+      offer.installment_frequency,
+      offer.installment_amount,
+      offer.installment_duration_months,
+      offer.first_installment_due_rule,
+      offer.grace_period_days,
     ],
   );
   return rows[0]!;
@@ -76,12 +124,15 @@ export async function createBooking(client: PoolClient, userId: string, offerSlu
 
 /** Admin: confirm a pending booking's payment. Posts commission ledger rows
  * to every matrix ancestor of the booker, computed from THIS booking's own
- * frozen amount. Idempotent (see commissions.ts). */
+ * frozen amount. Idempotent (see commissions.ts). Consumes shared inventory
+ * exactly once. */
 export async function confirmBooking(client: PoolClient, bookingId: string, adminUserId: string): Promise<Booking> {
   const { rows } = await client.query<Booking>(`select * from bookings where id = $1 for update`, [bookingId]);
   const booking = rows[0];
   if (!booking) throw notFound("Booking not found");
   if (booking.status !== "pending") throw conflict(`Booking is ${booking.status}, expected pending`);
+
+  await consumeInventoryForConfirmation(client, { offerSlug: booking.offer_slug, bookingId: booking.id });
 
   const { rows: updated } = await client.query<Booking>(
     `update bookings set status = 'confirmed', confirmed_at = now(), confirmed_by_admin_id = $2 where id = $1 returning *`,
@@ -110,8 +161,12 @@ export async function activateBooking(client: PoolClient, bookingId: string): Pr
   );
   await client.query(
     `insert into booking_snapshots
-       (id, booking_id, user_id, offer_slug, offer_title, retail_value, booking_amount, qualification_benefit, commission_eligible_amount, offer_version, activated_at)
-     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, now())
+       (id, booking_id, user_id, offer_slug, offer_title, retail_value, booking_amount, qualification_benefit,
+        commission_eligible_amount, offer_version, activated_at,
+        full_payment_price, full_payment_deadline_days, installment_enabled, installment_count,
+        installment_frequency, installment_amount, installment_duration_months,
+        first_installment_due_rule, grace_period_days)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,now(),$11,$12,$13,$14,$15,$16,$17,$18,$19)
      on conflict (booking_id) do nothing`,
     [
       uid("snap"),
@@ -124,6 +179,15 @@ export async function activateBooking(client: PoolClient, bookingId: string): Pr
       booking.qualification_benefit,
       booking.commission_eligible_amount ?? booking.booking_amount,
       booking.offer_version ?? 1,
+      booking.full_payment_price ?? null,
+      booking.full_payment_deadline_days ?? null,
+      booking.installment_enabled ?? false,
+      booking.installment_count ?? null,
+      booking.installment_frequency ?? null,
+      booking.installment_amount ?? null,
+      booking.installment_duration_months ?? null,
+      booking.first_installment_due_rule ?? null,
+      booking.grace_period_days ?? null,
     ],
   );
   await postCommissionsForBooking(client, {
@@ -151,7 +215,8 @@ export async function cancelBooking(client: PoolClient, bookingId: string): Prom
 /** Admin: reverse a confirmed/activated booking. Every commission it
  * generated is offset with a reversal_entries row (never deleted); the
  * booking itself flips to 'reversed'. A prior activation snapshot, if any,
- * is left exactly as it was — history is never rewritten. */
+ * is left exactly as it was — history is never rewritten.
+ * Inventory is not restored: a reversed confirmation remains a committed unit. */
 export async function reverseBooking(
   client: PoolClient,
   bookingId: string,

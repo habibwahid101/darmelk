@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { FeaturedOffer } from "@/components/property-card";
+import { OfferCommercialTerms } from "@/components/offer-commercial-terms";
 import { AmountRow, PageHeader } from "@/components/states";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -41,6 +42,9 @@ function AdminOfferPreview() {
         <Badge>{offer.status}</Badge>
         <Badge>{offer.category}</Badge>
         {offer.flagship ? <Badge tone="pine">Flagship</Badge> : null}
+        {offer.inventory?.total != null ? (
+          <Badge tone="cream">{offer.inventory.available ?? 0} available</Badge>
+        ) : null}
       </div>
       <FeaturedOffer offer={offer} />
       {images.length > 1 ? (
@@ -50,12 +54,19 @@ function AdminOfferPreview() {
           ))}
         </div>
       ) : null}
-      <dl className="rounded-2xl bg-cream p-5 shadow-[var(--shadow-card)]">
-        <AmountRow label="Retail value" value={offer.retailValue} />
-        <AmountRow label="Booking amount" value={offer.bookingAmount} />
-        <AmountRow label="Qualification benefit" value={offer.qualificationBenefit} />
-        <AmountRow label="Commission-eligible" value={offer.commissionEligibleAmount ?? offer.bookingAmount} />
-      </dl>
+      <div className="rounded-2xl bg-cream p-5 shadow-[var(--shadow-card)]">
+        <OfferCommercialTerms offer={offer} variant="growth" />
+        <dl>
+          <AmountRow label="Commission-eligible" value={offer.commissionEligibleAmount ?? offer.bookingAmount} />
+        </dl>
+        {offer.inventory ? (
+          <p className="mt-4 text-sm text-muted">
+            Inventory: {offer.inventory.total == null ? "unbounded" : `${offer.inventory.available ?? 0} available of ${offer.inventory.total}`}
+            {` · sold ${offer.inventory.sold}`}
+            {` · reserved not used`}
+          </p>
+        ) : null}
+      </div>
       {offer.details ? <p className="max-w-3xl text-sm leading-relaxed text-muted">{offer.details}</p> : null}
       {offer.features?.length ? (
         <ul className="list-disc space-y-1 pl-5 text-sm text-muted">

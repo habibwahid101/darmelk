@@ -1,9 +1,10 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { AmountRow, PageHeader, SuccessBanner, Surface } from "@/components/states";
+import { PageHeader, SuccessBanner, Surface } from "@/components/states";
+import { OfferAvailabilityNote, OfferCommercialTerms, offerBookingCopy } from "@/components/offer-commercial-terms";
 import { useMemberSession } from "@/components/layout/use-member";
-import { formatBdt, fromApiOffer, getOffer, isBookable } from "@/lib/offers";
+import { formatBdt, fromApiOffer, getOffer, isBookable, isSoldOut } from "@/lib/offers";
 import { api, ApiError } from "@/lib/api-client";
 import { PaymentForm } from "@/components/payment-form";
 
@@ -31,6 +32,7 @@ function BookOfferPage() {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [bookingId, setBookingId] = useState<string | null>(null);
+  const soldOut = isSoldOut(offer);
 
   if (!member) return null;
 
@@ -111,17 +113,21 @@ function BookOfferPage() {
         </div>
       </Surface>
 
-      <dl className="rounded-2xl bg-cream p-5 shadow-[var(--shadow-card)]">
-        <AmountRow label="Retail value" value={offer.retailValue} />
-        <AmountRow label="Amount due now (booking)" value={offer.bookingAmount} />
-        <AmountRow label="Qualification benefit (this offer)" value={offer.qualificationBenefit} />
-      </dl>
+      <div className="rounded-2xl bg-cream p-5 shadow-[var(--shadow-card)]">
+        <OfferCommercialTerms offer={offer} variant="growth" />
+        <OfferAvailabilityNote offer={offer} />
+      </div>
 
-        {step === 2 ? (
+        {soldOut ? (
+        <Surface>
+          <p className="text-sm font-medium">This property is sold out</p>
+          <p className="mt-2 text-sm text-muted">A Request to Book remains an enquiry and does not reserve a unit.</p>
+        </Surface>
+      ) : step === 2 ? (
         <Surface>
           <p className="text-sm font-medium">What happens next</p>
           <ul className="mt-3 space-y-2 text-sm text-muted">
-            <li>You submit a booking request for {formatBdt(offer.bookingAmount)}.</li>
+            <li>{offerBookingCopy(offer)}</li>
             <li>After creating the request, submit manual payment proof.</li>
             <li>Admin approval confirms and activates the booking.</li>
             <li>Qualification benefit stays attached to this offer, not a global figure.</li>
@@ -135,7 +141,13 @@ function BookOfferPage() {
       ) : null}
 
       <div className="flex flex-col items-stretch gap-3">
-        {step === 1 ? (
+        {soldOut ? (
+          <Button asChild variant="secondary">
+            <Link to="/properties/$slug" params={{ slug: offer.slug }}>
+              Back to offer
+            </Link>
+          </Button>
+        ) : step === 1 ? (
           <>
             <Button onClick={() => setStep(2)}>Continue to summary</Button>
             <Button asChild variant="ghost">

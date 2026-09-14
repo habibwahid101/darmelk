@@ -1,5 +1,12 @@
 export type OfferStatus = "available" | "coming-soon" | "draft" | "published" | "closed";
 
+export type OfferInventory = {
+  total: number | null;
+  reserved: number | null;
+  sold: number;
+  available: number | null;
+};
+
 export type PropertyOffer = {
   slug: string;
   title: string;
@@ -15,6 +22,17 @@ export type PropertyOffer = {
   bookingAmount: number;
   qualificationBenefit: number;
   commissionEligibleAmount?: number;
+  fullPaymentPrice?: number | null;
+  fullPaymentDeadlineDays?: number | null;
+  installmentEnabled?: boolean;
+  installmentCount?: number | null;
+  installmentFrequency?: string | null;
+  installmentAmount?: number | null;
+  installmentDurationMonths?: number | null;
+  firstInstallmentDueRule?: string | null;
+  gracePeriodDays?: number | null;
+  totalQuantity?: number | null;
+  inventory?: OfferInventory;
   status: OfferStatus;
   flagship?: boolean;
   summary: string;
@@ -112,6 +130,24 @@ export function isPublished(status: string | undefined): boolean {
   return status === "published" || status === "available";
 }
 
+export function isSoldOut(offer: Pick<PropertyOffer, "inventory">): boolean {
+  return offer.inventory?.total != null && (offer.inventory.available ?? 0) <= 0;
+}
+
+export function installmentFrequencyLabel(frequency: string | null | undefined): string {
+  if (frequency === "monthly") return "monthly";
+  if (frequency === "quarterly") return "quarterly";
+  if (frequency === "yearly") return "yearly";
+  return "";
+}
+
+export function installmentSummary(offer: Pick<PropertyOffer, "installmentEnabled" | "installmentCount" | "installmentFrequency" | "installmentAmount" | "installmentDurationMonths" | "firstInstallmentDueRule" | "gracePeriodDays">): string | null {
+  if (!offer.installmentEnabled || !offer.installmentCount || !offer.installmentAmount) return null;
+  const freq = installmentFrequencyLabel(offer.installmentFrequency);
+  const pace = freq ? ` ${freq}` : "";
+  return `${offer.installmentCount}${pace} payments of ${formatBdt(offer.installmentAmount)}`;
+}
+
 export function resolveMediaSrc(src: string | null | undefined): string {
   if (!src) return "";
   if (src.startsWith("/api/")) {
@@ -144,6 +180,17 @@ export type ApiOffer = {
   booking_amount: number;
   qualification_benefit: number;
   commission_eligible_amount?: number | null;
+  full_payment_price?: number | null;
+  full_payment_deadline_days?: number | null;
+  installment_enabled?: boolean | null;
+  installment_count?: number | null;
+  installment_frequency?: string | null;
+  installment_amount?: number | null;
+  installment_duration_months?: number | null;
+  first_installment_due_rule?: string | null;
+  grace_period_days?: number | null;
+  total_quantity?: number | null;
+  inventory?: OfferInventory | null;
   status: OfferStatus;
   flagship: boolean;
   summary: string;
@@ -154,6 +201,19 @@ export type ApiOffer = {
   version?: number | null;
   updated_at?: string | null;
 };
+
+function asInventory(row: ApiOffer): OfferInventory | undefined {
+  if (row.inventory) {
+    return {
+      total: row.inventory.total ?? row.total_quantity ?? null,
+      reserved: row.inventory.reserved ?? null,
+      sold: row.inventory.sold ?? 0,
+      available: row.inventory.available ?? null,
+    };
+  }
+  if (row.total_quantity == null) return undefined;
+  return { total: row.total_quantity, reserved: null, sold: 0, available: row.total_quantity };
+}
 
 export function fromApiOffer(row: ApiOffer): PropertyOffer {
   const gallery = Array.isArray(row.gallery) ? row.gallery.map(resolveMediaSrc).filter(Boolean) : [];
@@ -175,6 +235,17 @@ export function fromApiOffer(row: ApiOffer): PropertyOffer {
     bookingAmount: row.booking_amount,
     qualificationBenefit: row.qualification_benefit,
     commissionEligibleAmount: row.commission_eligible_amount ?? row.booking_amount,
+    fullPaymentPrice: row.full_payment_price ?? null,
+    fullPaymentDeadlineDays: row.full_payment_deadline_days ?? null,
+    installmentEnabled: Boolean(row.installment_enabled),
+    installmentCount: row.installment_count ?? null,
+    installmentFrequency: row.installment_frequency ?? null,
+    installmentAmount: row.installment_amount ?? null,
+    installmentDurationMonths: row.installment_duration_months ?? null,
+    firstInstallmentDueRule: row.first_installment_due_rule ?? null,
+    gracePeriodDays: row.grace_period_days ?? null,
+    totalQuantity: row.total_quantity ?? null,
+    inventory: asInventory(row),
     status: row.status,
     flagship: row.flagship,
     summary: row.summary,

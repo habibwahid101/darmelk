@@ -11,7 +11,8 @@ async function main() {
   const { app } = await import("./router.js");
   const { query, queryOne, withTransaction } = await import("./db.js");
   const { approveActivation, requestActivation } = await import("./engine/activation.js");
-  const { activateBooking, confirmBooking, createBooking, reverseBooking } = await import("./engine/bookings.js");
+  const { activateBooking, cancelBooking, confirmBooking, createBooking, reverseBooking } = await import("./engine/bookings.js");
+  const { consumeInventoryForConfirmation } = await import("./engine/inventory.js");
   const { evaluatePromotionsForConfirmedBooking } = await import("./engine/promotions.js");
   const { postCommissionsForBooking } = await import("./engine/commissions.js");
   const { completeOnboarding, ensureMember } = await import("./engine/members.js");
@@ -2139,6 +2140,356 @@ async function main() {
     "general signup remains optional after Growth bind API exists",
     stillOptional.member?.sponsor_user_id === null && stillOptional.member?.network_parent_user_id === null,
     stillOptional.member,
+  );
+
+  const soldOf = async (slug: string) =>
+    (await queryOne<{ n: number }>(
+      `select count(*)::int as n from offer_inventory_events where offer_slug=$1 and event_type='consume'`,
+      [slug],
+    ))?.n ?? 0;
+  const catchCode = async <T>(run: () => Promise<T>) => {
+    try {
+      return { ok: true as const, value: await run() };
+    } catch (err: any) {
+      if (err?.code === "offer_sold_out" || err?.code === "quantity_below_sold") {
+        return { ok: false as const, code: err.code as string, message: err.message as string };
+      }
+      throw err;
+    }
+  };
+
+  const invCreate = await json(await app.request("/api/admin/offers", {
+    method: "POST",
+    headers: { cookie: adminCookie, "content-type": "application/json" },
+    body: JSON.stringify({
+      slug: "qa-shared-inventory",
+      title: "QA Shared Inventory Share",
+      categorySlug: "land-plots",
+      location: "Dhaka",
+      summary: "Synthetic shared-stock offer for commercial terms.",
+      details: "One offer record for General Marketplace and Growth Program.",
+      retailValue: 200000,
+      bookingAmount: 20000,
+      qualificationBenefit: 180000,
+      commissionEligibleAmount: 20000,
+      fullPaymentPrice: 180000,
+      fullPaymentDeadlineDays: 30,
+      installmentEnabled: true,
+      installmentCount: 12,
+      installmentFrequency: "monthly",
+      installmentAmount: 15000,
+      installmentDurationMonths: 12,
+      firstInstallmentDueRule: "30 days after booking",
+      gracePeriodDays: 7,
+      totalQuantity: 2,
+      image: "/images/flagship-suite.jpg",
+      status: "published",
+      displayOrder: 80,
+    }),
+  }));
+  record(
+    "admin can create a published offer with commercial terms and total quantity",
+    invCreate.offer?.slug === "qa-shared-inventory" &&
+      invCreate.offer?.full_payment_price === 180000 &&
+      invCreate.offer?.installment_enabled === true &&
+      invCreate.offer?.installment_count === 12 &&
+      invCreate.offer?.installment_amount === 15000 &&
+      invCreate.offer?.total_quantity === 2 &&
+      invCreate.offer?.inventory?.sold === 0 &&
+      invCreate.offer?.inventory?.available === 2 &&
+      invCreate.offer?.inventory?.reserved === null,
+    invCreate.offer,
+  );
+
+  const missingPlan = await json(await app.request("/api/admin/offers", {
+    method: "POST",
+    headers: { cookie: adminCookie, "content-type": "application/json" },
+    body: JSON.stringify({
+      title: "QA Incomplete Plan",
+      categorySlug: "land-plots",
+      summary: "Missing installment count",
+      retailValue: 100000,
+      bookingAmount: 10000,
+      qualificationBenefit: 90000,
+      installmentEnabled: true,
+      installmentFrequency: "monthly",
+      image: "/images/flagship-suite.jpg",
+      status: "draft",
+    }),
+  }));
+  record(
+    "installment fields are required when the plan is enabled",
+    missingPlan.error?.code === "installment_count_required",
+    missingPlan,
+  );
+
+  const publicInv = await json(await app.request("/api/offers/qa-shared-inventory"));
+  record(
+    "public details expose commercial terms and available quantity from the same offer",
+    publicInv.offer?.retail_value === 200000 &&
+      publicInv.offer?.full_payment_price === 180000 &&
+      publicInv.offer?.booking_amount === 20000 &&
+      publicInv.offer?.installment_enabled === true &&
+      publicInv.offer?.inventory?.available === 2 &&
+      publicInv.offer?.inventory?.reserved === null,
+    publicInv.offer,
+  );
+  const publicFlagship = await json(await app.request("/api/offers/five-star-hotel-share"));
+  record(
+    "existing flagship stays unbounded so historical matrix bookings remain possible",
+    publicFlagship.offer?.total_quantity == null && publicFlagship.offer?.inventory?.available == null,
+    publicFlagship.offer?.inventory,
+  );
+
+  const bookInv = async (key: string, cookie = adminCookie) =>
+    json(await app.request("/api/bookings", {
+      method: "POST",
+      headers: { cookie, "content-type": "application/json", "Idempotency-Key": key },
+      body: JSON.stringify({ offerSlug: "qa-shared-inventory" }),
+    }));
+
+  const p1 = await bookInv("inv-p1");
+  const p2 = await bookInv("inv-p2");
+  const p3 = await bookInv("inv-p3");
+  record(
+    "pending bookings freeze commercial terms and do not consume stock",
+    p1.booking?.status === "pending" &&
+      p1.booking?.full_payment_price === 180000 &&
+      p1.booking?.installment_count === 12 &&
+      p2.booking?.id &&
+      p3.booking?.id &&
+      (await soldOf("qa-shared-inventory")) === 0,
+    { p1: p1.booking?.id, sold: await soldOf("qa-shared-inventory") },
+  );
+
+  const growthPending = await bookInv("inv-growth-member", memberCookie);
+  record(
+    "Growth member pending uses the same offer slug and still does not reserve",
+    growthPending.booking?.offer_slug === "qa-shared-inventory" && (await soldOf("qa-shared-inventory")) === 0,
+    growthPending.booking?.id,
+  );
+
+  const confirmedP1 = await withTransaction((client) => confirmBooking(client, p1.booking.id, adminMe.member.user_id));
+  record(
+    "confirm consumes exactly one shared unit",
+    confirmedP1.status === "confirmed" && (await soldOf("qa-shared-inventory")) === 1,
+    { sold: await soldOf("qa-shared-inventory") },
+  );
+  await withTransaction(async (client) => {
+    await consumeInventoryForConfirmation(client, { offerSlug: "qa-shared-inventory", bookingId: p1.booking.id });
+    await consumeInventoryForConfirmation(client, { offerSlug: "qa-shared-inventory", bookingId: p1.booking.id });
+  });
+  const p1Consumes = await query(`select id from offer_inventory_events where booking_id=$1 and event_type='consume'`, [p1.booking.id]);
+  record("inventory consume is idempotent for the same booking", p1Consumes.length === 1 && (await soldOf("qa-shared-inventory")) === 1, p1Consumes.length);
+
+  const activatedP1 = await withTransaction((client) => activateBooking(client, p1.booking.id));
+  const snapP1 = await queryOne<any>(`select * from booking_snapshots where booking_id=$1`, [p1.booking.id]);
+  record(
+    "activation snapshot freezes commercial terms from the booking, not live offer edits",
+    activatedP1.status === "activated" &&
+      snapP1?.full_payment_price === 180000 &&
+      snapP1?.installment_enabled === true &&
+      snapP1?.installment_count === 12 &&
+      snapP1?.installment_amount === 15000 &&
+      snapP1?.full_payment_deadline_days === 30,
+    snapP1,
+  );
+
+  const confirmedP2 = await withTransaction((client) => confirmBooking(client, p2.booking.id, adminMe.member.user_id));
+  const soldOutPublic = await json(await app.request("/api/offers/qa-shared-inventory"));
+  record(
+    "last remaining unit consumes to sold out on the shared offer",
+    confirmedP2.status === "confirmed" &&
+      (await soldOf("qa-shared-inventory")) === 2 &&
+      soldOutPublic.offer?.inventory?.available === 0,
+    soldOutPublic.offer?.inventory,
+  );
+
+  const p3Confirm = await withTransaction((client) => catchCode(() => confirmBooking(client, p3.booking.id, adminMe.member.user_id)));
+  const p3Row = await queryOne<{ status: string }>(`select status from bookings where id=$1`, [p3.booking.id]);
+  record(
+    "last-unit race rejects the extra confirm and leaves it pending",
+    p3Confirm.ok === false && p3Confirm.code === "offer_sold_out" && p3Row?.status === "pending",
+    { p3Confirm, p3Row },
+  );
+
+  const soldOutCreate = await app.request("/api/bookings", {
+    method: "POST",
+    headers: { cookie: adminCookie, "content-type": "application/json", "Idempotency-Key": "inv-sold-out" },
+    body: JSON.stringify({ offerSlug: "qa-shared-inventory" }),
+  });
+  const soldOutCreateBody = await json(soldOutCreate);
+  const growthSoldOut = await app.request("/api/bookings", {
+    method: "POST",
+    headers: { cookie: memberCookie, "content-type": "application/json", "Idempotency-Key": "inv-growth-sold-out" },
+    body: JSON.stringify({ offerSlug: "qa-shared-inventory" }),
+  });
+  const growthSoldOutBody = await json(growthSoldOut);
+  record(
+    "General and Growth both see offer_sold_out on the same stock",
+    soldOutCreate.status === 409 &&
+      soldOutCreateBody.error?.code === "offer_sold_out" &&
+      growthSoldOut.status === 409 &&
+      growthSoldOutBody.error?.code === "offer_sold_out",
+    { soldOutCreate: soldOutCreate.status, growthSoldOut: growthSoldOut.status },
+  );
+
+  const liveEdit = await json(await app.request("/api/admin/offers/qa-shared-inventory", {
+    method: "POST",
+    headers: { cookie: adminCookie, "content-type": "application/json" },
+    body: JSON.stringify({ fullPaymentPrice: 170000 }),
+  }));
+  const snapAfterEdit = await queryOne<any>(`select full_payment_price, installment_count from booking_snapshots where booking_id=$1`, [p1.booking.id]);
+  record(
+    "editing live commercial terms bumps version and does not rewrite historical snapshots",
+    liveEdit.offer?.full_payment_price === 170000 &&
+      liveEdit.offer?.version === (invCreate.offer?.version ?? 1) + 1 &&
+      snapAfterEdit?.full_payment_price === 180000 &&
+      snapAfterEdit?.installment_count === 12,
+    { version: liveEdit.offer?.version, snapAfterEdit },
+  );
+
+  const reversedP1 = await withTransaction((client) =>
+    reverseBooking(client, p1.booking.id, { reason: "inventory reverse must not restore", adminUserId: adminMe.member.user_id }),
+  );
+  const snapAfterReverse = await queryOne<any>(`select full_payment_price, installment_amount from booking_snapshots where booking_id=$1`, [p1.booking.id]);
+  record(
+    "reversal does not restore inventory and does not rewrite the snapshot",
+    reversedP1.booking.status === "reversed" &&
+      (await soldOf("qa-shared-inventory")) === 2 &&
+      snapAfterReverse?.full_payment_price === 180000 &&
+      snapAfterReverse?.installment_amount === 15000,
+    { sold: await soldOf("qa-shared-inventory"), snapAfterReverse },
+  );
+
+  await withTransaction((client) => cancelBooking(client, p3.booking.id));
+  const growthCancel = await withTransaction((client) => cancelBooking(client, growthPending.booking.id));
+  record(
+    "cancelling pending does not consume or restore stock",
+    growthCancel.status === "cancelled" && (await soldOf("qa-shared-inventory")) === 2,
+    await soldOf("qa-shared-inventory"),
+  );
+
+  const rtbBefore = await soldOf("qa-shared-inventory");
+  const rtbInv = await app.request("/api/contact", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      name: "Inventory Enquiry",
+      profession: "Teacher",
+      mobile: "+8801811111199",
+      location: "Dhaka",
+      offerSlug: "qa-shared-inventory",
+      source: "request_to_book",
+    }),
+  });
+  record(
+    "Request to Book is not a reservation and does not consume stock",
+    rtbInv.status === 201 && (await soldOf("qa-shared-inventory")) === rtbBefore,
+    rtbInv.status,
+  );
+
+  const belowSold = await json(await app.request("/api/admin/offers/qa-shared-inventory", {
+    method: "POST",
+    headers: { cookie: adminCookie, "content-type": "application/json" },
+    body: JSON.stringify({ totalQuantity: 1 }),
+  }));
+  record(
+    "admin cannot set total quantity below committed sold",
+    belowSold.error?.code === "quantity_below_sold",
+    belowSold,
+  );
+
+  const versionBeforeQty = liveEdit.offer?.version;
+  const qtySame = await json(await app.request("/api/admin/offers/qa-shared-inventory", {
+    method: "POST",
+    headers: { cookie: adminCookie, "content-type": "application/json" },
+    body: JSON.stringify({ totalQuantity: 2 }),
+  }));
+  const qtyRaise = await json(await app.request("/api/admin/offers/qa-shared-inventory", {
+    method: "POST",
+    headers: { cookie: adminCookie, "content-type": "application/json" },
+    body: JSON.stringify({ totalQuantity: 3 }),
+  }));
+  record(
+    "quantity-only edits do not bump offer version and raise available stock",
+    qtySame.offer?.version === versionBeforeQty &&
+      qtyRaise.offer?.version === versionBeforeQty &&
+      qtyRaise.offer?.inventory?.available === 1 &&
+      qtyRaise.offer?.inventory?.sold === 2,
+    { versionBeforeQty, same: qtySame.offer?.version, raised: qtyRaise.offer?.inventory },
+  );
+
+  const p5 = await bookInv("inv-p5");
+  record("raising total quantity allows a new pending booking", p5.booking?.status === "pending" && p5.booking?.full_payment_price === 170000, p5.booking);
+  await submitAndApprovePayment(adminCookie, "booking", p5.booking.id, "inv-p5-pay");
+  const p5AfterPay = await queryOne<{ status: string }>(`select status from bookings where id=$1`, [p5.booking.id]);
+  const snapP5 = await queryOne<any>(`select full_payment_price, installment_enabled from booking_snapshots where booking_id=$1`, [p5.booking.id]);
+  const p5Consumes = await query(`select id from offer_inventory_events where booking_id=$1`, [p5.booking.id]);
+  record(
+    "payment approval confirms, activates, snapshots new terms, and consumes once",
+    p5AfterPay?.status === "activated" &&
+      snapP5?.full_payment_price === 170000 &&
+      snapP5?.installment_enabled === true &&
+      p5Consumes.length === 1 &&
+      (await soldOf("qa-shared-inventory")) === 3,
+    { p5AfterPay, snapP5, sold: await soldOf("qa-shared-inventory") },
+  );
+
+  const disabledPlan = await json(await app.request("/api/admin/offers/qa-shared-inventory", {
+    method: "POST",
+    headers: { cookie: adminCookie, "content-type": "application/json" },
+    body: JSON.stringify({ installmentEnabled: false, totalQuantity: 4 }),
+  }));
+  record(
+    "disabling installments clears plan fields and can raise quantity",
+    disabledPlan.offer?.installment_enabled === false &&
+      disabledPlan.offer?.installment_count == null &&
+      disabledPlan.offer?.installment_amount == null &&
+      disabledPlan.offer?.installment_frequency == null &&
+      disabledPlan.offer?.total_quantity === 4,
+    disabledPlan.offer,
+  );
+  const p6 = await bookInv("inv-p6");
+  record(
+    "new bookings freeze the disabled installment plan without rewriting older snapshots",
+    p6.booking?.installment_enabled === false &&
+      p6.booking?.installment_count == null &&
+      snapP1?.installment_enabled === true,
+    p6.booking,
+  );
+
+  const historicalSnap = await queryOne<any>(
+    `select full_payment_price, installment_count, installment_amount from booking_snapshots where offer_slug='five-star-hotel-share' order by activated_at asc limit 1`,
+  );
+  record(
+    "historical flagship snapshots do not invent missing commercial terms",
+    historicalSnap && historicalSnap.full_payment_price == null && historicalSnap.installment_count == null && historicalSnap.installment_amount == null,
+    historicalSnap,
+  );
+
+  const unboundedBook = await json(await app.request("/api/bookings", {
+    method: "POST",
+    headers: { cookie: adminCookie, "content-type": "application/json", "Idempotency-Key": "inv-flagship-still-open" },
+    body: JSON.stringify({ offerSlug: "five-star-hotel-share" }),
+  }));
+  record(
+    "unbounded flagship still accepts a new pending booking",
+    unboundedBook.booking?.status === "pending" && unboundedBook.booking?.offer_slug === "five-star-hotel-share",
+    unboundedBook.booking?.id,
+  );
+
+  const orderOnly = await json(await app.request("/api/admin/offers/qa-shared-inventory", {
+    method: "POST",
+    headers: { cookie: adminCookie, "content-type": "application/json" },
+    body: JSON.stringify({ displayOrder: 81 }),
+  }));
+  record(
+    "display order is listing order, not stock",
+    orderOnly.offer?.display_order === 81 &&
+      orderOnly.offer?.inventory?.sold === 3 &&
+      orderOnly.offer?.inventory?.available === 1,
+    orderOnly.offer?.inventory,
   );
 
   const failed = results.filter((r) => !r.ok);

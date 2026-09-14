@@ -49,10 +49,20 @@ function BookingDetailPage() {
       <Surface>
         <dl>
           <AmountRow label="Retail value" value={booking.retail_value} />
+          {booking.full_payment_price ? <AmountRow label="Full payment price" value={booking.full_payment_price} /> : null}
           <AmountRow label="Booking amount" value={booking.booking_amount} />
           <AmountRow label="Qualification benefit" value={booking.qualification_benefit} />
         </dl>
-        <p className="mt-3 text-xs text-subtle">Figures belong to this offer only.</p>
+        {booking.installment_enabled && booking.installment_count && booking.installment_amount ? (
+          <p className="mt-3 text-sm text-muted">
+            Frozen installment plan: {booking.installment_count} {booking.installment_frequency ?? ""} payments of{" "}
+            {booking.installment_amount.toLocaleString("en-US")} BDT
+            {booking.full_payment_deadline_days ? ` · full payment within ${booking.full_payment_deadline_days} days` : ""}.
+          </p>
+        ) : booking.full_payment_deadline_days ? (
+          <p className="mt-3 text-sm text-muted">Frozen full-payment deadline: {booking.full_payment_deadline_days} days after booking.</p>
+        ) : null}
+        <p className="mt-3 text-xs text-subtle">Figures belong to this offer only. They do not change if the live offer is edited later.</p>
       </Surface>
 
       <Surface>

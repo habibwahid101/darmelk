@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readdirSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
@@ -99,15 +99,15 @@ test("general signup stays optional and Batch 02 contracts remain", () => {
   assert.match(onboarding, /sponsor\?\.user_id \?\? null/);
 });
 
-test("annual activation amount is unchanged and no new migration was added", () => {
+test("annual activation amount is unchanged", () => {
   const activation = read("backend/src/engine/activation.ts");
   const page = read("src/routes/app/activation.tsx");
   const overview = read("src/routes/app/index.tsx");
   assert.match(activation, /1000/);
   assert.match(page, /const ACTIVATION_FEE = 1000/);
   assert.match(overview, /BDT 1,000/);
-  const migrations = readdirSync(join(root, "migrations")).filter((name) => /^\d+_.*\.sql$/.test(name));
-  assert.ok(!migrations.some((name) => Number(name.slice(0, 4)) > 17));
+  const commercial = read("migrations/0018_darmelk_commercial_inventory.sql");
+  assert.doesNotMatch(commercial, /annual_activations/);
 });
 
 test("growth engines are not rewritten in the growth-program batch", () => {

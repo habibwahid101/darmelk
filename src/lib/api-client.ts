@@ -74,6 +74,15 @@ export type Booking = {
   retail_value: number;
   booking_amount: number;
   qualification_benefit: number;
+  full_payment_price?: number | null;
+  full_payment_deadline_days?: number | null;
+  installment_enabled?: boolean | null;
+  installment_count?: number | null;
+  installment_frequency?: string | null;
+  installment_amount?: number | null;
+  installment_duration_months?: number | null;
+  first_installment_due_rule?: string | null;
+  grace_period_days?: number | null;
   status: "pending" | "confirmed" | "activated" | "cancelled" | "reversed";
   created_at: string;
   confirmed_at: string | null;

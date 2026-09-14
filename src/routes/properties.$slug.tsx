@@ -1,9 +1,9 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { FileText, MapPin } from "lucide-react";
-import { AmountRow } from "@/components/states";
+import { OfferAvailabilityNote, OfferCommercialTerms } from "@/components/offer-commercial-terms";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { fromApiOffer, getOffer, isBookable, offerImages } from "@/lib/offers";
+import { fromApiOffer, getOffer, isBookable, isSoldOut, offerImages } from "@/lib/offers";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { api } from "@/lib/api-client";
 import { useAsync } from "@/lib/use-async";
@@ -28,6 +28,7 @@ function PropertyDetail() {
   const hero = images[0];
   const rest = images.slice(1);
   const bookable = isBookable(offer.status);
+  const soldOut = isSoldOut(offer);
 
   return (
     <div className="pb-16 pt-20 md:pt-24">
@@ -64,8 +65,8 @@ function PropertyDetail() {
           <div className="flex flex-wrap gap-2">
             <Badge>{offer.category}</Badge>
             {offer.flagship ? <Badge tone="pine">Flagship</Badge> : null}
-            <Badge tone={bookable ? "pine" : "cream"}>
-              {bookable ? "Available" : offer.status === "closed" ? "Closed" : "Coming soon"}
+            <Badge tone={bookable && !soldOut ? "pine" : "cream"}>
+              {soldOut ? "Sold out" : bookable ? "Available" : offer.status === "closed" ? "Closed" : "Coming soon"}
             </Badge>
           </div>
           <h1 className="mt-4 font-display text-3xl font-semibold text-pretty sm:text-4xl">{offer.title}</h1>
@@ -76,11 +77,11 @@ function PropertyDetail() {
             </p>
           ) : null}
           <p className="mt-5 leading-relaxed text-muted text-pretty">{offer.summary}</p>
-          <dl className="mt-6 rounded-2xl bg-cream p-5 shadow-[var(--shadow-card)] sm:p-6">
-            <AmountRow label="Property value" value={offer.retailValue} />
-            <AmountRow label="Booking amount" value={offer.bookingAmount} />
-          </dl>
-          <PropertyCta slug={offer.slug} bookable={bookable} />
+          <div className="mt-6 rounded-2xl bg-cream p-5 shadow-[var(--shadow-card)] sm:p-6">
+            <OfferCommercialTerms offer={offer} variant="public" />
+            <OfferAvailabilityNote offer={offer} />
+          </div>
+          <PropertyCta slug={offer.slug} bookable={bookable} soldOut={soldOut} />
         </div>
       </section>
       <section className="border-y border-line bg-cream section-y">
@@ -147,7 +148,7 @@ function PropertyDetail() {
   );
 }
 
-function PropertyCta({ slug, bookable }: { slug: string; bookable: boolean }) {
+function PropertyCta({ slug, bookable, soldOut }: { slug: string; bookable: boolean; soldOut: boolean }) {
   const { user } = useCurrentUserState();
   const { data: me } = useAsync(() => api.me(), [user?.id], { enabled: Boolean(user) });
   const active = me?.member.activation_status === "active";
@@ -167,7 +168,11 @@ function PropertyCta({ slug, bookable }: { slug: string; bookable: boolean }) {
           Request to Book
         </Link>
       </Button>
-      {active ? (
+      {soldOut ? (
+        <Button className="w-full" disabled>
+          Sold out
+        </Button>
+      ) : active ? (
         <Button asChild variant="secondary" className="w-full">
           <Link to="/app/book/$slug" params={{ slug }}>
             Start booking
