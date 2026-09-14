@@ -1,11 +1,13 @@
 import type { PoolClient } from "pg";
 import { badRequest, conflict, notFound } from "../errors.js";
 import { uid } from "../ids.js";
+import { assertTotalQuantityAllowed, deriveInventory, soldByOffer, type Inventory } from "./inventory.js";
 
 export const PUBLIC_STATUSES = new Set(["published", "available"]);
 export const VISIBLE_STATUSES = new Set(["published", "available", "closed"]);
 export const ALL_STATUSES = new Set(["draft", "published", "closed", "available", "coming-soon"]);
 export const WRITE_STATUSES = new Set(["draft", "published", "closed"]);
+export const INSTALLMENT_FREQUENCIES = new Set(["monthly", "quarterly", "yearly"]);
 
 const CATEGORY_MAP: Record<string, string> = {
   "hotel-resort-shares": "Hotel & Resort Shares",
@@ -32,6 +34,17 @@ export type OfferRow = {
   booking_amount: number;
   qualification_benefit: number;
   commission_eligible_amount: number;
+  full_payment_price: number | null;
+  full_payment_deadline_days: number | null;
+  installment_enabled: boolean;
+  installment_count: number | null;
+  installment_frequency: string | null;
+  installment_amount: number | null;
+  installment_duration_months: number | null;
+  first_installment_due_rule: string | null;
+  grace_period_days: number | null;
+  total_quantity: number | null;
+  inventory?: Inventory;
   status: string;
   flagship: boolean;
   summary: string;
@@ -67,6 +80,26 @@ export type OfferInput = {
   qualification_benefit?: number;
   commissionEligibleAmount?: number;
   commission_eligible_amount?: number;
+  fullPaymentPrice?: number | null;
+  full_payment_price?: number | null;
+  fullPaymentDeadlineDays?: number | null;
+  full_payment_deadline_days?: number | null;
+  installmentEnabled?: boolean;
+  installment_enabled?: boolean;
+  installmentCount?: number | null;
+  installment_count?: number | null;
+  installmentFrequency?: string | null;
+  installment_frequency?: string | null;
+  installmentAmount?: number | null;
+  installment_amount?: number | null;
+  installmentDurationMonths?: number | null;
+  installment_duration_months?: number | null;
+  firstInstallmentDueRule?: string | null;
+  first_installment_due_rule?: string | null;
+  gracePeriodDays?: number | null;
+  grace_period_days?: number | null;
+  totalQuantity?: number | null;
+  total_quantity?: number | null;
   status?: string;
   flagship?: boolean;
   summary?: string;
@@ -93,6 +126,29 @@ function money(value: unknown, label: string): number {
   const n = typeof value === "number" ? value : typeof value === "string" && value.trim() ? Number(value) : NaN;
   if (!Number.isFinite(n) || !Number.isInteger(n) || n <= 0) {
     throw badRequest(`${label} must be a positive whole amount`);
+  }
+  return n;
+}
+
+function optionalMoney(value: unknown, label: string): number | null {
+  if (value == null || value === "") return null;
+  return money(value, label);
+}
+
+function optionalPositiveInt(value: unknown, label: string): number | null {
+  if (value == null || value === "") return null;
+  const n = typeof value === "number" ? value : typeof value === "string" && value.trim() ? Number(value) : NaN;
+  if (!Number.isFinite(n) || !Number.isInteger(n) || n <= 0) {
+    throw badRequest(`${label} must be a positive whole number`);
+  }
+  return n;
+}
+
+function optionalNonNegInt(value: unknown, label: string): number | null {
+  if (value == null || value === "") return null;
+  const n = typeof value === "number" ? value : typeof value === "string" && value.trim() ? Number(value) : NaN;
+  if (!Number.isFinite(n) || !Number.isInteger(n) || n < 0) {
+    throw badRequest(`${label} must be zero or a positive whole number`);
   }
   return n;
 }
@@ -154,7 +210,28 @@ function normalize(row: OfferRow): OfferRow {
     ...row,
     features: Array.isArray(row.features) ? row.features : [],
     gallery: Array.isArray(row.gallery) ? row.gallery : [],
+    installment_enabled: Boolean(row.installment_enabled),
+    full_payment_price: row.full_payment_price ?? null,
+    full_payment_deadline_days: row.full_payment_deadline_days ?? null,
+    installment_count: row.installment_count ?? null,
+    installment_frequency: row.installment_frequency ?? null,
+    installment_amount: row.installment_amount ?? null,
+    installment_duration_months: row.installment_duration_months ?? null,
+    first_installment_due_rule: row.first_installment_due_rule ?? null,
+    grace_period_days: row.grace_period_days ?? null,
+    total_quantity: row.total_quantity ?? null,
   };
+}
+
+async function withInventory(client: PoolClient, rows: OfferRow[]): Promise<OfferRow[]> {
+  const counts = await soldByOffer(
+    client,
+    rows.map((row) => row.slug),
+  );
+  return rows.map((row) => ({
+    ...normalize(row),
+    inventory: deriveInventory(row.total_quantity, counts.get(row.slug) ?? 0),
+  }));
 }
 
 export async function listPublicOffers(client: PoolClient): Promise<OfferRow[]> {
@@ -163,14 +240,14 @@ export async function listPublicOffers(client: PoolClient): Promise<OfferRow[]> 
       where status in ('published', 'available')
       order by flagship desc, display_order asc, created_at asc`,
   );
-  return rows.map(normalize);
+  return withInventory(client, rows);
 }
 
 export async function listAdminOffers(client: PoolClient): Promise<OfferRow[]> {
   const { rows } = await client.query<OfferRow>(
     `select * from offers order by flagship desc, display_order asc, updated_at desc`,
   );
-  return rows.map(normalize);
+  return withInventory(client, rows);
 }
 
 export async function getOfferRow(client: PoolClient, slug: string, opts: { includeDraft?: boolean } = {}): Promise<OfferRow> {
@@ -180,7 +257,7 @@ export async function getOfferRow(client: PoolClient, slug: string, opts: { incl
   if (!opts.includeDraft && !VISIBLE_STATUSES.has(offer.status) && offer.status !== "coming-soon") {
     throw notFound("Offer not found");
   }
-  return normalize(offer);
+  return (await withInventory(client, [offer]))[0]!;
 }
 
 function parsedInput(body: OfferInput) {
@@ -204,6 +281,44 @@ function parsedInput(body: OfferInput) {
     body.commissionEligibleAmount ?? body.commission_eligible_amount ?? bookingAmount,
     "Commission-eligible amount",
   );
+  const fullPaymentPrice = optionalMoney(body.fullPaymentPrice ?? body.full_payment_price, "Full payment price");
+  const fullPaymentDeadlineDays = optionalPositiveInt(
+    body.fullPaymentDeadlineDays ?? body.full_payment_deadline_days,
+    "Full payment deadline",
+  );
+  const installmentEnabled = Boolean(body.installmentEnabled ?? body.installment_enabled);
+  let installmentCount = optionalPositiveInt(body.installmentCount ?? body.installment_count, "Installment count");
+  let installmentFrequency = cleanText(body.installmentFrequency ?? body.installment_frequency ?? "", "Installment frequency", 20) || null;
+  let installmentAmount = optionalMoney(body.installmentAmount ?? body.installment_amount, "Installment amount");
+  let installmentDurationMonths = optionalPositiveInt(
+    body.installmentDurationMonths ?? body.installment_duration_months,
+    "Installment duration",
+  );
+  let firstInstallmentDueRule =
+    cleanText(body.firstInstallmentDueRule ?? body.first_installment_due_rule ?? "", "First installment due", 160) || null;
+  let gracePeriodDays = optionalNonNegInt(body.gracePeriodDays ?? body.grace_period_days, "Grace period");
+  const totalQuantity = optionalNonNegInt(body.totalQuantity ?? body.total_quantity, "Total quantity");
+
+  if (installmentEnabled) {
+    if (!installmentCount) throw badRequest("Installment count is required when installments are available", "installment_count_required");
+    if (!installmentFrequency) throw badRequest("Installment frequency is required when installments are available", "installment_frequency_required");
+    if (!INSTALLMENT_FREQUENCIES.has(installmentFrequency)) {
+      throw badRequest("Installment frequency must be monthly, quarterly, or yearly", "installment_frequency_invalid");
+    }
+    if (!installmentAmount && fullPaymentPrice) {
+      installmentAmount = Math.floor(fullPaymentPrice / installmentCount);
+      if (installmentAmount <= 0) throw badRequest("Installment amount must be a positive whole amount");
+    }
+    if (!installmentAmount) throw badRequest("Installment amount is required when installments are available", "installment_amount_required");
+  } else {
+    installmentCount = null;
+    installmentFrequency = null;
+    installmentAmount = null;
+    installmentDurationMonths = null;
+    firstInstallmentDueRule = null;
+    gracePeriodDays = null;
+  }
+
   let status = cleanText(body.status ?? "draft", "Status", 32) || "draft";
   if (status === "available") status = "published";
   if (status === "coming-soon") status = "draft";
@@ -231,6 +346,16 @@ function parsedInput(body: OfferInput) {
     bookingAmount,
     qualificationBenefit,
     commissionEligible,
+    fullPaymentPrice,
+    fullPaymentDeadlineDays,
+    installmentEnabled,
+    installmentCount,
+    installmentFrequency,
+    installmentAmount,
+    installmentDurationMonths,
+    firstInstallmentDueRule,
+    gracePeriodDays,
+    totalQuantity,
     status,
     displayOrder,
     features,
@@ -244,6 +369,52 @@ function assertPublishable(parsed: ReturnType<typeof parsedInput>) {
   if (!parsed.image) throw badRequest("Published offers need a main image");
 }
 
+const OFFER_WRITE_COLS = `
+       slug, title, category, category_slug, location, image, hero_image, image_alt, hero_image_alt,
+       retail_value, booking_amount, qualification_benefit, commission_eligible_amount,
+       full_payment_price, full_payment_deadline_days, installment_enabled, installment_count,
+       installment_frequency, installment_amount, installment_duration_months,
+       first_installment_due_rule, grace_period_days, total_quantity,
+       status, flagship, summary, details, features, notes, display_order, gallery, version
+`;
+
+function writeParams(slug: string, parsed: ReturnType<typeof parsedInput>, version: number): unknown[] {
+  return [
+    slug,
+    parsed.title,
+    parsed.category,
+    parsed.categorySlug,
+    parsed.location,
+    parsed.image,
+    parsed.heroImage,
+    parsed.imageAlt,
+    parsed.heroImageAlt,
+    parsed.retailValue,
+    parsed.bookingAmount,
+    parsed.qualificationBenefit,
+    parsed.commissionEligible,
+    parsed.fullPaymentPrice,
+    parsed.fullPaymentDeadlineDays,
+    parsed.installmentEnabled,
+    parsed.installmentCount,
+    parsed.installmentFrequency,
+    parsed.installmentAmount,
+    parsed.installmentDurationMonths,
+    parsed.firstInstallmentDueRule,
+    parsed.gracePeriodDays,
+    parsed.totalQuantity,
+    parsed.status,
+    parsed.flagship,
+    parsed.summary,
+    parsed.details,
+    JSON.stringify(parsed.features),
+    parsed.notes,
+    parsed.displayOrder,
+    JSON.stringify(parsed.gallery),
+    version,
+  ];
+}
+
 export async function createOffer(client: PoolClient, body: OfferInput): Promise<OfferRow> {
   const parsed = parsedInput(body);
   const requested = cleanText(body.slug ?? "", "Slug", 88);
@@ -254,38 +425,13 @@ export async function createOffer(client: PoolClient, body: OfferInput): Promise
   if (parsed.status === "published") assertPublishable(parsed);
   if (parsed.flagship) await unsetOtherFlagships(client, slug);
   const { rows } = await client.query<OfferRow>(
-    `insert into offers (
-       slug, title, category, category_slug, location, image, hero_image, image_alt, hero_image_alt,
-       retail_value, booking_amount, qualification_benefit, commission_eligible_amount,
-       status, flagship, summary, details, features, notes, display_order, gallery, version
-     ) values (
-       $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18::jsonb,$19,$20,$21::jsonb,1
+    `insert into offers (${OFFER_WRITE_COLS})
+     values (
+       $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28::jsonb,$29,$30,$31::jsonb,$32
      ) returning *`,
-    [
-      slug,
-      parsed.title,
-      parsed.category,
-      parsed.categorySlug,
-      parsed.location,
-      parsed.image,
-      parsed.heroImage,
-      parsed.imageAlt,
-      parsed.heroImageAlt,
-      parsed.retailValue,
-      parsed.bookingAmount,
-      parsed.qualificationBenefit,
-      parsed.commissionEligible,
-      parsed.status,
-      parsed.flagship,
-      parsed.summary,
-      parsed.details,
-      JSON.stringify(parsed.features),
-      parsed.notes,
-      parsed.displayOrder,
-      JSON.stringify(parsed.gallery),
-    ],
+    writeParams(slug, parsed, 1),
   );
-  return normalize(rows[0]!);
+  return (await withInventory(client, [rows[0]!]))[0]!;
 }
 
 async function uniqueOrConflict(client: PoolClient, slug: string): Promise<string> {
@@ -306,17 +452,37 @@ export async function updateOffer(client: PoolClient, slug: string, body: OfferI
     imageAlt: existing.image_alt,
     heroImageAlt: existing.hero_image_alt,
     displayOrder: existing.display_order,
+    fullPaymentPrice: existing.full_payment_price,
+    fullPaymentDeadlineDays: existing.full_payment_deadline_days,
+    installmentEnabled: existing.installment_enabled,
+    installmentCount: existing.installment_count,
+    installmentFrequency: existing.installment_frequency,
+    installmentAmount: existing.installment_amount,
+    installmentDurationMonths: existing.installment_duration_months,
+    firstInstallmentDueRule: existing.first_installment_due_rule,
+    gracePeriodDays: existing.grace_period_days,
+    totalQuantity: existing.total_quantity,
     ...body,
     title: body.title ?? existing.title,
     categorySlug: body.categorySlug ?? body.category_slug ?? existing.category_slug,
     status: body.status ?? existing.status,
   });
   if (parsed.status === "published") assertPublishable(parsed);
+  await assertTotalQuantityAllowed(client, slug, parsed.totalQuantity);
   const economicsChanged =
     parsed.retailValue !== existing.retail_value ||
     parsed.bookingAmount !== existing.booking_amount ||
     parsed.qualificationBenefit !== existing.qualification_benefit ||
-    parsed.commissionEligible !== existing.commission_eligible_amount;
+    parsed.commissionEligible !== existing.commission_eligible_amount ||
+    parsed.fullPaymentPrice !== (existing.full_payment_price ?? null) ||
+    parsed.fullPaymentDeadlineDays !== (existing.full_payment_deadline_days ?? null) ||
+    parsed.installmentEnabled !== Boolean(existing.installment_enabled) ||
+    parsed.installmentCount !== (existing.installment_count ?? null) ||
+    parsed.installmentFrequency !== (existing.installment_frequency ?? null) ||
+    parsed.installmentAmount !== (existing.installment_amount ?? null) ||
+    parsed.installmentDurationMonths !== (existing.installment_duration_months ?? null) ||
+    parsed.firstInstallmentDueRule !== (existing.first_installment_due_rule ?? null) ||
+    parsed.gracePeriodDays !== (existing.grace_period_days ?? null);
   const nextVersion = economicsChanged ? existing.version + 1 : existing.version;
   if (parsed.flagship) await unsetOtherFlagships(client, slug);
   const { rows } = await client.query<OfferRow>(
@@ -324,37 +490,17 @@ export async function updateOffer(client: PoolClient, slug: string, body: OfferI
        title = $2, category = $3, category_slug = $4, location = $5,
        image = $6, hero_image = $7, image_alt = $8, hero_image_alt = $9,
        retail_value = $10, booking_amount = $11, qualification_benefit = $12,
-       commission_eligible_amount = $13, status = $14, flagship = $15,
-       summary = $16, details = $17, features = $18::jsonb, notes = $19,
-       display_order = $20, gallery = $21::jsonb, version = $22, updated_at = now()
+       commission_eligible_amount = $13, full_payment_price = $14, full_payment_deadline_days = $15,
+       installment_enabled = $16, installment_count = $17, installment_frequency = $18,
+       installment_amount = $19, installment_duration_months = $20, first_installment_due_rule = $21,
+       grace_period_days = $22, total_quantity = $23, status = $24, flagship = $25,
+       summary = $26, details = $27, features = $28::jsonb, notes = $29,
+       display_order = $30, gallery = $31::jsonb, version = $32, updated_at = now()
      where slug = $1
      returning *`,
-    [
-      slug,
-      parsed.title,
-      parsed.category,
-      parsed.categorySlug,
-      parsed.location,
-      parsed.image,
-      parsed.heroImage,
-      parsed.imageAlt,
-      parsed.heroImageAlt,
-      parsed.retailValue,
-      parsed.bookingAmount,
-      parsed.qualificationBenefit,
-      parsed.commissionEligible,
-      parsed.status,
-      parsed.flagship,
-      parsed.summary,
-      parsed.details,
-      JSON.stringify(parsed.features),
-      parsed.notes,
-      parsed.displayOrder,
-      JSON.stringify(parsed.gallery),
-      nextVersion,
-    ],
+    writeParams(slug, parsed, nextVersion),
   );
-  return normalize(rows[0]!);
+  return (await withInventory(client, [rows[0]!]))[0]!;
 }
 
 export async function setOfferStatus(client: PoolClient, slug: string, statusRaw: string): Promise<OfferRow> {
@@ -371,7 +517,7 @@ export async function setOfferStatus(client: PoolClient, slug: string, statusRaw
     `update offers set status = $2, updated_at = now() where slug = $1 returning *`,
     [slug, status],
   );
-  return normalize(rows[0]!);
+  return (await withInventory(client, [rows[0]!]))[0]!;
 }
 
 export async function addOfferMedia(
@@ -410,7 +556,7 @@ export async function addOfferMedia(
   }
   sql += ` where slug = $1 returning *`;
   const { rows } = await client.query<OfferRow>(sql, params);
-  return { offer: normalize(rows[0]!), src, id };
+  return { offer: (await withInventory(client, [rows[0]!]))[0]!, src, id };
 }
 
 export async function removeOfferMedia(client: PoolClient, slug: string, mediaId: string): Promise<OfferRow> {
@@ -434,22 +580,21 @@ export async function removeOfferMedia(client: PoolClient, slug: string, mediaId
      returning *`,
     [slug, src],
   );
-  if (!rows[0]) throw notFound("Offer not found");
-  return normalize(rows[0]);
+  return (await withInventory(client, [rows[0]!]))[0]!;
 }
 
 export async function getOfferMedia(
   client: PoolClient,
   slug: string,
-  mediaId: string,
+  id: string,
 ): Promise<{ bytes: Buffer; mime: string; filename: string }> {
   const { rows } = await client.query<{ bytes: Buffer; mime: string; filename: string; status: string }>(
     `select m.bytes, m.mime, m.filename, o.status
        from offer_media m join offers o on o.slug = m.offer_slug
       where m.id = $1 and m.offer_slug = $2`,
-    [mediaId, slug],
+    [id, slug],
   );
-  const row = rows[0];
-  if (!row) throw notFound("Image not found");
-  return { bytes: row.bytes, mime: row.mime, filename: row.filename };
+  const media = rows[0];
+  if (!media) throw notFound("Image not found");
+  return { bytes: media.bytes, mime: media.mime, filename: media.filename };
 }

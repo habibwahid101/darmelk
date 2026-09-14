@@ -1,9 +1,9 @@
 import { Link } from "@tanstack/react-router";
 import { MapPin } from "lucide-react";
-import { AmountRow } from "@/components/states";
+import { OfferCommercialTerms } from "@/components/offer-commercial-terms";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { type PropertyOffer, isBookable, resolveMediaSrc } from "@/lib/offers";
+import { type PropertyOffer, isBookable, isSoldOut, resolveMediaSrc } from "@/lib/offers";
 import { cn } from "@/lib/utils";
 
 export function PropertyCard({
@@ -13,6 +13,7 @@ export function PropertyCard({
   offer: PropertyOffer;
   className?: string;
 }) {
+  const soldOut = isSoldOut(offer);
   return (
     <article
       className={cn(
@@ -31,8 +32,8 @@ export function PropertyCard({
           {offer.flagship ? <Badge tone="pine">Flagship</Badge> : null}
         </div>
         <div className="absolute bottom-3 right-3">
-          <Badge tone={isBookable(offer.status) ? "pine" : "cream"}>
-            {isBookable(offer.status) ? "Available" : offer.status === "closed" ? "Closed" : "Coming soon"}
+          <Badge tone={isBookable(offer.status) && !soldOut ? "pine" : "cream"}>
+            {soldOut ? "Sold out" : isBookable(offer.status) ? "Available" : offer.status === "closed" ? "Closed" : "Coming soon"}
           </Badge>
         </div>
       </div>
@@ -48,10 +49,9 @@ export function PropertyCard({
             </p>
           ) : null}
         </div>
-        <dl className="mt-auto border-t border-line pt-3">
-          <AmountRow compact label="Property value" value={offer.retailValue} />
-          <AmountRow compact label="Booking amount" value={offer.bookingAmount} />
-        </dl>
+        <div className="mt-auto border-t border-line pt-3">
+          <OfferCommercialTerms offer={offer} variant="public" compact />
+        </div>
         <Button asChild variant="secondary" className="w-full">
           <Link to="/properties/$slug" params={{ slug: offer.slug }}>
             View details
@@ -64,6 +64,7 @@ export function PropertyCard({
 
 export function FeaturedOffer({ offer }: { offer: PropertyOffer }) {
   const canBook = isBookable(offer.status);
+  const soldOut = isSoldOut(offer);
 
   return (
     <article className="grid min-w-0 overflow-hidden rounded-2xl bg-cream shadow-[var(--shadow-card)] md:grid-cols-[1.35fr_1fr]">
@@ -75,8 +76,8 @@ export function FeaturedOffer({ offer }: { offer: PropertyOffer }) {
         />
         <div className="absolute left-3 top-3 flex flex-wrap gap-1.5">
           <Badge tone="cream">{offer.category}</Badge>
-          <Badge tone={canBook ? "pine" : "cream"}>
-            {canBook ? "Currently available" : offer.status === "closed" ? "Closed" : "Coming soon"}
+          <Badge tone={canBook && !soldOut ? "pine" : "cream"}>
+            {soldOut ? "Sold out" : canBook ? "Currently available" : offer.status === "closed" ? "Closed" : "Coming soon"}
           </Badge>
         </div>
       </div>
@@ -92,10 +93,9 @@ export function FeaturedOffer({ offer }: { offer: PropertyOffer }) {
         </h2>
         <p className="mt-3 text-sm leading-relaxed text-muted">{offer.summary}</p>
         <p className="mt-2 text-xs text-subtle">Figures below belong to this offer only.</p>
-        <dl className="mt-5">
-          <AmountRow label="Property value" value={offer.retailValue} />
-          <AmountRow label="Booking amount" value={offer.bookingAmount} />
-        </dl>
+        <div className="mt-5">
+          <OfferCommercialTerms offer={offer} variant="public" />
+        </div>
         <div className="mt-6 flex flex-col gap-3 lg:flex-row">
           {canBook ? (
             <Button asChild className="w-full lg:flex-1">

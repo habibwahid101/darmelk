@@ -35,7 +35,7 @@ function AdminOffers() {
       <PageHeader
         kicker="Catalog"
         title="Properties / Offers"
-        description="Create and manage property offers. Economics stay offer-specific. Existing bookings keep their original snapshot."
+        description="Create and manage property offers. Economics stay offer-specific. Existing bookings keep their original snapshot. Inventory is shared across General Marketplace and Growth Program."
         action={
           <Button asChild size="sm">
             <Link to="/admin/offers/new">Add offer</Link>
@@ -57,6 +57,7 @@ function AdminOffers() {
                 <th className="px-4 py-3 font-medium">Status</th>
                 <th className="px-4 py-3 font-medium">Booking</th>
                 <th className="px-4 py-3 font-medium">Retail</th>
+                <th className="px-4 py-3 font-medium">Available</th>
                 <th className="px-4 py-3 font-medium">Updated</th>
                 <th className="px-4 py-3 font-medium">Actions</th>
               </tr>
@@ -74,6 +75,9 @@ function AdminOffers() {
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap tabular-nums">{formatBdt(o.bookingAmount)}</td>
                   <td className="px-4 py-3 whitespace-nowrap tabular-nums">{formatBdt(o.retailValue)}</td>
+                  <td className="px-4 py-3 whitespace-nowrap tabular-nums text-muted">
+                    {o.inventory?.total == null ? "Unbounded" : `${o.inventory.available ?? 0} / ${o.inventory.total}`}
+                  </td>
                   <td className="px-4 py-3 whitespace-nowrap text-muted">{formatWhen(o.updatedAt)}</td>
                   <td className="px-4 py-3">
                     <div className="flex min-w-0 flex-wrap gap-2">

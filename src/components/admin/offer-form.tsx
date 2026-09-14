@@ -17,12 +17,32 @@ export type OfferFormValue = {
   bookingAmount: string;
   qualificationBenefit: string;
   commissionEligibleAmount: string;
+  fullPaymentPrice: string;
+  fullPaymentDeadlineDays: string;
+  installmentEnabled: boolean;
+  installmentCount: string;
+  installmentFrequency: string;
+  installmentAmount: string;
+  installmentDurationMonths: string;
+  firstInstallmentDueRule: string;
+  gracePeriodDays: string;
+  totalQuantity: string;
+  soldQuantity: number;
+  reservedQuantity: number | null;
+  availableQuantity: number | null;
   image: string;
   heroImage: string;
   galleryText: string;
   flagship: boolean;
   displayOrder: string;
 };
+
+function optionalNumber(value: string): number | null {
+  const text = value.trim();
+  if (!text) return null;
+  const n = Number(text);
+  return Number.isFinite(n) ? n : null;
+}
 
 export function emptyOfferForm(): OfferFormValue {
   return {
@@ -38,6 +58,19 @@ export function emptyOfferForm(): OfferFormValue {
     bookingAmount: "",
     qualificationBenefit: "",
     commissionEligibleAmount: "",
+    fullPaymentPrice: "",
+    fullPaymentDeadlineDays: "",
+    installmentEnabled: false,
+    installmentCount: "",
+    installmentFrequency: "monthly",
+    installmentAmount: "",
+    installmentDurationMonths: "",
+    firstInstallmentDueRule: "",
+    gracePeriodDays: "",
+    totalQuantity: "",
+    soldQuantity: 0,
+    reservedQuantity: null,
+    availableQuantity: null,
     image: "",
     heroImage: "",
     galleryText: "",
@@ -60,6 +93,19 @@ export function formFromOffer(offer: PropertyOffer): OfferFormValue {
     bookingAmount: String(offer.bookingAmount),
     qualificationBenefit: String(offer.qualificationBenefit),
     commissionEligibleAmount: String(offer.commissionEligibleAmount ?? offer.bookingAmount),
+    fullPaymentPrice: offer.fullPaymentPrice != null ? String(offer.fullPaymentPrice) : "",
+    fullPaymentDeadlineDays: offer.fullPaymentDeadlineDays != null ? String(offer.fullPaymentDeadlineDays) : "",
+    installmentEnabled: Boolean(offer.installmentEnabled),
+    installmentCount: offer.installmentCount != null ? String(offer.installmentCount) : "",
+    installmentFrequency: offer.installmentFrequency || "monthly",
+    installmentAmount: offer.installmentAmount != null ? String(offer.installmentAmount) : "",
+    installmentDurationMonths: offer.installmentDurationMonths != null ? String(offer.installmentDurationMonths) : "",
+    firstInstallmentDueRule: offer.firstInstallmentDueRule ?? "",
+    gracePeriodDays: offer.gracePeriodDays != null ? String(offer.gracePeriodDays) : "",
+    totalQuantity: offer.totalQuantity != null ? String(offer.totalQuantity) : offer.inventory?.total != null ? String(offer.inventory.total) : "",
+    soldQuantity: offer.inventory?.sold ?? 0,
+    reservedQuantity: offer.inventory?.reserved ?? null,
+    availableQuantity: offer.inventory?.available ?? null,
     image: persistMediaSrc(offer.image),
     heroImage: persistMediaSrc(offer.heroImage ?? ""),
     galleryText: (offer.gallery ?? []).map(persistMediaSrc).join("\n"),
@@ -83,6 +129,16 @@ export function payloadFromForm(form: OfferFormValue, opts?: { includeSlug?: boo
     bookingAmount: Number(form.bookingAmount),
     qualificationBenefit: Number(form.qualificationBenefit),
     commissionEligibleAmount: Number(form.commissionEligibleAmount || form.bookingAmount),
+    fullPaymentPrice: optionalNumber(form.fullPaymentPrice),
+    fullPaymentDeadlineDays: optionalNumber(form.fullPaymentDeadlineDays),
+    installmentEnabled: form.installmentEnabled,
+    installmentCount: optionalNumber(form.installmentCount),
+    installmentFrequency: form.installmentEnabled ? form.installmentFrequency || null : null,
+    installmentAmount: optionalNumber(form.installmentAmount),
+    installmentDurationMonths: optionalNumber(form.installmentDurationMonths),
+    firstInstallmentDueRule: form.firstInstallmentDueRule.trim() || null,
+    gracePeriodDays: optionalNumber(form.gracePeriodDays),
+    totalQuantity: optionalNumber(form.totalQuantity),
     image: persistMediaSrc(form.image.trim()) || null,
     heroImage: persistMediaSrc(form.heroImage.trim()) || null,
     gallery: gallery.map(persistMediaSrc),
@@ -121,6 +177,8 @@ export function OfferForm({
 }) {
   const set = (patch: Partial<OfferFormValue>) => onChange({ ...value, ...patch });
   const [bookingTouchedCommission, setBookingTouchedCommission] = useState(false);
+  const derivedAvailable =
+    optionalNumber(value.totalQuantity) == null ? null : Math.max(0, (optionalNumber(value.totalQuantity) ?? 0) - value.soldQuantity);
 
   return (
     <form
@@ -201,10 +259,13 @@ export function OfferForm({
       </Section>
 
       <Section title="Financial details">
-        <p className="text-sm text-muted">These amounts belong to this offer only. Existing bookings keep their original snapshot.</p>
+        <p className="text-sm text-muted">These amounts belong to this offer only. Existing bookings keep their original snapshot. General Marketplace and Growth Program share this same offer.</p>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Retail value (BDT)" htmlFor="offer-retail">
+          <Field label="Regular / total price (BDT)" htmlFor="offer-retail">
             <Input id="offer-retail" inputMode="numeric" value={value.retailValue} onChange={(e) => set({ retailValue: e.target.value })} required />
+          </Field>
+          <Field label="Full payment price (BDT)" hint="Optional cash price if paid in full." htmlFor="offer-full-price">
+            <Input id="offer-full-price" inputMode="numeric" value={value.fullPaymentPrice} onChange={(e) => set({ fullPaymentPrice: e.target.value })} />
           </Field>
           <Field label="Booking amount (BDT)" htmlFor="offer-booking">
             <Input
@@ -221,6 +282,15 @@ export function OfferForm({
               required
             />
           </Field>
+          <Field label="Full payment deadline (days)" hint="Days after booking. Leave blank if unused." htmlFor="offer-full-deadline">
+            <Input id="offer-full-deadline" inputMode="numeric" value={value.fullPaymentDeadlineDays} onChange={(e) => set({ fullPaymentDeadlineDays: e.target.value })} />
+          </Field>
+        </div>
+      </Section>
+
+      <Section title="Growth qualification">
+        <p className="text-sm text-muted">Shown in the Growth Program booking flow. Not featured on the public marketplace.</p>
+        <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Qualification benefit (BDT)" htmlFor="offer-benefit">
             <Input id="offer-benefit" inputMode="numeric" value={value.qualificationBenefit} onChange={(e) => set({ qualificationBenefit: e.target.value })} required />
           </Field>
@@ -234,6 +304,77 @@ export function OfferForm({
                 set({ commissionEligibleAmount: e.target.value });
               }}
               required
+            />
+          </Field>
+        </div>
+      </Section>
+
+      <Section title="Payment plan">
+        <label className="flex min-h-11 items-center gap-3 text-sm">
+          <input
+            type="checkbox"
+            checked={value.installmentEnabled}
+            onChange={(e) => set({ installmentEnabled: e.target.checked })}
+            className="size-4 accent-[var(--color-pine)]"
+          />
+          Installments are available for this offer
+        </label>
+        {value.installmentEnabled ? (
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Installment count" htmlFor="offer-inst-count">
+              <Input id="offer-inst-count" inputMode="numeric" value={value.installmentCount} onChange={(e) => set({ installmentCount: e.target.value })} required />
+            </Field>
+            <Field label="Frequency" htmlFor="offer-inst-freq">
+              <select
+                id="offer-inst-freq"
+                className="field-control"
+                value={value.installmentFrequency}
+                onChange={(e) => set({ installmentFrequency: e.target.value })}
+                required
+              >
+                <option value="monthly">Monthly</option>
+                <option value="quarterly">Quarterly</option>
+                <option value="yearly">Yearly</option>
+              </select>
+            </Field>
+            <Field label="Installment amount (BDT)" hint="Leave blank to divide full payment price by count." htmlFor="offer-inst-amount">
+              <Input id="offer-inst-amount" inputMode="numeric" value={value.installmentAmount} onChange={(e) => set({ installmentAmount: e.target.value })} />
+            </Field>
+            <Field label="Duration (months)" htmlFor="offer-inst-duration">
+              <Input id="offer-inst-duration" inputMode="numeric" value={value.installmentDurationMonths} onChange={(e) => set({ installmentDurationMonths: e.target.value })} />
+            </Field>
+            <Field label="First installment due" htmlFor="offer-inst-first">
+              <Input id="offer-inst-first" value={value.firstInstallmentDueRule} onChange={(e) => set({ firstInstallmentDueRule: e.target.value })} placeholder="30 days after booking" />
+            </Field>
+            <Field label="Grace period (days)" htmlFor="offer-inst-grace">
+              <Input id="offer-inst-grace" inputMode="numeric" value={value.gracePeriodDays} onChange={(e) => set({ gracePeriodDays: e.target.value })} />
+            </Field>
+          </div>
+        ) : (
+          <p className="text-sm text-muted">Installment fields stay hidden until this offer offers a payment plan.</p>
+        )}
+      </Section>
+
+      <Section title="Inventory">
+        <p className="text-sm text-muted">
+          Shared stock for General Marketplace and Growth Program. Available = total − sold. Pending requests and Request
+          to Book do not reserve units. Display order is listing order, not stock.
+        </p>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Total quantity" hint="Leave blank for unbounded. Cannot go below sold." htmlFor="offer-qty-total">
+            <Input id="offer-qty-total" inputMode="numeric" value={value.totalQuantity} onChange={(e) => set({ totalQuantity: e.target.value })} />
+          </Field>
+          <Field label="Sold quantity" hint="Binding confirmations. Read only." htmlFor="offer-qty-sold">
+            <Input id="offer-qty-sold" value={String(value.soldQuantity)} disabled />
+          </Field>
+          <Field label="Reserved quantity" hint="Deferred. Pending does not hold stock." htmlFor="offer-qty-reserved">
+            <Input id="offer-qty-reserved" value="Not reserved at request" disabled />
+          </Field>
+          <Field label="Available quantity" hint="Read only." htmlFor="offer-qty-available">
+            <Input
+              id="offer-qty-available"
+              value={derivedAvailable == null ? "Unbounded" : String(derivedAvailable)}
+              disabled
             />
           </Field>
         </div>
@@ -261,7 +402,7 @@ export function OfferForm({
       </Section>
 
       <Section title="Publishing">
-        <Field label="Display order" hint="Lower numbers appear first." htmlFor="offer-order">
+        <Field label="Display order" hint="Lower numbers appear first. This is not stock." htmlFor="offer-order">
           <Input id="offer-order" inputMode="numeric" value={value.displayOrder} onChange={(e) => set({ displayOrder: e.target.value })} />
         </Field>
         <label className="flex min-h-11 items-center gap-3 text-sm">
