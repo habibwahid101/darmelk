@@ -91,8 +91,9 @@ function MemberPromotionDetails() {
         ) : (
           <p className="mt-4 max-w-xl text-sm leading-relaxed text-muted">
             Qualification requires your own confirmed or activated booking on an eligible property, with the
-            confirmation time inside this campaign window. Creating a booking, pending payment, or Merchant approval
-            alone does not qualify.
+            confirmation time inside this campaign window. Darmelk Bank and Pay by Merchant bookings qualify the
+            same way after confirmation. Creating a booking, pending payment, Merchant approval, or a Request to
+            Book does not qualify.
           </p>
         )}
       </Surface>
@@ -158,12 +159,27 @@ function MemberPromotionDetails() {
         </ul>
       </Surface>
 
-      {promotion.terms ? (
-        <Surface>
-          <h2 className="font-display text-xl font-semibold">Terms & Conditions</h2>
-          <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed">{qualification?.terms_snapshot ?? promotion.terms}</p>
-        </Surface>
-      ) : null}
+      <Surface>
+        <h2 className="font-display text-xl font-semibold">Promotion Terms</h2>
+        <p className="mt-3 max-w-xl text-sm leading-relaxed text-muted">
+          Promotions are campaign-specific. Qualification follows an authoritative confirmed booking on an eligible
+          property inside this campaign window. Payment method does not change eligibility. Darmelk does not
+          guarantee a gift or reward outcome.
+        </p>
+        <Link
+          to="/terms"
+          search={{ key: "promotion" }}
+          className="mt-4 inline-flex text-sm font-medium text-pine underline-offset-2 hover:underline"
+        >
+          Read Promotion Terms
+        </Link>
+        {promotion.terms ? (
+          <div className="mt-6 border-t border-line pt-5">
+            <h3 className="text-sm font-medium">Campaign terms</h3>
+            <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed">{qualification?.terms_snapshot ?? promotion.terms}</p>
+          </div>
+        ) : null}
+      </Surface>
 
       <Link to="/app/promotions" className="inline-flex text-sm font-medium text-pine underline-offset-2 hover:underline">
         All promotions

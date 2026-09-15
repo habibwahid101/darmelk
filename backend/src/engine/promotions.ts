@@ -2,6 +2,7 @@ import type { PoolClient } from "pg";
 import { badRequest, conflict, notFound } from "../errors.js";
 import { uid } from "../ids.js";
 import { logAdminAction } from "./members.js";
+import { POLICY_DOCUMENTS } from "./terms.js";
 
 export const STORED_STATUSES = new Set(["draft", "published", "closed"]);
 export const FULFILLMENT_STATUSES = new Set(["eligible", "approved", "fulfilled", "cancelled", "reversed"]);
@@ -578,6 +579,13 @@ function campaignMatchesOffer(
 }
 
 export async function evaluatePromotionsForConfirmedBooking(client: PoolClient, bookingId: string, actorUserId?: string) {
+  // Channel-neutral: any authoritative confirmed/activated booking whose
+  // confirmed_at falls inside a published campaign window on an eligible offer
+  // qualifies the same way. Payment method (bank vs Merchant), account type,
+  // and frontend source are not eligibility filters. Called only from
+  // confirmBooking. Merchant approval, payment submission, Request to Book,
+  // Contact, and activation do not qualify. PROMOTION_TERMS is readable and
+  // versioned; current campaigns auto-qualify without a blocking consent gate.
   const { rows } = await client.query<{
     id: string;
     user_id: string;
@@ -668,7 +676,11 @@ export async function evaluatePromotionsForConfirmedBooking(client: PoolClient, 
       actionType: "promotion.qualify",
       targetType: "promotion_qualification",
       targetId: qualification.id,
-      payload: { promotionId: raw.id, bookingId: booking.id },
+      payload: {
+        promotionId: raw.id,
+        bookingId: booking.id,
+        promotionTermsVersion: POLICY_DOCUMENTS.PROMOTION_TERMS.version,
+      },
     });
   }
 }
