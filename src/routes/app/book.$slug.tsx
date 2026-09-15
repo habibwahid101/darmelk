@@ -77,7 +77,18 @@ function BookOfferPage() {
     );
   }
 
-  if (step === 3 && bookingId) return <div className="mx-auto max-w-2xl space-y-8"><PageHeader kicker="Booking payment" title={offer.title} description="Use an approved manual payment destination and submit proof for review." /><PaymentForm targetType="booking" targetId={bookingId} amount={offer.bookingAmount} onSubmitted={()=>setStep(4)} /></div>;
+  if (step === 3 && bookingId) {
+    return (
+      <div className="mx-auto max-w-2xl space-y-8">
+        <PageHeader
+          kicker="Booking payment"
+          title={offer.title}
+          description="Pay via Darmelk Bank or Pay by Merchant. Darmelk confirms the booking after review."
+        />
+        <PaymentForm targetType="booking" targetId={bookingId} amount={offer.bookingAmount} onSubmitted={() => setStep(4)} />
+      </div>
+    );
+  }
 
   if (member.activation_status !== "active") return <div className="mx-auto max-w-xl space-y-6"><PageHeader kicker="Booking" title="Activation required" description="Annual activation approval is required before a property booking can be submitted."/><Surface><p className="text-sm text-muted">Activate your member ID first. The annual fee is separate from the property booking amount.</p><Button asChild className="mt-5"><Link to="/app/activation">Go to activation</Link></Button></Surface></div>;
 
@@ -128,7 +139,7 @@ function BookOfferPage() {
           <p className="text-sm font-medium">What happens next</p>
           <ul className="mt-3 space-y-2 text-sm text-muted">
             <li>{offerBookingCopy(offer)}</li>
-            <li>After creating the request, submit manual payment proof.</li>
+            <li>After creating the request, pay via Darmelk Bank or Pay by Merchant.</li>
             <li>Admin approval confirms and activates the booking.</li>
             <li>Qualification benefit stays attached to this offer, not a global figure.</li>
             <li>

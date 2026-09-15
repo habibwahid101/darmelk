@@ -41,6 +41,25 @@ export type PaymentSubmission = {
   rejection_reason: string | null;
 };
 
+export function destinationsForTarget(target?: string | null) {
+  const all = Object.values(PAYMENT_DESTINATIONS);
+  if (target === "booking") return all.filter((d) => d.method === "bank");
+  return all;
+}
+
+export function assertPaymentMethodForTarget(targetType: PaymentTarget, method: unknown): PaymentMethod {
+  if (method !== "bkash" && method !== "nagad" && method !== "bank") {
+    throw badRequest("Unsupported payment method", "unsupported_payment_method");
+  }
+  if (targetType === "booking" && method !== "bank") {
+    throw badRequest(
+      "This booking can be paid via Darmelk Bank or Pay by Merchant",
+      "payment_method_not_allowed",
+    );
+  }
+  return method;
+}
+
 function cleanText(value: unknown, field: string, max: number): string {
   if (typeof value !== "string" || !value.trim()) throw badRequest(`${field} is required`);
   const result = value.trim();
@@ -62,8 +81,8 @@ export async function createPaymentSubmission(
     notes?: unknown;
   },
 ): Promise<PaymentSubmission> {
-  const destination = PAYMENT_DESTINATIONS[input.paymentMethod];
-  if (!destination) throw badRequest("Unsupported payment method");
+  const paymentMethod = assertPaymentMethodForTarget(input.targetType, input.paymentMethod);
+  const destination = PAYMENT_DESTINATIONS[paymentMethod];
   const targetId = cleanText(input.targetId, "targetId", 120);
   const referenceId = cleanText(input.referenceId, "referenceId", 120);
   const proofFilename = cleanText(input.proofFilename, "proofFilename", 180);
@@ -117,7 +136,7 @@ export async function createPaymentSubmission(
      values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'submitted') returning
        id,target_type,target_id,user_id,amount,payment_method,destination_snapshot,reference_id,
        proof_filename,proof_mime,notes,status,submitted_at,reviewed_at,reviewed_by_admin_id,rejection_reason`,
-    [uid("pay"), input.targetType, targetId, userId, amount, input.paymentMethod,
+    [uid("pay"), input.targetType, targetId, userId, amount, paymentMethod,
       JSON.stringify(destination), referenceId, proofFilename, proofMime, proof, notes],
   );
   return rows[0]!;

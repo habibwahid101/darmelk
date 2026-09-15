@@ -11,6 +11,11 @@ import { Surface } from "@/components/states";
 type ManualTarget = "activation" | "booking" | "merchant_bundle";
 type PayMode = PaymentDestination["method"] | "merchant";
 
+function destinationLabel(destination: PaymentDestination, targetType: ManualTarget) {
+  if (targetType === "booking" && destination.method === "bank") return "Pay via Darmelk Bank";
+  return destination.label;
+}
+
 export function PaymentForm({
   targetType,
   targetId,
@@ -22,9 +27,10 @@ export function PaymentForm({
   amount: number;
   onSubmitted: () => void;
 }) {
-  const { data } = useAsync(() => api.paymentDestinations(), []);
+  const { data } = useAsync(() => api.paymentDestinations(targetType), [targetType]);
   const destinations = data?.destinations ?? [];
-  const [method, setMethod] = useState<PayMode>("bkash");
+  const allowMerchant = targetType === "booking";
+  const [method, setMethod] = useState<PayMode>(allowMerchant ? "bank" : "bkash");
   const [referenceId, setReferenceId] = useState("");
   const [proof, setProof] = useState<File | null>(null);
   const [notes, setNotes] = useState("");
@@ -33,7 +39,6 @@ export function PaymentForm({
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const selected = destinations.find((d) => d.method === method);
-  const allowMerchant = targetType === "booking";
   const merchantMode = allowMerchant && method === "merchant";
 
   async function submit(e: React.FormEvent) {
@@ -93,32 +98,45 @@ export function PaymentForm({
         <p className="max-w-sm text-sm text-muted">
           {merchantMode
             ? "Request payment from an active Merchant. The booking stays pending until Darmelk confirms it."
-            : "Pay manually, then submit the reference and proof. Payment is not approved automatically."}
+            : allowMerchant
+              ? "Pay via Darmelk Bank, then submit the reference and proof. Payment is not approved automatically."
+              : "Pay manually, then submit the reference and proof. Payment is not approved automatically."}
         </p>
       </div>
-      <div className={`mt-5 grid gap-2 ${allowMerchant ? "sm:grid-cols-2 lg:grid-cols-4" : "sm:grid-cols-3"}`}>
-        {destinations.map((d) => (
-          <button
-            key={d.method}
-            type="button"
-            onClick={() => setMethod(d.method)}
-            className={
-              method === d.method
-                ? "rounded-xl bg-pine px-4 py-3 text-left text-sm font-medium text-pine-fg"
-                : "rounded-xl bg-mist px-4 py-3 text-left text-sm font-medium"
-            }
-          >
-            {d.label}
-          </button>
-        ))}
+      <div
+        role="radiogroup"
+        aria-label="Payment method"
+        className={`mt-5 grid gap-2 ${allowMerchant ? "sm:grid-cols-2" : "sm:grid-cols-3"}`}
+      >
+        {destinations.map((d) => {
+          const selectedMethod = method === d.method;
+          return (
+            <button
+              key={d.method}
+              type="button"
+              role="radio"
+              aria-checked={selectedMethod}
+              onClick={() => setMethod(d.method)}
+              className={
+                selectedMethod
+                  ? "min-h-11 rounded-xl bg-pine px-4 py-3 text-left text-sm font-medium text-pine-fg"
+                  : "min-h-11 rounded-xl bg-mist px-4 py-3 text-left text-sm font-medium"
+              }
+            >
+              {destinationLabel(d, targetType)}
+            </button>
+          );
+        })}
         {allowMerchant ? (
           <button
             type="button"
+            role="radio"
+            aria-checked={merchantMode}
             onClick={() => setMethod("merchant")}
             className={
               merchantMode
-                ? "rounded-xl bg-pine px-4 py-3 text-left text-sm font-medium text-pine-fg"
-                : "rounded-xl bg-mist px-4 py-3 text-left text-sm font-medium"
+                ? "min-h-11 rounded-xl bg-pine px-4 py-3 text-left text-sm font-medium text-pine-fg"
+                : "min-h-11 rounded-xl bg-mist px-4 py-3 text-left text-sm font-medium"
             }
           >
             Pay by Merchant
@@ -127,8 +145,9 @@ export function PaymentForm({
       </div>
       {merchantMode ? (
         <form onSubmit={submit} className="mt-5 space-y-4">
-          <Field label="Merchant User ID" hint="The canonical Darmelk User ID of an active Merchant. No password or OTP is required.">
+          <Field label="Merchant User ID" hint="The canonical Darmelk User ID of an active Merchant. No password or OTP is required." htmlFor="merchant-user-id">
             <Input
+              id="merchant-user-id"
               value={merchantUserId}
               onChange={(e) => setMerchantUserId(e.target.value)}
               maxLength={120}
@@ -140,7 +159,7 @@ export function PaymentForm({
             This creates a payment request for {formatBdt(amount)}. Merchant Credit is reserved only if the Merchant
             approves. Commission is not created at this step.
           </p>
-          {error ? <p className="text-sm text-clay">{error}</p> : null}
+          {error ? <p className="text-sm text-clay" role="alert">{error}</p> : null}
           <Button type="submit" className="w-full" disabled={pending}>
             {pending ? "Sending request…" : "Send Merchant payment request"}
           </Button>
@@ -150,8 +169,8 @@ export function PaymentForm({
           {selected ? (
             <div className="mt-4 rounded-xl bg-paper p-4 text-sm">
               <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="font-medium">{selected.label}</p>
+                <div className="min-w-0">
+                  <p className="font-medium">{destinationLabel(selected, targetType)}</p>
                   {selected.bankName ? (
                     <p className="text-muted">
                       {selected.bankName} · {selected.branch}
@@ -160,19 +179,19 @@ export function PaymentForm({
                     <p className="text-muted">{selected.accountType}</p>
                   )}
                   {selected.accountName ? <p className="text-muted">Account name: {selected.accountName}</p> : null}
-                  <p className="mt-1 font-semibold tabular-nums">{selected.account}</p>
+                  <p className="mt-1 break-all font-semibold tabular-nums">{selected.account}</p>
                 </div>
                 <button
                   type="button"
                   aria-label="Copy payment account"
-                  className="grid size-10 place-items-center rounded-lg bg-cream"
+                  className="grid size-11 shrink-0 place-items-center rounded-lg bg-cream"
                   onClick={async () => {
                     await navigator.clipboard.writeText(selected.account);
                     setCopied(true);
                     setTimeout(() => setCopied(false), 1200);
                   }}
                 >
-                  {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
+                  {copied ? <Check className="size-4" aria-hidden="true" /> : <Copy className="size-4" aria-hidden="true" />}
                 </button>
               </div>
               <p className="mt-3 text-muted">
@@ -182,26 +201,35 @@ export function PaymentForm({
             </div>
           ) : null}
           <form onSubmit={submit} className="mt-5 space-y-4">
-            <Field label="Transaction / reference ID">
-              <Input value={referenceId} onChange={(e) => setReferenceId(e.target.value)} maxLength={120} required />
-            </Field>
-            <Field label="Payment proof" hint="JPG, PNG, WebP, or PDF · maximum 4 MB">
+            <Field label="Transaction / reference ID" htmlFor="payment-reference">
               <Input
+                id="payment-reference"
+                value={referenceId}
+                onChange={(e) => setReferenceId(e.target.value)}
+                maxLength={120}
+                required
+                autoComplete="off"
+              />
+            </Field>
+            <Field label="Payment proof" hint="JPG, PNG, WebP, or PDF · maximum 4 MB" htmlFor="payment-proof">
+              <Input
+                id="payment-proof"
                 type="file"
                 accept="image/jpeg,image/png,image/webp,application/pdf"
                 onChange={(e) => setProof(e.target.files?.[0] ?? null)}
                 required
               />
             </Field>
-            <Field label="Notes" hint="Optional">
+            <Field label="Notes" hint="Optional" htmlFor="payment-notes">
               <textarea
+                id="payment-notes"
                 className="min-h-24 w-full rounded-xl border border-line bg-paper px-3 py-2 text-sm outline-none focus:border-pine"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 maxLength={1000}
               />
             </Field>
-            {error ? <p className="text-sm text-clay">{error}</p> : null}
+            {error ? <p className="text-sm text-clay" role="alert">{error}</p> : null}
             <Button type="submit" className="w-full" disabled={pending || !selected}>
               {pending ? "Submitting…" : "Submit for review"}
             </Button>
