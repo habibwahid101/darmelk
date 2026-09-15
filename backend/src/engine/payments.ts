@@ -48,12 +48,24 @@ export function destinationsForTarget(target?: string | null) {
 }
 
 export function assertPaymentMethodForTarget(targetType: PaymentTarget, method: unknown): PaymentMethod {
+  if (targetType === "activation" && method === "merchant") {
+    throw badRequest(
+      "Growth Program Activation can be paid via bKash, Nagad, or Darmelk Bank",
+      "payment_method_not_allowed",
+    );
+  }
   if (method !== "bkash" && method !== "nagad" && method !== "bank") {
     throw badRequest("Unsupported payment method", "unsupported_payment_method");
   }
   if (targetType === "booking" && method !== "bank") {
     throw badRequest(
       "This booking can be paid via Darmelk Bank or Pay by Merchant",
+      "payment_method_not_allowed",
+    );
+  }
+  if (targetType === "activation" && method !== "bkash" && method !== "nagad" && method !== "bank") {
+    throw badRequest(
+      "Growth Program Activation can be paid via bKash, Nagad, or Darmelk Bank",
       "payment_method_not_allowed",
     );
   }

@@ -8,7 +8,7 @@ import type { PoolClient } from "pg";
 import { badRequest, conflict, notFound } from "../errors.js";
 import { uid } from "../ids.js";
 import { getCommissionTotals } from "./commissions.js";
-import { requireActiveMember } from "./members.js";
+import { requireActiveGrowthProgram } from "./members.js";
 
 export type Withdrawal = {
   id: string;
@@ -46,7 +46,7 @@ export async function requestWithdrawal(client: PoolClient, userId: string, amou
   if (!Number.isInteger(amount) || amount < MIN_WITHDRAWAL) {
     throw badRequest(`Minimum withdrawal is BDT ${MIN_WITHDRAWAL}`, "minimum_withdrawal");
   }
-  await requireActiveMember(client, userId, "Annual activation is required to withdraw earnings");
+  await requireActiveGrowthProgram(client, userId, "Growth Program activation is required to withdraw earnings");
   const booking = await client.query(
     `select 1 from bookings where user_id = $1 and status in ('confirmed','activated') limit 1`, [userId],
   );

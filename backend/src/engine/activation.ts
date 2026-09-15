@@ -1,12 +1,14 @@
-// Annual activation (BDT 1,000) — financially separate from booking
-// economics. A member must be "active" for their sponsees to count toward a
-// sponsor's qualification (see engine/network.ts getEligibleSponsorCount).
+// Growth Program Activation (BDT 1,000 / year) — financially separate from
+// booking economics. A member must be Growth-active for sponsees to count
+// toward a sponsor's qualification (see engine/network.ts getEligibleSponsorCount).
 import type { PoolClient } from "pg";
-import { badRequest, conflict, notFound } from "../errors.js";
+import { badRequest, conflict, forbidden, notFound } from "../errors.js";
 import { uid } from "../ids.js";
+import { recordConsents, requireCurrentConsents } from "./terms.js";
 
 const ACTIVATION_FEE = 1000;
 const YEAR_MS = 365 * 24 * 60 * 60 * 1000;
+const GROWTH_ACTIVATION_DOCUMENTS = ["GROWTH_PROGRAM_TERMS", "GROWTH_ACTIVATION_TERMS"] as const;
 
 export type AnnualActivation = {
   id: string;
@@ -20,7 +22,11 @@ export type AnnualActivation = {
   decided_by_admin_id: string | null;
 };
 
-export async function requestActivation(client: PoolClient, userId: string): Promise<AnnualActivation> {
+export async function requestActivation(
+  client: PoolClient,
+  userId: string,
+  input: { acceptGrowthTerms?: unknown } = {},
+): Promise<AnnualActivation> {
   await client.query(
     `update members set activation_status = 'expired', updated_at = now()
       where user_id = $1 and activation_status = 'active'
@@ -32,14 +38,37 @@ export async function requestActivation(client: PoolClient, userId: string): Pro
       where user_id = $1 and status = 'active' and period_end <= now()`,
     [userId],
   );
-  const { rows: memberRows } = await client.query<{ activation_status: string }>(
-    `select activation_status from members where user_id = $1 for update`,
+  const { rows: memberRows } = await client.query<{
+    activation_status: string;
+    sponsor_user_id: string | null;
+    role: string;
+  }>(
+    `select activation_status, sponsor_user_id, role from members where user_id = $1 for update`,
     [userId],
   );
   if (!memberRows[0]) throw notFound("Member not found");
+  if (!memberRows[0].sponsor_user_id && memberRows[0].role !== "admin") {
+    throw forbidden(
+      "A valid Growth Program referral is required before activation",
+      "growth_referral_required",
+    );
+  }
   if (memberRows[0].activation_status === "active" || memberRows[0].activation_status === "pending") {
     throw conflict(`Activation already ${memberRows[0].activation_status}`);
   }
+
+  if (input.acceptGrowthTerms === true) {
+    await recordConsents(client, userId, {
+      keys: [...GROWTH_ACTIVATION_DOCUMENTS],
+      context: "growth_activation",
+    });
+  }
+  await requireCurrentConsents(
+    client,
+    userId,
+    [...GROWTH_ACTIVATION_DOCUMENTS],
+    "Growth Program Terms and Growth Activation Terms must be accepted",
+  );
 
   const periodStart = new Date();
   const periodEnd = new Date(periodStart.getTime() + YEAR_MS);

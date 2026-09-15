@@ -36,7 +36,7 @@ function AdminOverview() {
       />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Members" value={String(members.length)} hint={`${active} with active annual activation`} />
+        <StatCard label="Members" value={String(members.length)} hint={`${active} with active Growth Program`} />
         <StatCard
           label="Published offers"
           value={String(published)}

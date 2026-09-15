@@ -50,8 +50,8 @@ function CommissionPage() {
 
       <Surface>
         <h2 className="font-display text-xl font-semibold">Withdraw earnings</h2>
-        <p className="mt-2 text-sm text-muted">Requires current annual activation, an own confirmed booking, minimum BDT 1,000, and a saved payout method.</p>
-        <ul className="mt-4 grid gap-2 text-sm sm:grid-cols-2"><li>{member.activation_status==="active"?"✓":"✕"} Active ID</li><li>{hasOwnBooking?"✓":"✕"} Own confirmed booking</li><li>{wallet.available>=1000?"✓":"✕"} Minimum available balance</li><li>{(payoutData?.methods??[]).length?"✓":"✕"} Saved payout method</li></ul>
+        <p className="mt-2 text-sm text-muted">Requires current Growth Program Activation, an own confirmed booking, minimum BDT 1,000, and a saved payout method.</p>
+        <ul className="mt-4 grid gap-2 text-sm sm:grid-cols-2"><li>{member.activation_status==="active"?"✓":"✕"} Growth Program Active</li><li>{hasOwnBooking?"✓":"✕"} Own confirmed booking</li><li>{wallet.available>=1000?"✓":"✕"} Minimum available balance</li><li>{(payoutData?.methods??[]).length?"✓":"✕"} Saved payout method</li></ul>
         <form onSubmit={withdraw} className="mt-5 grid gap-4 sm:grid-cols-2">
           <Field label="Saved payout method"><select className="field-control" value={methodId} onChange={(e)=>setMethodId(e.target.value)} required><option value="">Select method</option>{(payoutData?.methods??[]).map((m)=><option key={m.id} value={m.id}>{m.method_type.toUpperCase()} · {m.details.accountNumber}</option>)}</select></Field>
           <Field label="Requested amount"><Input type="number" min={1000} step={1} value={amount} onChange={(e)=>setAmount(Number(e.target.value))} required/></Field>

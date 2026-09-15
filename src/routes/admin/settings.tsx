@@ -29,7 +29,7 @@ function AdminSettings() {
           />
           <Row label="Commission base" value="Each source booking’s actual confirmed amount" />
           <Row label="Qualification benefit" value="Member’s own booked offer" />
-          <Row label="Annual activation" value={formatBdt(ACTIVATION_FEE)} />
+          <Row label="Growth Program Activation" value={formatBdt(ACTIVATION_FEE)} />
         </dl>
       </Surface>
     </div>

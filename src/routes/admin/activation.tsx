@@ -23,15 +23,15 @@ function AdminActivation() {
   return (
     <div className="space-y-8">
       <PageHeader
-        kicker="Activation"
-        title="Annual activation"
-        description={`Fee ${formatBdt(ACTIVATION_FEE)}. Separate from property booking and commission.`}
+        kicker="Growth Program"
+        title="Growth Program Activation"
+        description={`Fee ${formatBdt(ACTIVATION_FEE)} / year. Separate from property booking and commission.`}
       />
       {activations.length === 0 ? (
         <EmptyState
           icon={BadgeCheck}
-          title="No activation requests"
-          description="Requests appear when a member requests annual activation."
+          title="No Growth Program Activation requests"
+          description="Requests appear when a Growth member requests annual activation."
         />
       ) : (
         <Surface className="p-0 sm:p-0">
@@ -45,6 +45,11 @@ function AdminActivation() {
                       Requested {formatWhen(a.requested_at)}
                       {a.period_end ? ` · Expires ${formatWhen(a.period_end)}` : ""}
                     </p>
+                    {Array.isArray(a.consents) && a.consents.length ? (
+                      <p className="mt-1 text-xs text-subtle">
+                        Terms {a.consents.map((c) => `${c.document_key} v${c.document_version}`).join(" · ")}
+                      </p>
+                    ) : null}
                   </div>
                   <StatusBadge status={a.status} />
                 </div>

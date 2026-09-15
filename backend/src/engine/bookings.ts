@@ -3,7 +3,7 @@ import { badRequest, conflict, notFound } from "../errors.js";
 import { uid } from "../ids.js";
 import { postCommissionsForBooking, reverseCommissionsForBooking } from "./commissions.js";
 import { consumeInventoryForConfirmation, soldForOffer } from "./inventory.js";
-import { requireActiveMember } from "./members.js";
+import { requireActiveGrowthProgram } from "./members.js";
 import {
   releaseMerchantPaymentForBooking,
   reverseMerchantPaymentForBooking,
@@ -64,7 +64,7 @@ type OfferFreeze = {
  * (mixed offers, each keeping its own booked terms). Pending does not reserve
  * inventory. */
 export async function createBooking(client: PoolClient, userId: string, offerSlug: string): Promise<Booking> {
-  await requireActiveMember(client, userId, "Annual activation approval is required before booking");
+  await requireActiveGrowthProgram(client, userId, "Growth Program activation is required before booking");
   const { rows: offerRows } = await client.query<OfferFreeze>(
     `select slug, retail_value, booking_amount, qualification_benefit,
             coalesce(commission_eligible_amount, booking_amount) as commission_eligible_amount,

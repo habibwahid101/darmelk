@@ -90,7 +90,7 @@ function BookOfferPage() {
     );
   }
 
-  if (member.activation_status !== "active") return <div className="mx-auto max-w-xl space-y-6"><PageHeader kicker="Booking" title="Activation required" description="Annual activation approval is required before a property booking can be submitted."/><Surface><p className="text-sm text-muted">Activate your member ID first. The annual fee is separate from the property booking amount.</p><Button asChild className="mt-5"><Link to="/app/activation">Go to activation</Link></Button></Surface></div>;
+  if (member.activation_status !== "active") return <div className="mx-auto max-w-xl space-y-6"><PageHeader kicker="Booking" title="Growth Program Activation required" description="Growth Program Activation approval is required before a property booking can be submitted."/><Surface><p className="text-sm text-muted">Activate the Growth Program first. The annual fee is separate from the property booking amount.</p><Button asChild className="mt-5"><Link to="/app/activation">Go to Growth Program Activation</Link></Button></Surface></div>;
 
   return (
     <div className="mx-auto max-w-2xl space-y-8">
@@ -143,7 +143,7 @@ function BookOfferPage() {
             <li>Admin approval confirms and activates the booking.</li>
             <li>Qualification benefit stays attached to this offer, not a global figure.</li>
             <li>
-              Annual activation is a separate {formatBdt(ACTIVATION_FEE)} fee and is not part of this
+              Growth Program Activation is a separate {formatBdt(ACTIVATION_FEE)} fee and is not part of this
               booking.
             </li>
           </ul>

@@ -12,7 +12,11 @@ type ManualTarget = "activation" | "booking" | "merchant_bundle";
 type PayMode = PaymentDestination["method"] | "merchant";
 
 function destinationLabel(destination: PaymentDestination, targetType: ManualTarget) {
-  if (targetType === "booking" && destination.method === "bank") return "Pay via Darmelk Bank";
+  if (destination.method === "bank") {
+    return targetType === "booking" ? "Pay via Darmelk Bank" : "Darmelk Bank";
+  }
+  if (destination.method === "bkash") return "bKash";
+  if (destination.method === "nagad") return "Nagad";
   return destination.label;
 }
 

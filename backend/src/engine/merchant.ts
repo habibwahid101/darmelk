@@ -1,6 +1,7 @@
 import type { PoolClient } from "pg";
 import { badRequest, conflict, forbidden, notFound } from "../errors.js";
 import { uid } from "../ids.js";
+import { recordConsents } from "./terms.js";
 
 export const BUNDLE_STATUSES = new Set(["draft", "active", "inactive"]);
 export const MERCHANT_STATUSES = new Set(["pending", "active", "suspended", "inactive"]);
@@ -428,6 +429,12 @@ export async function startBundlePurchase(
   const bundleId = cleanText(input.bundleId, "Bundle", 80, true);
   const bundle = await getBundle(client, bundleId);
   await ensureMerchantRow(client, userId);
+  await recordConsents(client, userId, {
+    keys: ["MERCHANT_PAYMENT_TERMS"],
+    context: "merchant_bundle",
+    referenceId: bundle.id,
+    metadata: { bundleVersion: bundle.version },
+  });
   const { rows } = await client.query<MerchantPurchase>(
     `insert into merchant_bundle_purchases
        (id, user_id, bundle_id, bundle_version, bundle_name, purchase_amount, purchased_credit, bonus_credit,

@@ -201,6 +201,10 @@ function Login() {
                     <Link to="/terms" className="font-medium text-pine underline-offset-2 hover:underline">
                       Terms & Conditions
                     </Link>
+                    {" "}and{" "}
+                    <Link to="/privacy" className="font-medium text-pine underline-offset-2 hover:underline">
+                      Privacy Policy
+                    </Link>
                     .
                   </span>
                 </label>

@@ -25,8 +25,8 @@ const marketplace = [
 
 const program = [
   [
-    "How does activation work?",
-    "Annual activation costs BDT 1,000. Submit payment evidence for admin review. Active-member privileges begin only after approval and pause after expiry until renewal.",
+    "How does Growth Program Activation work?",
+    "Growth Program Activation costs BDT 1,000 per year. Submit payment evidence for admin review. Growth privileges begin only after approval and pause after expiry until renewal. A Darmelk account stays free.",
   ],
   [
     "How does qualification work?",
@@ -38,15 +38,15 @@ const program = [
   ],
   [
     "When can I withdraw?",
-    "You need an active ID, at least one own confirmed or activated booking, sufficient available commission, and a saved payout method. The minimum is BDT 1,000 and the fee is 2.5%.",
+    "You need an active Growth Program period, at least one own confirmed or activated booking, sufficient available commission, and a saved payout method. The minimum is BDT 1,000 and the fee is 2.5%.",
   ],
   [
     "How are payments approved?",
-    "Activation and booking payments are manual. Submit the transaction reference and proof; an admin reviews and approves or rejects the submission. Submission is not instant approval.",
+    "Growth Program Activation and booking payments are manual. Submit the transaction reference and proof; an admin reviews and approves or rejects the submission. Submission is not instant approval.",
   ],
   [
-    "What happens when activation expires?",
-    "Your account, history, network, balances, and existing qualification records remain. Applicable sponsoring, earning, booking, and withdrawal privileges pause until renewal is approved.",
+    "What happens when Growth Program Activation expires?",
+    "Your account, history, network, balances, and existing qualification records remain. Applicable sponsoring, earning, Growth booking, and withdrawal privileges pause until renewal is approved.",
   ],
 ] as const;
 
@@ -86,10 +86,10 @@ function FaqPage() {
         <p className="text-xs font-medium uppercase tracking-[.18em] text-pine">FAQ</p>
         <h1 className="mt-3 font-display text-4xl font-semibold text-pretty">Property questions, plainly answered</h1>
         <p className="mt-4 text-sm leading-relaxed text-muted text-pretty">
-          Start with how to explore properties and request to book. Member program mechanics remain documented below.
+          Start with how to explore properties and request to book. Growth Program mechanics remain documented below.
         </p>
         <FaqGroup title="Exploring properties" items={marketplace} idPrefix="market" />
-        <FaqGroup title="Member program" items={program} idPrefix="program" />
+        <FaqGroup title="Growth Program" items={program} idPrefix="program" />
         <p className="mt-6 text-sm text-muted">
           For the authoritative product rules, read{" "}
           <Link to="/program-rules" className="font-medium text-pine hover:underline">

@@ -19,6 +19,7 @@ import {
 import { getCommissionTotals } from "./engine/commissions.js";
 import { completeOnboarding, ensureMember, logAdminAction, requireAdmin, bindSponsorForGrowth } from "./engine/members.js";
 import { createContactRequest, listContactRequests, updateContactRequestStatus } from "./engine/contact.js";
+import { getPolicy, listCurrentPolicies, listUserConsents, policyBySlug, recordConsents } from "./engine/terms.js";
 import { getQualificationStatus, PERSONAL_SPONSOR_TARGET, TOTAL_POSITIONS } from "./engine/network.js";
 import { listLeadershipRewardSummaries, syncLeadershipReward } from "./engine/leadership.js";
 import { decideWithdrawal, markWithdrawalPaid, requestWithdrawal } from "./engine/withdrawals.js";
@@ -109,6 +110,19 @@ app.use(
 
 app.get("/api/health", (c) => c.json({ ok: true, service: "darmelk-backend", time: new Date().toISOString() }));
 app.get("/api/payment-destinations", (c) => c.json({ destinations: destinationsForTarget(c.req.query("target")) }));
+app.get("/api/terms", (c) => {
+  const keys = (c.req.query("keys") ?? "")
+    .split(",")
+    .map((key) => key.trim())
+    .filter(Boolean);
+  return c.json({ documents: listCurrentPolicies(keys.length ? keys : undefined) });
+});
+app.get("/api/terms/:key", (c) => {
+  const raw = c.req.param("key");
+  const bySlug = policyBySlug(raw);
+  if (bySlug) return c.json({ document: bySlug });
+  return c.json({ document: getPolicy(raw) });
+});
 
 // Better Auth mounts its whole surface (sign-up, sign-in, sign-out,
 // get-session, forget-password, reset-password, ...) here, handling the raw
@@ -278,7 +292,12 @@ app.post("/api/me/onboarding", async (c) => {
     if (body.name?.trim()) {
       await client.query(`update "user" set name = $2, "updatedAt" = now() where id = $1`, [userId, body.name.trim()]);
     }
-    return completeOnboarding(client, userId, { phone: body.phone ?? "", sponsorCode: body.sponsorCode ?? "" });
+    const result = await completeOnboarding(client, userId, { phone: body.phone ?? "", sponsorCode: body.sponsorCode ?? "" });
+    await recordConsents(client, userId, {
+      keys: ["GENERAL_TERMS", "PRIVACY_POLICY"],
+      context: "signup",
+    });
+    return result;
   });
   return c.json({ member });
 });
@@ -565,14 +584,21 @@ app.get("/api/payments/:id/proof", async (c) => {
 app.post("/api/activation/request", async (c) => {
   const userId = c.get("userId");
   const idempotencyKey = c.req.header("Idempotency-Key");
+  const body = await jsonBody<{ acceptGrowthTerms?: boolean }>(c);
   const result = await withTransaction((client) =>
-    withIdempotency(client, { key: idempotencyKey, endpoint: "POST /api/activation/request", userId, requestBody: {} }, async () => {
+    withIdempotency(client, { key: idempotencyKey, endpoint: "POST /api/activation/request", userId, requestBody: body }, async () => {
       await ensureMember(client, { id: userId, email: c.get("userEmail") });
-      const activation = await requestActivation(client, userId);
+      const activation = await requestActivation(client, userId, { acceptGrowthTerms: body.acceptGrowthTerms });
       return { status: 201, body: { activation } };
     }),
   );
   return c.json(result.body, result.status as 200 | 201);
+});
+
+app.get("/api/me/consents", async (c) => {
+  const userId = c.get("userId");
+  const consents = await withTransaction((client) => listUserConsents(client, userId));
+  return c.json({ consents });
 });
 
 app.get("/api/me/activation", async (c) => {
@@ -727,11 +753,31 @@ app.get("/api/admin/activations", async (c) => {
   const adminId = c.get("userId");
   await withTransaction((client) => requireAdmin(client, adminId));
   const rows = await query(
-    `select a.*, u.name as user_name, u.email as user_email
+    `select a.*, u.name as user_name, u.email as user_email,
+            coalesce((
+              select json_agg(json_build_object(
+                'document_key', c.document_key,
+                'document_version', c.document_version,
+                'accepted_at', c.accepted_at
+              ) order by c.accepted_at desc)
+                from user_consents c
+               where c.user_id = a.user_id and c.context = 'growth_activation'
+            ), '[]'::json) as consents
        from annual_activations a join "user" u on u.id = a.user_id
       order by a.requested_at desc`,
   );
   return c.json({ activations: rows });
+});
+
+app.get("/api/admin/consents", async (c) => {
+  const adminId = c.get("userId");
+  const userId = c.req.query("userId");
+  if (!userId) throw badRequest("userId is required");
+  const consents = await withTransaction(async (client) => {
+    await requireAdmin(client, adminId);
+    return listUserConsents(client, userId);
+  });
+  return c.json({ consents });
 });
 
 app.post("/api/admin/activations/:id/:decision", async (c) => {
