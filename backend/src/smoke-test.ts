@@ -747,6 +747,11 @@ async function main() {
     const activation = await requestActivation(client, matrixRootId, { acceptGrowthTerms: true });
     return approveActivation(client, activation.id, adminMe.member.user_id);
   });
+  record(
+    "expired Growth member without a sponsor can renew the existing activation period",
+    rootRenewal.amount === 1000 && rootRenewal.status === "active" && !matrixRoot.sponsor_user_id,
+    { amount: rootRenewal.amount, status: rootRenewal.status, sponsor: matrixRoot.sponsor_user_id },
+  );
   const restoredReleaseBooking = await withTransaction(async (client) => {
     const created = await createBooking(client, deepest.user_id, "five-star-hotel-share");
     await confirmBooking(client, created.id, adminMe.member.user_id);

@@ -47,7 +47,14 @@ export async function requestActivation(
     [userId],
   );
   if (!memberRows[0]) throw notFound("Member not found");
-  if (!memberRows[0].sponsor_user_id && memberRows[0].role !== "admin") {
+  // First-time Growth activation needs a linked sponsor (or admin QA).
+  // Renewal of an already-expired period does not invent a new sponsor —
+  // that preserves founding/root Growth members who have no sponsor row.
+  if (
+    !memberRows[0].sponsor_user_id &&
+    memberRows[0].role !== "admin" &&
+    memberRows[0].activation_status !== "expired"
+  ) {
     throw forbidden(
       "A valid Growth Program referral is required before activation",
       "growth_referral_required",

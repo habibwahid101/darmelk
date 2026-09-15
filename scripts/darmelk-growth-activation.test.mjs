@@ -67,7 +67,8 @@ test("Growth activation requires sponsor and current Terms, and does not auto-ac
   const router = read("backend/src/router.ts");
   const smoke = read("backend/src/smoke-test.ts");
   const payments = read("backend/src/engine/payments.ts");
-  assert.match(engine, /sponsor_user_id && memberRows\[0\]\.role !== "admin"/);
+  assert.match(engine, /sponsor_user_id &&[\s\S]*role !== "admin"/);
+  assert.match(engine, /activation_status !== "expired"/);
   assert.match(engine, /requireCurrentConsents/);
   assert.match(engine, /GROWTH_PROGRAM_TERMS/);
   assert.match(engine, /GROWTH_ACTIVATION_TERMS/);
@@ -78,6 +79,7 @@ test("Growth activation requires sponsor and current Terms, and does not auto-ac
   assert.match(smoke, /sponsorless general account cannot request Growth Program Activation/);
   assert.match(smoke, /Growth activation without current Terms is rejected/);
   assert.match(smoke, /crafted Growth activation Merchant payment is rejected/);
+  assert.match(smoke, /expired Growth member without a sponsor can renew the existing activation period/);
   assert.match(smoke, /activation payment has no property booking or commission effect/);
 });
 
