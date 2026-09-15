@@ -22,7 +22,7 @@ import { createContactRequest, listContactRequests, updateContactRequestStatus }
 import { getQualificationStatus, PERSONAL_SPONSOR_TARGET, TOTAL_POSITIONS } from "./engine/network.js";
 import { listLeadershipRewardSummaries, syncLeadershipReward } from "./engine/leadership.js";
 import { decideWithdrawal, markWithdrawalPaid, requestWithdrawal } from "./engine/withdrawals.js";
-import { createPaymentSubmission, finalizePayment, getPaymentProof, markPaymentUnderReview, PAYMENT_DESTINATIONS, type PaymentMethod, type PaymentTarget } from "./engine/payments.js";
+import { createPaymentSubmission, finalizePayment, getPaymentProof, markPaymentUnderReview, destinationsForTarget, type PaymentMethod, type PaymentTarget } from "./engine/payments.js";
 import { uid } from "./ids.js";
 import {
   addOfferMedia,
@@ -108,7 +108,7 @@ app.use(
 );
 
 app.get("/api/health", (c) => c.json({ ok: true, service: "darmelk-backend", time: new Date().toISOString() }));
-app.get("/api/payment-destinations", (c) => c.json({ destinations: Object.values(PAYMENT_DESTINATIONS) }));
+app.get("/api/payment-destinations", (c) => c.json({ destinations: destinationsForTarget(c.req.query("target")) }));
 
 // Better Auth mounts its whole surface (sign-up, sign-in, sign-out,
 // get-session, forget-password, reset-password, ...) here, handling the raw

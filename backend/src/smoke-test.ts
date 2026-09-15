@@ -36,10 +36,11 @@ async function main() {
     console.log(ok ? "PASS" : "FAIL", step, detail ?? "");
   };
   const submitAndApprovePayment = async (cookie: string, targetType: "activation" | "booking" | "merchant_bundle", targetId: string, key: string) => {
+    const paymentMethod = targetType === "booking" ? "bank" : "bkash";
     const submitted = await json(await app.request("/api/payments", {
       method: "POST",
       headers: { cookie, "content-type": "application/json", "Idempotency-Key": key },
-      body: JSON.stringify({ targetType, targetId, paymentMethod: "bkash", referenceId: `REF-${key}`,
+      body: JSON.stringify({ targetType, targetId, paymentMethod, referenceId: `REF-${key}`,
         proofFilename: "receipt.png", proofMime: "image/png", proofBase64: "iVBORw0KGgo=" }),
     }));
     const reviewed = await json(await app.request(`/api/admin/payments/${submitted.payment.id}/review`, {
@@ -2490,6 +2491,161 @@ async function main() {
       orderOnly.offer?.inventory?.sold === 3 &&
       orderOnly.offer?.inventory?.available === 1,
     orderOnly.offer?.inventory,
+  );
+
+  const bookingDest = await json(await app.request("/api/payment-destinations?target=booking"));
+  record(
+    "booking destinations expose Darmelk Bank only",
+    Array.isArray(bookingDest.destinations) &&
+      bookingDest.destinations.length === 1 &&
+      bookingDest.destinations[0]?.method === "bank",
+    bookingDest.destinations,
+  );
+  const defaultDest = await json(await app.request("/api/payment-destinations"));
+  record(
+    "unscoped destinations still include bKash, Nagad, and bank",
+    ["bkash", "nagad", "bank"].every((method) => defaultDest.destinations?.some((d: { method: string }) => d.method === method)),
+    defaultDest.destinations,
+  );
+
+  const methodProbe = await json(await app.request("/api/bookings", {
+    method: "POST",
+    headers: { cookie: adminCookie, "content-type": "application/json", "Idempotency-Key": "pay-route-probe" },
+    body: JSON.stringify({ offerSlug: "five-star-hotel-share" }),
+  }));
+  record("payment-route probe booking is pending", methodProbe.booking?.status === "pending", methodProbe.booking);
+
+  const craftedBkash = await json(await app.request("/api/payments", {
+    method: "POST",
+    headers: { cookie: adminCookie, "content-type": "application/json", "Idempotency-Key": "pay-route-bkash" },
+    body: JSON.stringify({
+      targetType: "booking",
+      targetId: methodProbe.booking.id,
+      paymentMethod: "bkash",
+      referenceId: "BKASH-NOT-ALLOWED",
+      proofFilename: "receipt.png",
+      proofMime: "image/png",
+      proofBase64: "iVBORw0KGgo=",
+    }),
+  }));
+  record(
+    "crafted Growth booking bKash payment is rejected",
+    craftedBkash.error?.code === "payment_method_not_allowed",
+    craftedBkash,
+  );
+  const craftedNagad = await json(await app.request("/api/payments", {
+    method: "POST",
+    headers: { cookie: adminCookie, "content-type": "application/json", "Idempotency-Key": "pay-route-nagad" },
+    body: JSON.stringify({
+      targetType: "booking",
+      targetId: methodProbe.booking.id,
+      paymentMethod: "nagad",
+      referenceId: "NAGAD-NOT-ALLOWED",
+      proofFilename: "receipt.png",
+      proofMime: "image/png",
+      proofBase64: "iVBORw0KGgo=",
+    }),
+  }));
+  record(
+    "crafted Growth booking Nagad payment is rejected",
+    craftedNagad.error?.code === "payment_method_not_allowed",
+    craftedNagad,
+  );
+  const craftedVendor = await json(await app.request("/api/payments", {
+    method: "POST",
+    headers: { cookie: adminCookie, "content-type": "application/json", "Idempotency-Key": "pay-route-vendor" },
+    body: JSON.stringify({
+      targetType: "booking",
+      targetId: methodProbe.booking.id,
+      paymentMethod: "vendor",
+      referenceId: "VENDOR-NOT-ALLOWED",
+      proofFilename: "receipt.png",
+      proofMime: "image/png",
+      proofBase64: "iVBORw0KGgo=",
+    }),
+  }));
+  record(
+    "crafted Growth booking vendor payment is rejected",
+    craftedVendor.error?.code === "unsupported_payment_method" || craftedVendor.error?.code === "bad_request",
+    craftedVendor,
+  );
+  const missingRef = await json(await app.request("/api/payments", {
+    method: "POST",
+    headers: { cookie: adminCookie, "content-type": "application/json", "Idempotency-Key": "pay-route-noref" },
+    body: JSON.stringify({
+      targetType: "booking",
+      targetId: methodProbe.booking.id,
+      paymentMethod: "bank",
+      referenceId: "",
+      proofFilename: "receipt.png",
+      proofMime: "image/png",
+      proofBase64: "iVBORw0KGgo=",
+    }),
+  }));
+  record("Growth booking bank payment without a reference is rejected", missingRef.error && missingRef.payment == null, missingRef);
+
+  const bankPay = await json(await app.request("/api/payments", {
+    method: "POST",
+    headers: { cookie: adminCookie, "content-type": "application/json", "Idempotency-Key": "pay-route-bank" },
+    body: JSON.stringify({
+      targetType: "booking",
+      targetId: methodProbe.booking.id,
+      paymentMethod: "bank",
+      referenceId: "CITY-BANK-OK",
+      proofFilename: "receipt.png",
+      proofMime: "image/png",
+      proofBase64: "iVBORw0KGgo=",
+    }),
+  }));
+  record(
+    "Growth booking bank payment is accepted",
+    bankPay.payment?.status === "submitted" && bankPay.payment?.payment_method === "bank",
+    bankPay.payment,
+  );
+  const soldBeforeBank = await soldOf("five-star-hotel-share");
+  const reviewedBank = await json(await app.request(`/api/admin/payments/${bankPay.payment.id}/review`, {
+    method: "POST", headers: { cookie: adminCookie },
+  }));
+  const approvedBank = await json(await app.request(`/api/admin/payments/${bankPay.payment.id}/approve`, {
+    method: "POST", headers: { cookie: adminCookie },
+  }));
+  const probeAfter = await json(await app.request(`/api/bookings/${methodProbe.booking.id}`, { headers: { cookie: adminCookie } }));
+  record(
+    "manual bank approval uses the existing confirm and activate path",
+    reviewedBank.payment?.status === "under_review" &&
+      approvedBank.payment?.status === "approved" &&
+      probeAfter.booking?.status === "activated",
+    { reviewed: reviewedBank.payment?.status, approved: approvedBank.payment?.status, booking: probeAfter.booking?.status },
+  );
+  const soldAfterBank = await soldOf("five-star-hotel-share");
+  record("manual bank approval consumes shared inventory exactly once", soldAfterBank === soldBeforeBank + 1, { soldBeforeBank, soldAfterBank });
+  const repeatApprove = await app.request(`/api/admin/payments/${bankPay.payment.id}/approve`, {
+    method: "POST", headers: { cookie: adminCookie },
+  });
+  const soldAfterRepeat = await soldOf("five-star-hotel-share");
+  record(
+    "repeated manual approval does not double-consume stock",
+    repeatApprove.status >= 400 && soldAfterRepeat === soldAfterBank,
+    { status: repeatApprove.status, soldAfterRepeat },
+  );
+
+  const activationStillBkash = await json(await app.request("/api/payments", {
+    method: "POST",
+    headers: { cookie: adminCookie, "content-type": "application/json", "Idempotency-Key": "pay-route-activation-bkash" },
+    body: JSON.stringify({
+      targetType: "activation",
+      targetId: "not-a-real-activation",
+      paymentMethod: "bkash",
+      referenceId: "ACT-BKASH",
+      proofFilename: "receipt.png",
+      proofMime: "image/png",
+      proofBase64: "iVBORw0KGgo=",
+    }),
+  }));
+  record(
+    "activation still accepts the bKash method (rejected only because the request is missing, not the method)",
+    activationStillBkash.error?.code !== "payment_method_not_allowed",
+    activationStillBkash,
   );
 
   const failed = results.filter((r) => !r.ok);

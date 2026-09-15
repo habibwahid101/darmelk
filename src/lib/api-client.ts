@@ -463,7 +463,10 @@ export type ContactRequest = {
 };
 
 export const api = {
-  paymentDestinations: () => request<{ destinations: PaymentDestination[] }>("/api/payment-destinations"),
+  paymentDestinations: (target?: "activation" | "booking" | "merchant_bundle") =>
+    request<{ destinations: PaymentDestination[] }>(
+      `/api/payment-destinations${target ? `?target=${encodeURIComponent(target)}` : ""}`,
+    ),
   me: () => request<{ member: Member; merchant: MerchantSummary | null }>("/api/me"),
   onboarding: (data: { name?: string; phone?: string; sponsorCode?: string; termsAccepted?: boolean }) =>
     post<{ member: Member }>("/api/me/onboarding", data),
