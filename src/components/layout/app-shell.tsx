@@ -73,7 +73,7 @@ const GROWTH_MORE: NavItem[] = [
   { to: "/app/promotions", label: "Promotions", icon: Megaphone },
   { to: "/app/transactions", label: "Transactions", icon: List },
   { to: "/app/documents", label: "Documents", icon: FileText },
-  { to: "/app/activation", label: "Activation", icon: BadgeCheck },
+  { to: "/app/activation", label: "Growth Activation", icon: BadgeCheck },
   { to: "/app/settings", label: "Account", icon: Settings },
 ];
 
@@ -298,7 +298,7 @@ function JoinGrowthCard() {
       <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-pine">Growth Program</p>
       <h1 className="mt-3 font-display text-3xl font-semibold">Join to use this area</h1>
       <p className="mt-3 max-w-xl text-sm leading-relaxed text-muted">
-        Network, qualification, commission, leadership, and activation belong to the Growth Program. A valid Referral ID is required to join.
+        Network, qualification, commission, leadership, and Growth Program Activation belong to the Growth Program. A valid Referral ID is required to join.
       </p>
       <Button asChild className="mt-6">
         <Link to="/growth-program">Continue to Growth Program</Link>

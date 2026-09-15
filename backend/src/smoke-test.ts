@@ -35,6 +35,12 @@ async function main() {
     results.push({ step, ok, detail });
     console.log(ok ? "PASS" : "FAIL", step, detail ?? "");
   };
+  const requestGrowthActivation = async (cookie: string, extra: Record<string, unknown> = {}) =>
+    json(await app.request("/api/activation/request", {
+      method: "POST",
+      headers: { cookie, "content-type": "application/json" },
+      body: JSON.stringify({ acceptGrowthTerms: true, ...extra }),
+    }));
   const submitAndApprovePayment = async (cookie: string, targetType: "activation" | "booking" | "merchant_bundle", targetId: string, key: string) => {
     const paymentMethod = targetType === "booking" ? "bank" : "bkash";
     const submitted = await json(await app.request("/api/payments", {
@@ -164,6 +170,25 @@ async function main() {
     body: JSON.stringify({ email: "nosponsor@example.com", password: "password123" }),
   });
   record("login works for sponsorless account", generalSignIn.status === 200, generalSignIn.status);
+  const generalConsents = await json(await app.request("/api/me/consents", { headers: { cookie: noSponsorCookie } }));
+  record(
+    "general signup stores auditable General Terms and Privacy acceptance",
+    Array.isArray(generalConsents.consents) &&
+      generalConsents.consents.some((c: { document_key: string; document_version: string }) => c.document_key === "GENERAL_TERMS" && c.document_version === "1") &&
+      generalConsents.consents.some((c: { document_key: string }) => c.document_key === "PRIVACY_POLICY") &&
+      !generalConsents.consents.some((c: { document_key: string }) => c.document_key === "GROWTH_PROGRAM_TERMS"),
+    generalConsents.consents,
+  );
+  const generalActivation = await json(await app.request("/api/activation/request", {
+    method: "POST",
+    headers: { cookie: noSponsorCookie, "content-type": "application/json" },
+    body: JSON.stringify({ acceptGrowthTerms: true }),
+  }));
+  record(
+    "sponsorless general account cannot request Growth Program Activation",
+    generalActivation.error?.code === "growth_referral_required",
+    generalActivation,
+  );
 
   const whitespaceSignUp = await app.request("/api/auth/sign-up/email", {
     method: "POST",
@@ -243,10 +268,7 @@ async function main() {
   );
   record("self-referral is rejected", selfOnboard.error?.code === "self_sponsor", selfOnboard);
 
-  const adminActivationRequest = await json(await app.request("/api/activation/request", {
-    method: "POST",
-    headers: { cookie: adminCookie },
-  }));
+  const adminActivationRequest = await requestGrowthActivation(adminCookie);
   await submitAndApprovePayment(adminCookie, "activation", adminActivationRequest.activation.id, "admin-activation-payment");
   const adminAfterActivation = await json(await app.request("/api/me", { headers: { cookie: adminCookie } }));
   record("admin QA identity is annually active before earning or sponsoring", adminAfterActivation.member?.activation_status === "active");
@@ -275,13 +297,71 @@ async function main() {
     onboarded,
   );
 
-  const activationReq = await json(await app.request("/api/activation/request", {
-    method: "POST", headers: { cookie: memberCookie },
+  const missingGrowthTerms = await json(await app.request("/api/activation/request", {
+    method: "POST",
+    headers: { cookie: memberCookie, "content-type": "application/json" },
+    body: JSON.stringify({}),
   }));
+  record("Growth activation without current Terms is rejected", missingGrowthTerms.error?.code === "terms_required", missingGrowthTerms);
+
+  const activationReq = await requestGrowthActivation(memberCookie);
   record("member requests annual activation (BDT 1000, separate from booking economics)", activationReq.activation?.amount === 1000 && activationReq.activation?.status === "pending", activationReq);
+  const growthConsents = await json(await app.request("/api/me/consents", { headers: { cookie: memberCookie } }));
+  record(
+    "Growth activation stores exact current Terms versions",
+    growthConsents.consents?.some((c: { document_key: string; document_version: string }) => c.document_key === "GROWTH_PROGRAM_TERMS" && c.document_version === "1") &&
+      growthConsents.consents?.some((c: { document_key: string; document_version: string }) => c.document_key === "GROWTH_ACTIVATION_TERMS" && c.document_version === "1"),
+    growthConsents.consents,
+  );
+  const repeatGrowthTerms = await json(await app.request("/api/activation/request", {
+    method: "POST",
+    headers: { cookie: memberCookie, "content-type": "application/json" },
+    body: JSON.stringify({ acceptGrowthTerms: true }),
+  }));
+  record("repeat Growth activation request is rejected as already pending, not by duplicating consent", repeatGrowthTerms.error && repeatGrowthTerms.activation == null, repeatGrowthTerms);
+  const consentCount = await queryOne<{ n: number }>(
+    `select count(*)::int as n from user_consents where user_id=$1 and document_key='GROWTH_PROGRAM_TERMS' and document_version='1'`,
+    [onboarded.member.user_id],
+  );
+  record("repeated same Terms acceptance is idempotent", consentCount?.n === 1, consentCount);
+  const craftedActivationMerchant = await json(await app.request("/api/payments", {
+    method: "POST",
+    headers: { cookie: memberCookie, "content-type": "application/json", "Idempotency-Key": "act-merchant-not-allowed" },
+    body: JSON.stringify({
+      targetType: "activation",
+      targetId: activationReq.activation.id,
+      paymentMethod: "merchant",
+      referenceId: "MERCHANT-NOT-ALLOWED",
+      proofFilename: "receipt.png",
+      proofMime: "image/png",
+      proofBase64: "iVBORw0KGgo=",
+    }),
+  }));
+  record(
+    "crafted Growth activation Merchant payment is rejected",
+    craftedActivationMerchant.error?.code === "payment_method_not_allowed" || craftedActivationMerchant.error?.code === "unsupported_payment_method",
+    craftedActivationMerchant,
+  );
+  const bookingsBeforeActivationPay = await queryOne<{ n: number }>(
+    `select count(*)::int as n from bookings where user_id=$1`,
+    [onboarded.member.user_id],
+  );
   await submitAndApprovePayment(memberCookie, "activation", activationReq.activation.id, "member-activation-payment");
   const memberMeAfterActivation = await json(await app.request("/api/me", { headers: { cookie: memberCookie } }));
   record("member's activation_status flips to active after verified payment approval", memberMeAfterActivation.member?.activation_status === "active", memberMeAfterActivation.member);
+  const bookingsAfterActivationPay = await queryOne<{ n: number }>(
+    `select count(*)::int as n from bookings where user_id=$1`,
+    [onboarded.member.user_id],
+  );
+  const activationCommission = await queryOne<{ n: number }>(
+    `select count(*)::int as n from commission_ledger where source_user_id=$1 or beneficiary_user_id=$1`,
+    [onboarded.member.user_id],
+  );
+  record(
+    "activation payment has no property booking or commission effect",
+    bookingsBeforeActivationPay?.n === 0 && bookingsAfterActivationPay?.n === 0 && activationCommission?.n === 0,
+    { bookingsBeforeActivationPay, bookingsAfterActivationPay, activationCommission },
+  );
 
   // --- member books the flagship offer ---
   const bookRes = await app.request("/api/bookings", {
@@ -664,9 +744,14 @@ async function main() {
   record("expired member cannot sponsor a new network placement", expiredSponsorshipBlocked === true);
 
   const rootRenewal = await withTransaction(async (client) => {
-    const activation = await requestActivation(client, matrixRootId);
+    const activation = await requestActivation(client, matrixRootId, { acceptGrowthTerms: true });
     return approveActivation(client, activation.id, adminMe.member.user_id);
   });
+  record(
+    "expired Growth member without a sponsor can renew the existing activation period",
+    rootRenewal.amount === 1000 && rootRenewal.status === "active" && !matrixRoot.sponsor_user_id,
+    { amount: rootRenewal.amount, status: rootRenewal.status, sponsor: matrixRoot.sponsor_user_id },
+  );
   const restoredReleaseBooking = await withTransaction(async (client) => {
     const created = await createBooking(client, deepest.user_id, "five-star-hotel-share");
     await confirmBooking(client, created.id, adminMe.member.user_id);
@@ -689,7 +774,7 @@ async function main() {
     body: JSON.stringify({ amount: 1000, payoutMethodId: payoutMethod.method.id }),
   });
   record("expired member is blocked from withdrawal", expiredWithdrawal.status === 403);
-  const renewalReq = await json(await app.request("/api/activation/request", { method: "POST", headers: { cookie: adminCookie } }));
+  const renewalReq = await requestGrowthActivation(adminCookie);
   await submitAndApprovePayment(adminCookie, "activation", renewalReq.activation.id, "admin-renewal-payment");
   const renewed = await json(await app.request("/api/me", { headers: { cookie: adminCookie } }));
   record("BDT 1,000 renewal restores active status", renewalReq.activation?.amount === 1000 && renewed.member?.activation_status === "active", renewed);
@@ -1136,7 +1221,7 @@ async function main() {
       headers: { cookie, "content-type": "application/json" },
       body: JSON.stringify({ name, phone: "+8801999000000", sponsorCode, termsAccepted: true }),
     });
-    const act = await json(await app.request("/api/activation/request", { method: "POST", headers: { cookie } }));
+    const act = await requestGrowthActivation(cookie);
     await submitAndApprovePayment(cookie, "activation", act.activation.id, `${email}-activation`);
     const me = await json(await app.request("/api/me", { headers: { cookie } }));
     return { cookie, member: me.member, merchant: me.merchant };
@@ -2506,6 +2591,24 @@ async function main() {
     "unscoped destinations still include bKash, Nagad, and bank",
     ["bkash", "nagad", "bank"].every((method) => defaultDest.destinations?.some((d: { method: string }) => d.method === method)),
     defaultDest.destinations,
+  );
+  const activationDest = await json(await app.request("/api/payment-destinations?target=activation"));
+  record(
+    "activation destinations still include bKash, Nagad, and bank",
+    ["bkash", "nagad", "bank"].every((method) => activationDest.destinations?.some((d: { method: string }) => d.method === method)) &&
+      !activationDest.destinations?.some((d: { method: string }) => d.method === "merchant"),
+    activationDest.destinations,
+  );
+  const publicTerms = await json(await app.request("/api/terms"));
+  record(
+    "current Terms documents are versioned and readable",
+    publicTerms.documents?.some((d: { key: string; version: string }) => d.key === "GROWTH_PROGRAM_TERMS" && d.version === "1") &&
+      publicTerms.documents?.some((d: { key: string }) => d.key === "GROWTH_ACTIVATION_TERMS") &&
+      publicTerms.documents?.some((d: { key: string }) => d.key === "GENERAL_TERMS") &&
+      publicTerms.documents?.some((d: { key: string }) => d.key === "PRIVACY_POLICY") &&
+      !JSON.stringify(publicTerms).includes("Link Mate") &&
+      !JSON.stringify(publicTerms).includes("11,000"),
+    publicTerms.documents?.map((d: { key: string }) => d.key),
   );
 
   const methodProbe = await json(await app.request("/api/bookings", {

@@ -190,11 +190,11 @@ export async function bindSponsorForGrowth(
 }
 
 /** Refresh a stale active row at the point of use, then enforce the annual
- * activation privilege gate without deleting or rewriting history. */
+ * Growth Program activation privilege gate without deleting or rewriting history. */
 export async function requireActiveMember(
   client: PoolClient,
   userId: string,
-  message = "Annual activation is required",
+  message = "Growth Program activation is required",
 ): Promise<Member> {
   await client.query(
     `update members set activation_status = 'expired', updated_at = now()
@@ -211,6 +211,14 @@ export async function requireActiveMember(
   const member = rows[0];
   if (!member || member.activation_status !== "active") throw forbidden(message);
   return member;
+}
+
+export async function requireActiveGrowthProgram(
+  client: PoolClient,
+  userId: string,
+  message = "Growth Program activation is required",
+): Promise<Member> {
+  return requireActiveMember(client, userId, message);
 }
 
 export async function requireAdmin(client: PoolClient, userId: string): Promise<Member> {

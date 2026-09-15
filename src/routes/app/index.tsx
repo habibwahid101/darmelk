@@ -71,8 +71,8 @@ function OverviewPage() {
       <DashboardPromotions userId={member.user_id} />
       {!active ? (
         <Surface className="border border-clay/20">
-          <p className="text-xs font-medium uppercase tracking-[.16em] text-clay">Account activation</p>
-          <h2 className="mt-3 font-display text-3xl font-semibold">Activate Your Darmelk ID</h2>
+          <p className="text-xs font-medium uppercase tracking-[.16em] text-clay">Growth Program</p>
+          <h2 className="mt-3 font-display text-3xl font-semibold">Growth Program Activation</h2>
           <p className="mt-2 font-display text-2xl">
             BDT 1,000 <span className="font-sans text-sm text-muted">/ year</span>
           </p>
@@ -81,17 +81,17 @@ function OverviewPage() {
             {activationPayment ? <StatusBadge status={activationPayment.status} /> : null}
           </div>
           <p className="mt-4 max-w-xl text-sm leading-relaxed text-muted">
-            Active-member booking, sponsoring, earning, and withdrawal privileges unlock only after payment review and approval.
+            Growth booking, sponsoring, earning, and withdrawal privileges unlock only after payment review and approval. Your Darmelk account stays free.
           </p>
           <Button asChild className="mt-6">
-            <Link to="/app/activation">Continue Activation</Link>
+            <Link to="/app/activation">Continue Growth Program Activation</Link>
           </Button>
         </Surface>
       ) : !booking ? (
         <>
           <Surface>
-            <p className="text-xs font-medium uppercase tracking-[.16em] text-pine">Darmelk ID</p>
-            <h2 className="mt-2 font-display text-3xl font-semibold">Your Darmelk ID is Active</h2>
+            <p className="text-xs font-medium uppercase tracking-[.16em] text-pine">Growth Program</p>
+            <h2 className="mt-2 font-display text-3xl font-semibold">Growth Program Active</h2>
             <p className="mt-2 text-sm text-muted">Active until {formatWhen(member.activation_expires_at)}.</p>
           </Surface>
           <Surface className="grid gap-5 md:grid-cols-[9rem_1fr_auto] md:items-center">
@@ -142,7 +142,7 @@ function Eligibility({ ownBooking }: { ownBooking: boolean }) {
       <ul className="mt-4 space-y-2 text-sm">
         <li className="flex items-center gap-2">
           <Check className="size-4 text-pine" />
-          ID Active
+          Growth Program Active
         </li>
         <li className="flex items-center gap-2">
           {ownBooking ? <Check className="size-4 text-pine" /> : <X className="size-4 text-clay" />}

@@ -185,6 +185,27 @@ export type AnnualActivation = {
   status: "pending" | "active" | "expired" | "rejected";
   requested_at: string;
   decided_at: string | null;
+  consents?: Array<{ document_key: string; document_version: string; accepted_at: string }>;
+};
+
+export type PolicyDocument = {
+  key: string;
+  version: string;
+  slug: string;
+  title: string;
+  effectiveDate: string;
+  summary: string;
+  paragraphs: string[];
+};
+
+export type UserConsent = {
+  id: string;
+  user_id: string;
+  document_key: string;
+  document_version: string;
+  context: string;
+  reference_id: string | null;
+  accepted_at: string;
 };
 
 export type Withdrawal = {
@@ -467,6 +488,13 @@ export const api = {
     request<{ destinations: PaymentDestination[] }>(
       `/api/payment-destinations${target ? `?target=${encodeURIComponent(target)}` : ""}`,
     ),
+  terms: (keys?: string[]) =>
+    request<{ documents: PolicyDocument[] }>(
+      `/api/terms${keys?.length ? `?keys=${encodeURIComponent(keys.join(","))}` : ""}`,
+    ),
+  termsDocument: (key: string) =>
+    request<{ document: PolicyDocument }>(`/api/terms/${encodeURIComponent(key)}`),
+  myConsents: () => request<{ consents: UserConsent[] }>("/api/me/consents"),
   me: () => request<{ member: Member; merchant: MerchantSummary | null }>("/api/me"),
   onboarding: (data: { name?: string; phone?: string; sponsorCode?: string; termsAccepted?: boolean }) =>
     post<{ member: Member }>("/api/me/onboarding", data),
@@ -531,7 +559,8 @@ export const api = {
   declineMerchantRequest: (id: string, idempotencyKey: string) =>
     post<{ request: MerchantPaymentRequest }>(`/api/me/merchant/requests/${id}/decline`, {}, idempotencyKey),
 
-  requestActivation: (idempotencyKey: string) => post<{ activation: AnnualActivation }>("/api/activation/request", {}, idempotencyKey),
+  requestActivation: (idempotencyKey: string, acceptGrowthTerms = true) =>
+    post<{ activation: AnnualActivation }>("/api/activation/request", { acceptGrowthTerms }, idempotencyKey),
   submitPayment: (data: { targetType: "activation" | "booking" | "merchant_bundle"; targetId: string; paymentMethod: "bkash" | "nagad" | "bank"; referenceId: string; proofFilename: string; proofMime: string; proofBase64: string; notes?: string }, idempotencyKey: string) =>
     post<{ payment: PaymentSubmission }>("/api/payments", data, idempotencyKey),
   requestWithdrawal: (amount: number, payoutMethodId: string, idempotencyKey: string) =>
@@ -556,7 +585,9 @@ export const api = {
     decidePayment: (id: string, decision: "approve" | "reject", reason?: string) =>
       post<{ payment: PaymentSubmission }>(`/api/admin/payments/${id}/${decision}`, { reason }),
 
-    activations: () => request<{ activations: AnnualActivation[] }>("/api/admin/activations"),
+    activations: () => request<{ activations: Array<AnnualActivation & { user_name?: string; user_email?: string; consents?: UserConsent[] }> }>("/api/admin/activations"),
+    consents: (userId: string) =>
+      request<{ consents: UserConsent[] }>(`/api/admin/consents?userId=${encodeURIComponent(userId)}`),
     decideActivation: (id: string, decision: "approve" | "reject") =>
       post<{ activation: AnnualActivation }>(`/api/admin/activations/${id}/${decision}`),
 

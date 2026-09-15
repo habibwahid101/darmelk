@@ -62,7 +62,7 @@ function SettingsPage() {
           <Row label="Referral code" value={member.referral_code} />
           <Row label="Sponsor" value={member.sponsor_user_id ? "Assigned" : "None"} />
           <div className="flex items-center justify-between gap-4">
-            <dt className="text-muted">Activation</dt>
+            <dt className="text-muted">Growth Program</dt>
             <dd>
               <StatusBadge status={member.activation_status} />
             </dd>
