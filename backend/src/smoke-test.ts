@@ -2004,20 +2004,28 @@ async function main() {
     method: "POST", headers: { cookie: promoMerchant.cookie, "Idempotency-Key": "promo-m-appr" },
   }));
   const merchantQualBefore = await query(`select id from promotion_qualifications where booking_id=$1`, [merchantBook.booking.id]);
+  const merchantInvBefore = await query(`select id from offer_inventory_events where booking_id=$1 and event_type='consume'`, [merchantBook.booking.id]);
   record(
     "Merchant approval alone does not qualify for a promotion",
     merchantAppr.request?.status === "approved" && merchantQualBefore.length === 0,
     { request: merchantAppr.request?.status, quals: merchantQualBefore.length },
   );
+  record(
+    "Merchant approval does not consume inventory",
+    merchantInvBefore.length === 0,
+    merchantInvBefore.length,
+  );
   const merchantConfirm = await json(await app.request(`/api/admin/bookings/${merchantBook.booking.id}/confirm`, {
     method: "POST", headers: { cookie: adminCookie },
   }));
   const merchantQualAfter = await query(`select id from promotion_qualifications where booking_id=$1 and user_id=$2`, [merchantBook.booking.id, pu6.member.user_id]);
+  const merchantInvAfter = await query(`select id from offer_inventory_events where booking_id=$1 and event_type='consume'`, [merchantBook.booking.id]);
   record(
     "Merchant-funded booking qualifies only after existing confirmation",
     merchantConfirm.booking?.status === "confirmed" && merchantQualAfter.length > 0,
     { status: merchantConfirm.booking?.status, quals: merchantQualAfter.length },
   );
+  record("Merchant-funded confirmation consumes inventory once", merchantInvAfter.length === 1, merchantInvAfter.length);
   const merchantComm = await query(`select id from commission_ledger where source_booking_id=$1`, [merchantBook.booking.id]);
   record("confirmed-but-not-activated promotion booking still has no commission", merchantComm.length === 0);
   await json(await app.request(`/api/admin/bookings/${merchantBook.booking.id}/activate`, {
@@ -2046,6 +2054,94 @@ async function main() {
   record("Leadership Reward remains available after Promotion batch", Array.isArray(lrStill.rewards));
   const merchantStill = await json(await app.request("/api/me/merchant", { headers: { cookie: promoMerchant.cookie } }));
   record("Merchant Credit remains available after Promotion batch", typeof merchantStill.merchant?.available === "number");
+
+  const pu7 = await signupOnboardActivate("promo-user-7@example.com", "Promo Seven", adminMe.member.referral_code);
+  const bankBook = await json(await app.request("/api/bookings", {
+    method: "POST",
+    headers: { cookie: pu7.cookie, "content-type": "application/json", "Idempotency-Key": "promo-bank-book" },
+    body: JSON.stringify({ offerSlug: "five-star-hotel-share" }),
+  }));
+  const bankPendingQual = await query(`select id from promotion_qualifications where booking_id=$1`, [bankBook.booking.id]);
+  record(
+    "Growth Bank booking pending does not qualify",
+    bankBook.booking?.status === "pending" && bankPendingQual.length === 0,
+    { status: bankBook.booking?.status, quals: bankPendingQual.length },
+  );
+  const bankPaySubmitted = await json(await app.request("/api/payments", {
+    method: "POST",
+    headers: { cookie: pu7.cookie, "content-type": "application/json", "Idempotency-Key": "promo-bank-pay" },
+    body: JSON.stringify({
+      targetType: "booking",
+      targetId: bankBook.booking.id,
+      paymentMethod: "bank",
+      referenceId: "REF-promo-bank-pay",
+      proofFilename: "receipt.png",
+      proofMime: "image/png",
+      proofBase64: "iVBORw0KGgo=",
+    }),
+  }));
+  const bankSubmitQual = await query(`select id from promotion_qualifications where booking_id=$1`, [bankBook.booking.id]);
+  record(
+    "Growth Bank payment submission does not qualify",
+    bankPaySubmitted.payment?.status === "submitted" && bankSubmitQual.length === 0,
+    { status: bankPaySubmitted.payment?.status, quals: bankSubmitQual.length },
+  );
+  await json(await app.request(`/api/admin/payments/${bankPaySubmitted.payment.id}/review`, {
+    method: "POST", headers: { cookie: adminCookie },
+  }));
+  const bankApproved = await json(await app.request(`/api/admin/payments/${bankPaySubmitted.payment.id}/approve`, {
+    method: "POST", headers: { cookie: adminCookie },
+  }));
+  const bankQualAfter = await query(`select id from promotion_qualifications where booking_id=$1 and user_id=$2`, [bankBook.booking.id, pu7.member.user_id]);
+  const bankStatus = await queryOne<{ status: string }>(`select status from bookings where id=$1`, [bankBook.booking.id]);
+  const bankInv = await query(`select id from offer_inventory_events where booking_id=$1 and event_type='consume'`, [bankBook.booking.id]);
+  record(
+    "Growth Bank payment approval qualifies through existing confirmation",
+    bankApproved.payment?.status === "approved" && bankStatus?.status === "activated" && bankQualAfter.length > 0,
+    { payment: bankApproved.payment?.status, booking: bankStatus?.status, quals: bankQualAfter.length },
+  );
+  record("Growth Bank confirmation consumes inventory once", bankInv.length === 1, bankInv.length);
+
+  const promoQualsBeforeContact = await queryOne<{ count: string }>(`select count(*)::text as count from promotion_qualifications`);
+  const promoContact = await app.request("/api/contact", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      name: "Promo Contact",
+      profession: "Engineer",
+      mobile: "+8801911111111",
+      location: "Dhaka",
+    }),
+  });
+  const promoRtb = await app.request("/api/contact", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      name: "Promo RtB",
+      profession: "Teacher",
+      mobile: "+8801911111112",
+      location: "Dhaka",
+      offerSlug: "five-star-hotel-share",
+      source: "request_to_book",
+    }),
+  });
+  const promoQualsAfterContact = await queryOne<{ count: string }>(`select count(*)::text as count from promotion_qualifications`);
+  record(
+    "Contact and Request to Book do not qualify for a promotion",
+    promoContact.status === 201 && promoRtb.status === 201 && promoQualsBeforeContact?.count === promoQualsAfterContact?.count,
+    { contact: promoContact.status, rtb: promoRtb.status, before: promoQualsBeforeContact, after: promoQualsAfterContact },
+  );
+  const promoTerms = await json(await app.request("/api/terms/promotion"));
+  record(
+    "Promotion Terms are readable without consent",
+    promoTerms.document?.key === "PROMOTION_TERMS" &&
+      promoTerms.document?.version === "1" &&
+      promoTerms.document?.slug === "promotion" &&
+      Array.isArray(promoTerms.document?.paragraphs) &&
+      promoTerms.document.paragraphs.some((p: string) => p.includes("confirmed")) &&
+      !JSON.stringify(promoTerms).toLowerCase().includes("guaranteed gift"),
+    { key: promoTerms.document?.key, version: promoTerms.document?.version },
+  );
 
   // --- Growth Program: bind sponsor later on an isolated sponsorless tree ---
   const signupGeneralLater = async (email: string, name: string) => {
@@ -2606,6 +2702,7 @@ async function main() {
       publicTerms.documents?.some((d: { key: string }) => d.key === "GROWTH_ACTIVATION_TERMS") &&
       publicTerms.documents?.some((d: { key: string }) => d.key === "GENERAL_TERMS") &&
       publicTerms.documents?.some((d: { key: string }) => d.key === "PRIVACY_POLICY") &&
+      publicTerms.documents?.some((d: { key: string; slug: string }) => d.key === "PROMOTION_TERMS" && d.slug === "promotion") &&
       !JSON.stringify(publicTerms).includes("Link Mate") &&
       !JSON.stringify(publicTerms).includes("11,000"),
     publicTerms.documents?.map((d: { key: string }) => d.key),

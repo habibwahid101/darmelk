@@ -139,6 +139,9 @@ export async function confirmBooking(client: PoolClient, bookingId: string, admi
     [bookingId, adminUserId],
   );
   await settleMerchantPaymentForBooking(client, bookingId);
+  // Single qualification entry for every payment rail. Bank approval and
+  // Merchant-funded confirmation both reach this function; Merchant approval
+  // itself never does.
   await evaluatePromotionsForConfirmedBooking(client, bookingId, adminUserId);
   return updated[0]!;
 }

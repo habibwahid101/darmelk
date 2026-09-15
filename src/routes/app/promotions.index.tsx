@@ -19,8 +19,13 @@ function MemberPromotionsPage() {
       <PageHeader
         kicker="Promotions"
         title="Current promotions"
-        description="Complete an eligible confirmed property booking inside the campaign window to qualify. Creating a booking or paying by Merchant is not enough."
+        description="Complete an eligible confirmed Darmelk property booking inside the campaign window to qualify. Darmelk Bank and Pay by Merchant bookings are treated the same way after confirmation. Creating a booking, submitting payment, Merchant approval, or a Request to Book is not enough."
       />
+      <p className="text-sm text-muted">
+        <Link to="/terms" search={{ key: "promotion" }} className="font-medium text-pine underline-offset-2 hover:underline">
+          Read Promotion Terms
+        </Link>
+      </p>
       {loading && !data ? (
         <p className="text-sm text-muted">Loading promotions…</p>
       ) : promotions.length === 0 ? (

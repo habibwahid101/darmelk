@@ -105,6 +105,13 @@ export function DashboardPromotions({ userId }: { userId?: string }) {
                 More promotions ({more.length})
               </Link>
             ) : null}
+            <Link
+              to="/terms"
+              search={{ key: "promotion" }}
+              className="text-center text-sm font-medium text-pine underline-offset-2 hover:underline"
+            >
+              Promotion Terms
+            </Link>
           </div>
         </div>
       </div>
