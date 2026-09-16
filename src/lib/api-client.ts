@@ -538,10 +538,10 @@ export const api = {
     post<{ method: PayoutMethod }>("/api/me/payout-methods", { methodType, details }),
 
   booking: (id: string) => request<{ booking: Booking; merchantRequest: MerchantPaymentRequest | null }>(`/api/bookings/${id}`),
-  createBooking: (offerSlug: string, idempotencyKey: string) =>
-    post<{ booking: Booking }>("/api/bookings", { offerSlug }, idempotencyKey),
-  requestMerchantPay: (bookingId: string, merchantUserId: string, idempotencyKey: string) =>
-    post<{ request: MerchantPaymentRequest }>(`/api/bookings/${bookingId}/merchant-pay`, { merchantUserId }, idempotencyKey),
+  createBooking: (offerSlug: string, idempotencyKey: string, acceptBookingTerms: boolean) =>
+    post<{ booking: Booking }>("/api/bookings", { offerSlug, acceptBookingTerms }, idempotencyKey),
+  requestMerchantPay: (bookingId: string, merchantUserId: string, idempotencyKey: string, acceptMerchantTerms: boolean) =>
+    post<{ request: MerchantPaymentRequest }>(`/api/bookings/${bookingId}/merchant-pay`, { merchantUserId, acceptMerchantTerms }, idempotencyKey),
 
   promotions: () => request<{ promotions: Promotion[]; serverNow: string }>("/api/promotions"),
   promotion: (id: string) =>

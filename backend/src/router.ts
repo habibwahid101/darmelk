@@ -508,7 +508,7 @@ app.post("/api/me/payout-methods", async (c) => {
 // ---- bookings -------------------------------------------------------------
 app.post("/api/bookings", async (c) => {
   const userId = c.get("userId");
-  const body = await jsonBody<{ offerSlug?: string }>(c);
+  const body = await jsonBody<{ offerSlug?: string; acceptBookingTerms?: boolean }>(c);
   if (!body.offerSlug) throw badRequest("offerSlug is required");
   const idempotencyKey = c.req.header("Idempotency-Key");
 
@@ -518,7 +518,9 @@ app.post("/api/bookings", async (c) => {
       { key: idempotencyKey, endpoint: "POST /api/bookings", userId, requestBody: body },
       async () => {
         await ensureMember(client, { id: userId, email: c.get("userEmail") });
-        const booking = await createBooking(client, userId, body.offerSlug!);
+        const booking = await createBooking(client, userId, body.offerSlug!, {
+          acceptBookingTerms: body.acceptBookingTerms,
+        });
         return { status: 201, body: { booking } };
       },
     ),
@@ -543,13 +545,15 @@ app.get("/api/bookings/:id", async (c) => {
 app.post("/api/bookings/:id/merchant-pay", async (c) => {
   const userId = c.get("userId");
   const bookingId = c.req.param("id");
-  const body = await jsonBody<{ merchantUserId?: string }>(c);
+  const body = await jsonBody<{ merchantUserId?: string; acceptMerchantTerms?: boolean }>(c);
   const result = await withTransaction((client) =>
     withIdempotency(
       client,
       { key: c.req.header("Idempotency-Key"), endpoint: `POST /api/bookings/${bookingId}/merchant-pay`, userId, requestBody: body },
       async () => {
-        const request = await createMerchantPaymentRequest(client, userId, bookingId, body.merchantUserId);
+        const request = await createMerchantPaymentRequest(client, userId, bookingId, body.merchantUserId, {
+          acceptMerchantTerms: body.acceptMerchantTerms,
+        });
         return { status: 201, body: { request } };
       },
     ),

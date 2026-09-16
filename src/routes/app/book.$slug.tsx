@@ -7,6 +7,7 @@ import { useMemberSession } from "@/components/layout/use-member";
 import { formatBdt, fromApiOffer, getOffer, isBookable, isSoldOut } from "@/lib/offers";
 import { api, ApiError } from "@/lib/api-client";
 import { PaymentForm } from "@/components/payment-form";
+import { TermsAccept } from "@/components/terms-accept";
 
 const ACTIVATION_FEE = 1000;
 
@@ -32,15 +33,21 @@ function BookOfferPage() {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [bookingId, setBookingId] = useState<string | null>(null);
+  const [accepted, setAccepted] = useState<Record<string, boolean>>({});
   const soldOut = isSoldOut(offer);
+  const termsReady = Boolean(accepted.PROPERTY_BOOKING_TERMS);
 
   if (!member) return null;
 
   async function submit() {
+    if (!termsReady) {
+      setError("Property Booking Terms must be accepted.");
+      return;
+    }
     setPending(true);
     setError(null);
     try {
-      const { booking } = await api.createBooking(offer.slug, crypto.randomUUID());
+      const { booking } = await api.createBooking(offer.slug, crypto.randomUUID(), true);
       setBookingId(booking.id);
       setStep(3);
     } catch (err) {
@@ -139,15 +146,31 @@ function BookOfferPage() {
           <p className="text-sm font-medium">What happens next</p>
           <ul className="mt-3 space-y-2 text-sm text-muted">
             <li>{offerBookingCopy(offer)}</li>
+            <li>This booking freezes the commercial figures shown above. Later offer edits do not rewrite it.</li>
             <li>After creating the request, pay via Darmelk Bank or Pay by Merchant.</li>
-            <li>Admin approval confirms and activates the booking.</li>
+            <li>Payment submission and Merchant approval do not confirm the booking. Darmelk confirms it after review.</li>
+            <li>Inventory is consumed once at confirmation. Reversal does not restore stock.</li>
             <li>Qualification benefit stays attached to this offer, not a global figure.</li>
             <li>
               Growth Program Activation is a separate {formatBdt(ACTIVATION_FEE)} fee and is not part of this
               booking.
             </li>
           </ul>
-          {error ? <p className="mt-3 text-sm text-clay">{error}</p> : null}
+          <div className="mt-5">
+            <TermsAccept
+              statement="Read the Property Booking Terms, then confirm. The box starts unchecked."
+              items={[
+                {
+                  key: "PROPERTY_BOOKING_TERMS",
+                  label: "Property Booking Terms for this booking",
+                  href: "/terms?key=booking",
+                },
+              ]}
+              accepted={accepted}
+              onChange={(key, value) => setAccepted((current) => ({ ...current, [key]: value }))}
+            />
+          </div>
+          {error ? <p className="mt-3 text-sm text-clay" role="alert">{error}</p> : null}
         </Surface>
       ) : null}
 
@@ -160,7 +183,7 @@ function BookOfferPage() {
           </Button>
         ) : step === 1 ? (
           <>
-            <Button onClick={() => setStep(2)}>Continue to summary</Button>
+            <Button onClick={() => { setAccepted({}); setStep(2); }}>Continue to summary</Button>
             <Button asChild variant="ghost">
               <Link to="/properties/$slug" params={{ slug: offer.slug }}>
                 Back to offer
@@ -169,10 +192,10 @@ function BookOfferPage() {
           </>
         ) : (
           <>
-            <Button onClick={() => void submit()} disabled={pending}>
+            <Button onClick={() => void submit()} disabled={pending || !termsReady}>
               {pending ? "Submitting…" : "Submit booking request"}
             </Button>
-            <Button variant="ghost" onClick={() => setStep(1)} disabled={pending}>
+            <Button variant="ghost" onClick={() => { setAccepted({}); setStep(1); }} disabled={pending}>
               Back
             </Button>
           </>

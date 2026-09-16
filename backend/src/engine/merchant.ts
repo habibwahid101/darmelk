@@ -1,7 +1,7 @@
 import type { PoolClient } from "pg";
 import { badRequest, conflict, forbidden, notFound } from "../errors.js";
 import { uid } from "../ids.js";
-import { recordConsents } from "./terms.js";
+import { recordConsents, requireCurrentConsentFor } from "./terms.js";
 
 export const BUNDLE_STATUSES = new Set(["draft", "active", "inactive"]);
 export const MERCHANT_STATUSES = new Set(["pending", "active", "suspended", "inactive"]);
@@ -564,7 +564,11 @@ export async function createMerchantPaymentRequest(
   customerUserId: string,
   bookingId: string,
   merchantUserIdRaw: unknown,
+  input: { acceptMerchantTerms?: unknown } = {},
 ): Promise<MerchantPaymentRequest> {
+  if (input.acceptMerchantTerms !== true) {
+    throw badRequest("Merchant Payment Terms must be accepted", "terms_required");
+  }
   const merchantUserId = cleanText(merchantUserIdRaw, "Merchant User ID", 120, true);
   const { rows: bookingRows } = await client.query<{
     id: string;
@@ -610,6 +614,21 @@ export async function createMerchantPaymentRequest(
   if (merchant.available < booking.booking_amount) {
     throw conflict("Merchant does not have sufficient available credit", "insufficient_credit");
   }
+
+  await recordConsents(client, customerUserId, {
+    keys: ["MERCHANT_PAYMENT_TERMS"],
+    context: "merchant_payment",
+    referenceId: booking.id,
+    metadata: { bookingId: booking.id, offerSlug: booking.offer_slug, merchantUserId },
+  });
+  await requireCurrentConsentFor(
+    client,
+    customerUserId,
+    "MERCHANT_PAYMENT_TERMS",
+    "merchant_payment",
+    booking.id,
+    "Merchant Payment Terms must be accepted",
+  );
 
   try {
     const { rows } = await client.query<MerchantPaymentRequest>(

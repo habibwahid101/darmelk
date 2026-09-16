@@ -267,6 +267,38 @@ export async function hasCurrentConsent(
   return Boolean(rows[0]);
 }
 
+export async function hasCurrentConsentFor(
+  client: PoolClient,
+  userId: string,
+  key: DocumentKey,
+  context: ConsentContext,
+  referenceId?: string | null,
+): Promise<boolean> {
+  const doc = POLICY_DOCUMENTS[key];
+  const referenceKey = referenceId ?? "";
+  const { rows } = await client.query(
+    `select 1 from user_consents
+      where user_id = $1 and document_key = $2 and document_version = $3
+        and context = $4 and reference_key = $5
+      limit 1`,
+    [userId, doc.key, doc.version, context, referenceKey],
+  );
+  return Boolean(rows[0]);
+}
+
+export async function requireCurrentConsentFor(
+  client: PoolClient,
+  userId: string,
+  key: DocumentKey,
+  context: ConsentContext,
+  referenceId: string | null,
+  message = "Required terms must be accepted",
+): Promise<void> {
+  if (!(await hasCurrentConsentFor(client, userId, key, context, referenceId))) {
+    throw forbidden(message, "terms_required");
+  }
+}
+
 export async function requireCurrentConsents(
   client: PoolClient,
   userId: string,

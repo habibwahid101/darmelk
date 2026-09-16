@@ -66,8 +66,7 @@ test("Promotion Terms are readable, versioned, and not a blocking consent gate",
   assert.doesNotMatch(activation, /PROMOTION_TERMS/);
   assert.doesNotMatch(merchant, /PROMOTION_TERMS/);
   assert.doesNotMatch(bookings, /PROMOTION_TERMS/);
-  assert.doesNotMatch(bookings, /PROPERTY_BOOKING_TERMS/);
-  assert.doesNotMatch(bookings, /requireCurrentConsents/);
+  assert.match(bookings, /PROPERTY_BOOKING_TERMS/);
 });
 
 test("promotion UI wires readable Terms without changing the dashboard grid", () => {
