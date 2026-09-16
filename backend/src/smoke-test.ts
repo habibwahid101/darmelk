@@ -35,6 +35,19 @@ async function main() {
     results.push({ step, ok, detail });
     console.log(ok ? "PASS" : "FAIL", step, detail ?? "");
   };
+
+  const healthRes = await app.request("/api/health");
+  record(
+    "API responses send nosniff and deny framing",
+    healthRes.headers.get("x-content-type-options") === "nosniff" &&
+      healthRes.headers.get("x-frame-options") === "DENY" &&
+      healthRes.headers.get("referrer-policy") === "strict-origin-when-cross-origin",
+    {
+      nosniff: healthRes.headers.get("x-content-type-options"),
+      frame: healthRes.headers.get("x-frame-options"),
+      referrer: healthRes.headers.get("referrer-policy"),
+    },
+  );
   const requestGrowthActivation = async (cookie: string, extra: Record<string, unknown> = {}) =>
     json(await app.request("/api/activation/request", {
       method: "POST",

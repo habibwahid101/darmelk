@@ -104,7 +104,7 @@ export function SiteHeader() {
         <button
           type="button"
           className={cn(
-            "relative inline-flex size-11 items-center justify-center rounded-lg lg:hidden",
+            "relative inline-flex size-11 items-center justify-center rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pine lg:hidden",
             inverted ? "text-cream" : "text-ink",
           )}
           aria-label={open ? "Close menu" : "Open menu"}

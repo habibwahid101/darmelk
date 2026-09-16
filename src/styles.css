@@ -173,7 +173,8 @@
   color: var(--color-subtle);
 }
 
-.field-control:focus {
+.field-control:focus,
+.field-control:focus-visible {
   box-shadow: 0 0 0 2px var(--color-brand-hover);
 }
 

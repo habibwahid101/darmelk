@@ -21,7 +21,7 @@ export function TermsAccept({
         {statement ?? "Read each document, then confirm. Boxes start unchecked."}
       </legend>
       {items.map((item) => (
-        <label key={item.key} className="flex items-start gap-3 rounded-xl bg-paper px-3 py-3 text-sm leading-relaxed">
+        <label key={item.key} className="flex min-h-11 items-start gap-3 rounded-xl bg-paper px-3 py-3 text-sm leading-relaxed">
           <input
             type="checkbox"
             className="mt-0.5 size-4 shrink-0 accent-[var(--color-pine)]"

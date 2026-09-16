@@ -21,7 +21,7 @@ import { BrandMark } from "@/components/brand-mark";
 import { Button } from "@/components/ui/button";
 import { RedirectToSignIn } from "@/lib/auth/gates";
 import { signOut } from "@/lib/auth/client";
-import { SkeletonBlock } from "@/components/states";
+import { SkeletonBlock, SkipToContent } from "@/components/states";
 import { useMemberSession } from "@/components/layout/use-member";
 import { cn } from "@/lib/utils";
 import { isGrowthParticipant } from "@/lib/growth";
@@ -146,6 +146,7 @@ export function AppShell() {
 
   return (
     <div className="min-h-dvh bg-paper">
+      <SkipToContent />
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-60 flex-col border-r border-line bg-cream lg:flex">
         <div className="px-5 py-5">
           <Link to="/" aria-label="Darmelk home">
@@ -178,7 +179,7 @@ export function AppShell() {
             type="button"
             onClick={() => void onSignOut()}
             disabled={signingOut}
-            className="mt-3 text-sm text-muted hover:text-ink disabled:opacity-60"
+            className="mt-3 rounded-sm text-sm text-muted hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pine disabled:opacity-60"
           >
             {signingOut ? "Signing out…" : "Sign out"}
           </button>
@@ -191,7 +192,7 @@ export function AppShell() {
         </Link>
         <button
           type="button"
-          className="grid size-11 place-items-center rounded-lg"
+          className="grid size-11 place-items-center rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pine"
           aria-label={menuOpen ? "Close menu" : "Open menu"}
           aria-expanded={menuOpen}
           onClick={() => setMenuOpen((v) => !v)}
@@ -234,7 +235,7 @@ export function AppShell() {
             <button
               type="button"
               onClick={() => void onSignOut()}
-              className="mt-2 flex min-h-11 w-full items-center rounded-lg px-3 py-2.5 text-left text-[15px] text-clay"
+              className="mt-2 flex min-h-11 w-full items-center rounded-lg px-3 py-2.5 text-left text-[15px] text-clay focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pine"
             >
               {signingOut ? "Signing out…" : "Sign out"}
             </button>
@@ -252,7 +253,7 @@ export function AppShell() {
             <span className="text-sm font-medium">{user.displayName ?? "Member"}</span>
           </div>
         </div>
-        <main className="app-main-with-nav px-[var(--darmelk-gutter)] py-6 md:px-8 md:py-8">
+        <main id="main-content" tabIndex={-1} className="app-main-with-nav px-[var(--darmelk-gutter)] py-6 outline-none md:px-8 md:py-8">
           <div className="mx-auto min-w-0 max-w-6xl">{growthLocked ? <JoinGrowthCard /> : <Outlet />}</div>
         </main>
       </div>
@@ -267,7 +268,7 @@ export function AppShell() {
               key={item.to}
               to={item.to}
               className={cn(
-                "flex min-h-14 flex-col items-center justify-center gap-1 text-[10px] font-medium",
+                "flex min-h-14 flex-col items-center justify-center gap-1 text-[10px] font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pine",
                 isActive(pathname, item.to) ? "text-pine" : "text-muted",
               )}
             >
@@ -279,7 +280,7 @@ export function AppShell() {
             type="button"
             onClick={() => setMenuOpen(true)}
             className={cn(
-              "flex min-h-14 flex-col items-center justify-center gap-1 text-[10px] font-medium",
+              "flex min-h-14 flex-col items-center justify-center gap-1 text-[10px] font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pine",
               menuOpen ? "text-pine" : "text-muted",
             )}
           >

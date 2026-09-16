@@ -22,7 +22,7 @@ import { BrandMark } from "@/components/brand-mark";
 import { Button } from "@/components/ui/button";
 import { RedirectToSignIn } from "@/lib/auth/gates";
 import { signOut } from "@/lib/auth/client";
-import { ErrorState, SkeletonBlock } from "@/components/states";
+import { ErrorState, SkeletonBlock, SkipToContent } from "@/components/states";
 import { useMemberSession } from "@/components/layout/use-member";
 import { cn } from "@/lib/utils";
 
@@ -133,6 +133,7 @@ export function AdminShell() {
 
   return (
     <div className="min-h-dvh bg-paper">
+      <SkipToContent />
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-60 flex-col border-r border-line bg-cream lg:flex">
         <div className="px-5 py-5">
           <Link to="/admin" aria-label="Admin home">
@@ -167,7 +168,7 @@ export function AdminShell() {
             type="button"
             onClick={() => void onSignOut()}
             disabled={signingOut}
-            className="mt-2 block text-sm text-muted hover:text-ink"
+            className="mt-2 block rounded-sm text-sm text-muted hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pine disabled:opacity-60"
           >
             {signingOut ? "Signing out…" : "Sign out"}
           </button>
@@ -180,8 +181,9 @@ export function AdminShell() {
         </Link>
         <button
           type="button"
-          className="grid size-11 place-items-center rounded-lg"
+          className="grid size-11 place-items-center rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pine"
           aria-label={more ? "Close menu" : "Open menu"}
+          aria-expanded={more}
           onClick={() => setMore((v) => !v)}
         >
           {more ? <X className="size-5" /> : <Menu className="size-5" />}
@@ -218,7 +220,7 @@ export function AdminShell() {
             <Link to="/app">Member area</Link>
           </Button>
         </div>
-        <main className="app-main-with-nav px-[var(--darmelk-gutter)] py-6 md:px-8 md:py-8">
+        <main id="main-content" tabIndex={-1} className="app-main-with-nav px-[var(--darmelk-gutter)] py-6 outline-none md:px-8 md:py-8">
           <div className="mx-auto min-w-0 max-w-6xl">
             <Outlet />
           </div>
@@ -232,7 +234,7 @@ export function AdminShell() {
               key={item.to}
               to={item.to}
               className={cn(
-                "flex min-h-14 flex-col items-center justify-center gap-1 text-[10px] font-medium",
+                "flex min-h-14 flex-col items-center justify-center gap-1 text-[10px] font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pine",
                 isActive(pathname, item.to) ? "text-pine" : "text-muted",
               )}
             >
@@ -243,7 +245,9 @@ export function AdminShell() {
           <button
             type="button"
             onClick={() => setMore(true)}
-            className="flex min-h-14 flex-col items-center justify-center gap-1 text-[10px] font-medium text-muted"
+            className="flex min-h-14 flex-col items-center justify-center gap-1 text-[10px] font-medium text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pine"
+            aria-label="Open menu"
+            aria-expanded={more}
           >
             <Menu className="size-5" />
             More
