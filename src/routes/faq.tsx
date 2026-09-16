@@ -81,7 +81,7 @@ function FaqGroup({
 
 function FaqPage() {
   return (
-    <main className="container-pg py-28 md:py-32">
+    <main className="container-pg py-10 md:py-14">
       <div className="mx-auto max-w-3xl">
         <p className="text-xs font-medium uppercase tracking-[.18em] text-pine">FAQ</p>
         <h1 className="mt-3 font-display text-4xl font-semibold text-pretty">Property questions, plainly answered</h1>

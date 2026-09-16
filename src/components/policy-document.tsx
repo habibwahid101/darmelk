@@ -7,18 +7,20 @@ export function PolicyDocumentPage({ slug }: { slug: string }) {
   const document = data?.document;
   if (error) {
     return (
-      <main className="container-pg py-28 md:py-32">
+      <main className="container-pg py-10 md:py-14">
         <article className="mx-auto max-w-3xl">
           <h1 className="font-display text-4xl font-semibold">Document not found</h1>
-          <p className="mt-4 text-sm text-muted">That terms document is not published.</p>
+          <p className="mt-4 text-sm text-muted">That document is not published.</p>
         </article>
       </main>
     );
   }
   if (!document) {
     return (
-      <main className="container-pg py-28 md:py-32">
-        <p className="text-sm text-muted">Loading…</p>
+      <main className="container-pg py-10 md:py-14">
+        <p className="text-sm text-muted" role="status">
+          Loading…
+        </p>
       </main>
     );
   }
@@ -26,10 +28,11 @@ export function PolicyDocumentPage({ slug }: { slug: string }) {
 }
 
 export function PolicyArticle({ document }: { document: PolicyDocument }) {
+  const kicker = document.key === "PRIVACY_POLICY" ? "Privacy" : "Terms";
   return (
-    <main className="container-pg py-28 md:py-32">
+    <main className="container-pg py-10 md:py-14">
       <article className="mx-auto max-w-3xl">
-        <p className="text-xs font-medium uppercase tracking-[.18em] text-pine">Terms</p>
+        <p className="text-xs font-medium uppercase tracking-[.18em] text-pine">{kicker}</p>
         <h1 className="mt-3 font-display text-4xl font-semibold text-pretty">{document.title}</h1>
         <p className="mt-3 text-sm text-muted">
           Version {document.version} · Effective {document.effectiveDate}

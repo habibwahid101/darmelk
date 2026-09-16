@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { AmountRow, PageHeader, Surface } from "@/components/states";
+import { AmountRow, LoadingState, PageHeader, Surface } from "@/components/states";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { useMemberSession } from "@/components/layout/use-member";
@@ -14,7 +14,7 @@ export const Route = createFileRoute("/app/bookings/$id")({
 function BookingDetailPage() {
   const { id } = Route.useParams();
   const { member } = useMemberSession();
-  const { data, error } = useAsync(() => api.booking(id), [id], { enabled: Boolean(member) });
+  const { data, error, loading } = useAsync(() => api.booking(id), [id], { enabled: Boolean(member) });
 
   if (!member) return null;
 
@@ -31,7 +31,10 @@ function BookingDetailPage() {
 
   const booking = data?.booking;
   const merchantRequest = data?.merchantRequest;
-  if (!booking) return null;
+  if (loading && !booking) {
+    return <LoadingState label="Loading booking…" />;
+  }
+  if (!booking) return <LoadingState label="Loading booking…" />;
 
   return (
     <div className="space-y-8">
@@ -69,8 +72,8 @@ function BookingDetailPage() {
         <h2 className="font-display text-xl font-semibold">Timeline</h2>
         <ul className="mt-4 space-y-3 text-sm">
           <li>Requested {formatWhen(booking.created_at)}</li>
-          <li>Confirmed {formatWhen(booking.confirmed_at)}</li>
-          <li>Activated {formatWhen(booking.activated_at)}</li>
+          <li>{booking.confirmed_at ? `Confirmed ${formatWhen(booking.confirmed_at)}` : "Not yet confirmed"}</li>
+          {booking.activated_at ? <li>Activated {formatWhen(booking.activated_at)}</li> : null}
         </ul>
         <p className="mt-4 text-sm text-muted">
           Pending means operations has not confirmed this request yet. Cancelled and reversed

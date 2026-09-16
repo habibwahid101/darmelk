@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { List } from "lucide-react";
 import { useMemo, useState } from "react";
-import { EmptyState, PageHeader, Surface } from "@/components/states";
+import { EmptyState, LoadingState, PageHeader, Surface } from "@/components/states";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Input } from "@/components/ui/input";
 import { useMemberSession } from "@/components/layout/use-member";
@@ -18,7 +18,7 @@ const TYPES: Array<Transaction["type"] | "all"> = ["all", "booking", "commission
 
 function TransactionsPage() {
   const { member } = useMemberSession();
-  const { data } = useAsync(() => api.myTransactions(), [member?.user_id], { enabled: Boolean(member) });
+  const { data, loading } = useAsync(() => api.myTransactions(), [member?.user_id], { enabled: Boolean(member) });
   const [q, setQ] = useState("");
   const [type, setType] = useState<Transaction["type"] | "all">("all");
   const rows = useMemo(() => {
@@ -32,6 +32,7 @@ function TransactionsPage() {
   }, [data, q, type]);
 
   if (!member) return null;
+  if (loading && !data) return <LoadingState label="Loading transactions…" />;
 
   return (
     <div className="space-y-8">

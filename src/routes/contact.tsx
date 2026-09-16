@@ -28,7 +28,7 @@ function ContactPage() {
       : undefined;
 
   return (
-    <main className="container-pg max-w-xl py-24 md:py-28">
+    <main className="container-pg max-w-xl py-10 md:py-14">
       <p className="text-xs font-medium uppercase tracking-[0.18em] text-pine">
         {requestToBook ? "Request to Book" : "Contact"}
       </p>

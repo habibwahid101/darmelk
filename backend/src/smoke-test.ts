@@ -961,6 +961,76 @@ async function main() {
   const statusBody = await json(statusRes);
   record("admin can transition contact request status", statusBody.request?.status === "reviewed", statusBody);
 
+  const rateMobile = "+8801999888777";
+  const ratePayload = {
+    name: "Rate Limit Check",
+    profession: "Tester",
+    mobile: rateMobile,
+    location: "Dhaka",
+  };
+  const rateOne = await app.request("/api/contact", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(ratePayload),
+  });
+  const rateTwo = await app.request("/api/contact", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ ...ratePayload, name: "Rate Limit Check Two" }),
+  });
+  const rateThree = await app.request("/api/contact", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ ...ratePayload, name: "Rate Limit Check Three" }),
+  });
+  record(
+    "three contact submissions from the same mobile are accepted",
+    rateOne.status === 201 && rateTwo.status === 201 && rateThree.status === 201,
+    { one: rateOne.status, two: rateTwo.status, three: rateThree.status },
+  );
+  const beforeFourth = await queryOne<{ n: number }>(
+    `select count(*)::int as n from contact_requests where regexp_replace(mobile, '[^0-9]', '', 'g') = '8801999888777'`,
+  );
+  const rateFour = await app.request("/api/contact", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ ...ratePayload, name: "Rate Limit Check Four" }),
+  });
+  const rateFourBody = await json(rateFour);
+  const afterFourth = await queryOne<{ n: number }>(
+    `select count(*)::int as n from contact_requests where regexp_replace(mobile, '[^0-9]', '', 'g') = '8801999888777'`,
+  );
+  record(
+    "fourth contact submission from the same mobile is rate limited",
+    rateFour.status === 429 && rateFourBody.error?.code === "rate_limited",
+    rateFourBody,
+  );
+  record(
+    "rate-limited contact attempt does not insert a row",
+    (beforeFourth?.n ?? 0) === (afterFourth?.n ?? 0),
+    { before: beforeFourth, after: afterFourth },
+  );
+  const ipFlood = [];
+  for (let i = 0; i < 9; i += 1) {
+    ipFlood.push(
+      await app.request("/api/contact", {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-forwarded-for": "203.0.113.9" },
+        body: JSON.stringify({
+          name: `Ip Flood ${i}`,
+          profession: "Tester",
+          mobile: `+88018880000${10 + i}`,
+          location: "Dhaka",
+        }),
+      }),
+    );
+  }
+  record(
+    "repeated contact posts from the same IP are rate limited",
+    ipFlood.slice(0, 8).every((res) => res.status === 201) && ipFlood[8]?.status === 429,
+    ipFlood.map((res) => res.status),
+  );
+
   const publicOffers = await json(await app.request("/api/offers"));
   const flagshipLive = publicOffers.offers?.find((o: { slug: string }) => o.slug === "five-star-hotel-share");
   record(

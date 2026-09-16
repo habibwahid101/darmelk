@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Check, Copy, GitFork } from "lucide-react";
 import { useState } from "react";
-import { EmptyState, PageHeader, StatCard, Surface } from "@/components/states";
+import { EmptyState, LoadingState, PageHeader, StatCard, Surface } from "@/components/states";
 import { useMemberSession } from "@/components/layout/use-member";
 import { COMMISSION_LEVELS, TOTAL_POSITIONS } from "@/lib/offers";
 import { PERSONAL_SPONSOR_TARGET } from "@/lib/platform";
@@ -29,8 +29,9 @@ function currentLevelProgress(counts: Record<1 | 2 | 3 | 4 | 5, number>) {
 
 function NetworkPage() {
   const { member } = useMemberSession();
-  const { data } = useAsync(() => api.myNetwork(), [member?.user_id], { enabled: Boolean(member) });
+  const { data, loading } = useAsync(() => api.myNetwork(), [member?.user_id], { enabled: Boolean(member) });
   if (!member) return null;
+  if (loading && !data) return <LoadingState label="Loading network…" />;
 
   const directs = data?.directs ?? [];
   const counts = data?.levelCounts ?? { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };

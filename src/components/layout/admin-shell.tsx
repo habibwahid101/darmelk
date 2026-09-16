@@ -148,7 +148,7 @@ export function AdminShell() {
               key={item.to}
               to={item.to}
               className={cn(
-                "flex min-h-10 items-center gap-2.5 rounded-lg px-3 text-sm font-medium",
+                "flex min-h-10 items-center gap-2.5 rounded-lg px-3 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pine",
                 isActive(pathname, item.to)
                   ? "bg-pine text-pine-fg"
                   : "text-ink/75 hover:bg-ink/5 hover:text-ink",

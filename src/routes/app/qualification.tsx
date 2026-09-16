@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { PageHeader, Surface } from "@/components/states";
+import { LoadingState, PageHeader, Surface } from "@/components/states";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { useMemberSession } from "@/components/layout/use-member";
@@ -14,8 +14,9 @@ export const Route = createFileRoute("/app/qualification")({
 
 function QualificationPage() {
   const { member } = useMemberSession();
-  const { data } = useAsync(() => api.myQualification(), [member?.user_id], { enabled: Boolean(member) });
+  const { data, loading } = useAsync(() => api.myQualification(), [member?.user_id], { enabled: Boolean(member) });
   if (!member) return null;
+  if (loading && !data) return <LoadingState label="Loading qualification…" />;
 
   const counts = data?.levelCounts ?? { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
   const qualified = data?.qualified ?? false;

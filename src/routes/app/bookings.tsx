@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Building2 } from "lucide-react";
-import { EmptyState, PageHeader } from "@/components/states";
+import { EmptyState, LoadingState, PageHeader } from "@/components/states";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { useMemberSession } from "@/components/layout/use-member";
@@ -13,7 +13,7 @@ export const Route = createFileRoute("/app/bookings")({ component: BookingsPage 
 
 function BookingsPage() {
   const { member } = useMemberSession();
-  const { data } = useAsync(() => api.myBookings(), [member?.user_id], { enabled: Boolean(member) });
+  const { data, loading } = useAsync(() => api.myBookings(), [member?.user_id], { enabled: Boolean(member) });
   if (!member) return null;
   const bookings = data?.bookings ?? [];
 
@@ -24,13 +24,15 @@ function BookingsPage() {
         title="Property bookings"
         description="Each row is an offer you requested. Amounts are specific to that offer."
         action={
-          <Button asChild>
+          <Button asChild size="sm">
             <Link to="/properties">Browse offers</Link>
           </Button>
         }
       />
 
-      {bookings.length === 0 ? (
+      {loading && !data ? (
+        <LoadingState label="Loading bookings…" />
+      ) : bookings.length === 0 ? (
         <EmptyState
           icon={Building2}
           title="No bookings yet"

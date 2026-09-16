@@ -2,7 +2,7 @@ import { Hono, type Context } from "hono";
 import { cors } from "hono/cors";
 import { auth } from "./auth.js";
 import { withTransaction, query, queryOne } from "./db.js";
-import { ApiError, badRequest, notFound, unauthorized } from "./errors.js";
+import { ApiError, badRequest, notFound, unauthorized, tooManyRequests } from "./errors.js";
 import { withIdempotency } from "./idempotency.js";
 import {
   activateBooking,
@@ -92,6 +92,43 @@ import {
 
 type Vars = { userId: string; userEmail: string };
 const app = new Hono<{ Variables: Vars }>();
+
+function binaryHeaders(mime: string, filename: string, extra: Record<string, string> = {}) {
+  return {
+    "content-type": mime,
+    "x-content-type-options": "nosniff",
+    "content-disposition": `inline; filename="${filename.replace(/["\\]/g, "_")}"`,
+    ...extra,
+  };
+}
+
+const CONTACT_IP_WINDOW_MS = 10 * 60 * 1000;
+const CONTACT_IP_CAP = 8;
+const contactIpHits = new Map<string, { n: number; resetAt: number }>();
+
+function clientIp(c: Context): string | null {
+  const forwarded = c.req.header("x-forwarded-for");
+  const raw = forwarded?.split(",")[0]?.trim() || c.req.header("x-real-ip")?.trim() || "";
+  if (!raw) return null;
+  return raw.slice(0, 64);
+}
+
+function allowContactIp(ip: string): boolean {
+  const now = Date.now();
+  const hit = contactIpHits.get(ip);
+  if (!hit || hit.resetAt <= now) {
+    contactIpHits.set(ip, { n: 1, resetAt: now + CONTACT_IP_WINDOW_MS });
+    if (contactIpHits.size > 4000) {
+      for (const [key, value] of contactIpHits) {
+        if (value.resetAt <= now) contactIpHits.delete(key);
+      }
+    }
+    return true;
+  }
+  if (hit.n >= CONTACT_IP_CAP) return false;
+  hit.n += 1;
+  return true;
+}
 
 const trustedOrigins = (process.env.TRUSTED_ORIGINS ?? "https://darmelk.com,https://www.darmelk.com")
   .split(",")
@@ -192,11 +229,7 @@ app.get("/api/offers", async (c) => {
 app.get("/api/offers/:slug/media/:id", async (c) => {
   const media = await withTransaction((client) => getOfferMedia(client, c.req.param("slug"), c.req.param("id")));
   return new Response(new Uint8Array(media.bytes), {
-    headers: {
-      "content-type": media.mime,
-      "cache-control": "public, max-age=86400",
-      "content-disposition": `inline; filename="${media.filename.replace(/["\\]/g, "_")}"`,
-    },
+    headers: binaryHeaders(media.mime, media.filename, { "cache-control": "public, max-age=86400" }),
   });
 });
 app.get("/api/offers/:slug", async (c) => {
@@ -225,6 +258,10 @@ app.get("/api/referral/:code", async (c) => {
 });
 
 app.post("/api/contact", async (c) => {
+  const ip = clientIp(c);
+  if (ip && !allowContactIp(ip)) {
+    throw tooManyRequests("Please wait before sending another request");
+  }
   const body = await jsonBody<{
     name?: string;
     profession?: string;
@@ -251,11 +288,7 @@ app.get("/api/promotions", async (c) => {
 app.get("/api/promotions/:id/banner", async (c) => {
   const media = await withTransaction((client) => getPromotionBanner(client, c.req.param("id")));
   return new Response(new Uint8Array(media.bytes), {
-    headers: {
-      "content-type": media.mime,
-      "cache-control": "public, max-age=86400",
-      "content-disposition": `inline; filename="${media.filename.replace(/["\\]/g, "_")}"`,
-    },
+    headers: binaryHeaders(media.mime, media.filename, { "cache-control": "public, max-age=86400" }),
   });
 });
 
@@ -578,10 +611,7 @@ app.post("/api/payments", async (c) => {
 
 app.get("/api/payments/:id/proof", async (c) => {
   const proof = await withTransaction((client) => getPaymentProof(client, c.req.param("id"), c.get("userId")));
-  return new Response(proof.proof_data, { headers: {
-    "content-type": proof.proof_mime,
-    "content-disposition": `inline; filename="${proof.proof_filename.replace(/[\"\\]/g, "_")}"`,
-  } });
+  return new Response(proof.proof_data, { headers: binaryHeaders(proof.proof_mime, proof.proof_filename) });
 });
 
 // ---- annual activation ------------------------------------------------
@@ -1357,11 +1387,7 @@ app.get("/api/admin/promotions/:id/banner", async (c) => {
     return getPromotionBanner(client, c.req.param("id"), { includeDraft: true });
   });
   return new Response(new Uint8Array(media.bytes), {
-    headers: {
-      "content-type": media.mime,
-      "cache-control": "private, max-age=60",
-      "content-disposition": `inline; filename="${media.filename.replace(/["\\]/g, "_")}"`,
-    },
+    headers: binaryHeaders(media.mime, media.filename, { "cache-control": "private, max-age=60" }),
   });
 });
 
@@ -1434,7 +1460,7 @@ app.get("/api/admin/leadership-rewards/:userId", async (c) => {
 
 app.onError((err, c) => {
   if (err instanceof ApiError) {
-    return c.json({ error: { code: err.code, message: err.message } }, err.status as 400 | 401 | 403 | 404 | 409);
+    return c.json({ error: { code: err.code, message: err.message } }, err.status as 400 | 401 | 403 | 404 | 409 | 429);
   }
   console.error("[api] unhandled error", err);
   return c.json({ error: { code: "internal_error", message: "Something went wrong" } }, 500);

@@ -1,6 +1,9 @@
 import { Link } from "@tanstack/react-router";
 import { BrandMark } from "@/components/brand-mark";
 
+const footerLink =
+  "inline-flex min-h-8 max-w-full items-center rounded-sm text-ink/80 hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pine";
+
 export function SiteFooter() {
   return (
     <footer className="border-t border-line bg-cream">
@@ -14,44 +17,44 @@ export function SiteFooter() {
         <nav aria-label="Footer" className="grid min-w-0 grid-cols-2 gap-x-6 sm:gap-x-10">
           <ul className="min-w-0 text-sm">
             <li>
-              <Link to="/properties" className="inline-flex min-h-8 max-w-full items-center text-ink/80 hover:text-ink">
+              <Link to="/properties" className={footerLink}>
                 Properties
               </Link>
             </li>
             <li>
-              <Link to="/" hash="how-it-works" className="inline-flex min-h-8 max-w-full items-center text-ink/80 hover:text-ink">
+              <Link to="/" hash="how-it-works" className={footerLink}>
                 How It Works
               </Link>
             </li>
             <li>
-              <Link to="/faq" className="inline-flex min-h-8 max-w-full items-center text-ink/80 hover:text-ink">
+              <Link to="/faq" className={footerLink}>
                 FAQ
               </Link>
             </li>
             <li>
-              <Link to="/contact" className="inline-flex min-h-8 max-w-full items-center text-ink/80 hover:text-ink">
+              <Link to="/contact" className={footerLink}>
                 Contact Us
               </Link>
             </li>
           </ul>
           <ul className="min-w-0 text-sm">
             <li>
-              <Link to="/program-rules" className="inline-flex min-h-8 max-w-full items-center text-ink/80 hover:text-ink">
+              <Link to="/program-rules" className={footerLink}>
                 Program Rules
               </Link>
             </li>
             <li>
-              <Link to="/terms" className="inline-flex min-h-8 max-w-full items-center text-ink/80 hover:text-ink">
+              <Link to="/terms" className={footerLink}>
                 Terms
               </Link>
             </li>
             <li>
-              <Link to="/privacy" className="inline-flex min-h-8 max-w-full items-center text-ink/80 hover:text-ink">
+              <Link to="/privacy" className={footerLink}>
                 Privacy
               </Link>
             </li>
             <li>
-              <Link to="/career" className="inline-flex min-h-8 max-w-full items-center text-ink/80 hover:text-ink">
+              <Link to="/career" className={footerLink}>
                 Career
               </Link>
             </li>
