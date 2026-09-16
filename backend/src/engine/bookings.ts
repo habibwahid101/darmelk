@@ -13,6 +13,7 @@ import {
   evaluatePromotionsForConfirmedBooking,
   reversePromotionRewardsForBooking,
 } from "./promotions.js";
+import { recordConsents, requireCurrentConsentFor } from "./terms.js";
 
 export type Booking = {
   id: string;
@@ -63,7 +64,12 @@ type OfferFreeze = {
  * booking's amounts never move again even if the offer's price changes later
  * (mixed offers, each keeping its own booked terms). Pending does not reserve
  * inventory. */
-export async function createBooking(client: PoolClient, userId: string, offerSlug: string): Promise<Booking> {
+export async function createBooking(
+  client: PoolClient,
+  userId: string,
+  offerSlug: string,
+  input: { acceptBookingTerms?: unknown } = {},
+): Promise<Booking> {
   await requireActiveGrowthProgram(client, userId, "Growth Program activation is required before booking");
   const { rows: offerRows } = await client.query<OfferFreeze>(
     `select slug, retail_value, booking_amount, qualification_benefit,
@@ -86,6 +92,9 @@ export async function createBooking(client: PoolClient, userId: string, offerSlu
     if (sold >= offer.total_quantity) {
       throw conflict("No remaining quantity for this property", "offer_sold_out");
     }
+  }
+  if (input.acceptBookingTerms !== true) {
+    throw badRequest("Property Booking Terms must be accepted", "terms_required");
   }
 
   const id = uid("bk");
@@ -119,7 +128,27 @@ export async function createBooking(client: PoolClient, userId: string, offerSlu
       offer.grace_period_days,
     ],
   );
-  return rows[0]!;
+  const booking = rows[0]!;
+  await recordConsents(client, userId, {
+    keys: ["PROPERTY_BOOKING_TERMS"],
+    context: "booking",
+    referenceId: booking.id,
+    metadata: {
+      offerSlug: offer.slug,
+      bookingAmount: offer.booking_amount,
+      retailValue: offer.retail_value,
+      offerVersion: offer.version ?? 1,
+    },
+  });
+  await requireCurrentConsentFor(
+    client,
+    userId,
+    "PROPERTY_BOOKING_TERMS",
+    "booking",
+    booking.id,
+    "Property Booking Terms must be accepted",
+  );
+  return booking;
 }
 
 /** Admin: confirm a pending booking's payment. Posts commission ledger rows

@@ -364,19 +364,83 @@ async function main() {
   );
 
   // --- member books the flagship offer ---
+  const bookingsBeforeConsentReject = await queryOne<{ n: number }>(`select count(*)::int as n from bookings`);
+  const bookNoTerms = await json(await app.request("/api/bookings", {
+    method: "POST",
+    headers: { cookie: memberCookie, "content-type": "application/json", "Idempotency-Key": "test-booking-no-terms" },
+    body: JSON.stringify({ offerSlug: "five-star-hotel-share" }),
+  }));
+  record(
+    "Growth booking without Property Booking Terms is rejected",
+    bookNoTerms.error?.code === "terms_required",
+    bookNoTerms,
+  );
+  const bookForgedTerms = await json(await app.request("/api/bookings", {
+    method: "POST",
+    headers: { cookie: memberCookie, "content-type": "application/json", "Idempotency-Key": "test-booking-forged-terms" },
+    body: JSON.stringify({ offerSlug: "five-star-hotel-share", termsAccepted: true, accepted: true }),
+  }));
+  record(
+    "crafted booking accepted=true without Property Booking Terms is rejected",
+    bookForgedTerms.error?.code === "terms_required",
+    bookForgedTerms,
+  );
+  const engineNoTerms = await withTransaction(async (client) => {
+    try {
+      await createBooking(client, onboarded.member.user_id, "five-star-hotel-share");
+      return { ok: true };
+    } catch (err: any) {
+      return { ok: false, code: err?.code, message: err?.message };
+    }
+  });
+  record(
+    "engine createBooking without Property Booking Terms is rejected",
+    engineNoTerms.ok === false && engineNoTerms.code === "terms_required",
+    engineNoTerms,
+  );
+  const bookingsAfterConsentReject = await queryOne<{ n: number }>(`select count(*)::int as n from bookings`);
+  record(
+    "rejected booking consent attempts do not create a booking",
+    bookingsBeforeConsentReject?.n === bookingsAfterConsentReject?.n,
+    { before: bookingsBeforeConsentReject, after: bookingsAfterConsentReject },
+  );
+
   const bookRes = await app.request("/api/bookings", {
     method: "POST",
     headers: { cookie: memberCookie, "content-type": "application/json", "Idempotency-Key": "test-booking-1" },
-    body: JSON.stringify({ offerSlug: "five-star-hotel-share" }),
+    body: JSON.stringify({ acceptBookingTerms: true, offerSlug: "five-star-hotel-share" }),
   });
   const booked = await json(bookRes);
   record("booking created pending, amount frozen from offer", booked.booking?.status === "pending" && booked.booking?.booking_amount === 50000, booked);
+  const bookingConsent = await queryOne<{ document_key: string; document_version: string; context: string; reference_id: string }>(
+    `select document_key, document_version, context, reference_id from user_consents
+      where user_id=$1 and document_key='PROPERTY_BOOKING_TERMS' and reference_id=$2`,
+    [onboarded.member.user_id, booked.booking.id],
+  );
+  record(
+    "Property Booking Terms consent is stored with user, version, booking context, and booking reference",
+    bookingConsent?.document_key === "PROPERTY_BOOKING_TERMS" &&
+      bookingConsent.document_version === "1" &&
+      bookingConsent.context === "booking" &&
+      bookingConsent.reference_id === booked.booking.id,
+    bookingConsent,
+  );
+  const laterBookNoTerms = await json(await app.request("/api/bookings", {
+    method: "POST",
+    headers: { cookie: memberCookie, "content-type": "application/json", "Idempotency-Key": "test-booking-later-no-terms" },
+    body: JSON.stringify({ offerSlug: "five-star-hotel-share" }),
+  }));
+  record(
+    "prior booking consent does not authorize a later booking",
+    laterBookNoTerms.error?.code === "terms_required",
+    laterBookNoTerms,
+  );
 
   // Idempotency replay: same key must not create a second booking.
   const bookRetryRes = await app.request("/api/bookings", {
     method: "POST",
     headers: { cookie: memberCookie, "content-type": "application/json", "Idempotency-Key": "test-booking-1" },
-    body: JSON.stringify({ offerSlug: "five-star-hotel-share" }),
+    body: JSON.stringify({ acceptBookingTerms: true, offerSlug: "five-star-hotel-share" }),
   });
   const bookedRetry = await json(bookRetryRes);
   record("idempotent replay returns the SAME booking id", bookedRetry.booking?.id === booked.booking?.id, bookedRetry.booking?.id);
@@ -385,6 +449,11 @@ async function main() {
   const beforeActivation = await json(await app.request("/api/me/commissions", { headers: { cookie: adminCookie } }));
   record("pending booking does not release commission", beforeActivation.commissions?.length === 0, beforeActivation);
   await submitAndApprovePayment(memberCookie, "booking", booked.booking.id, "booking-payment-1");
+  const bankMerchantConsent = await query(
+    `select id from user_consents where user_id=$1 and document_key='MERCHANT_PAYMENT_TERMS' and reference_id=$2`,
+    [onboarded.member.user_id, booked.booking.id],
+  );
+  record("Darmelk Bank booking payment does not require Merchant Payment Terms", bankMerchantConsent.length === 0, bankMerchantConsent.length);
   const activated = await json(await app.request(`/api/bookings/${booked.booking.id}`, { headers: { cookie: memberCookie } }));
   record("verified booking payment confirms, activates, and freezes its snapshot", activated.booking?.status === "activated", activated);
 
@@ -452,13 +521,13 @@ async function main() {
   const book2Res = await app.request("/api/bookings", {
     method: "POST",
     headers: { cookie: memberCookie, "content-type": "application/json", "Idempotency-Key": "test-booking-2" },
-    body: JSON.stringify({ offerSlug: "five-star-hotel-share" }),
+    body: JSON.stringify({ acceptBookingTerms: true, offerSlug: "five-star-hotel-share" }),
   });
   const book2 = await json(book2Res);
   await submitAndApprovePayment(memberCookie, "booking", book2.booking.id, "booking-payment-2");
 
   await withTransaction(async (client) => {
-    const own = await createBooking(client, adminMe.member.user_id, "five-star-hotel-share");
+    const own = await createBooking(client, adminMe.member.user_id, "five-star-hotel-share", { acceptBookingTerms: true });
     await confirmBooking(client, own.id, adminMe.member.user_id);
     await activateBooking(client, own.id);
   });
@@ -604,7 +673,7 @@ async function main() {
     }
 
     const booking = await withTransaction(async (client) => {
-      const created = await createBooking(client, userId, "five-star-hotel-share");
+      const created = await createBooking(client, userId, "five-star-hotel-share", { acceptBookingTerms: true });
       await confirmBooking(client, created.id, adminMe.member.user_id);
       return created;
     });
@@ -684,7 +753,7 @@ async function main() {
   );
 
   const reversedQa = await withTransaction(async (client) => {
-    const created = await createBooking(client, deepest.user_id, "five-star-hotel-share");
+    const created = await createBooking(client, deepest.user_id, "five-star-hotel-share", { acceptBookingTerms: true });
     await confirmBooking(client, created.id, adminMe.member.user_id);
     await activateBooking(client, created.id);
     return reverseBooking(client, created.id, { reason: "isolated QA reversal", adminUserId: adminMe.member.user_id });
@@ -701,7 +770,7 @@ async function main() {
   );
 
   const ownQaBooking = await withTransaction(async (client) => {
-    const created = await createBooking(client, matrixRootId, "five-star-hotel-share");
+    const created = await createBooking(client, matrixRootId, "five-star-hotel-share", { acceptBookingTerms: true });
     await confirmBooking(client, created.id, adminMe.member.user_id);
     await activateBooking(client, created.id);
     return created;
@@ -715,7 +784,7 @@ async function main() {
 
   await query(`update members set activation_status='active', activation_expires_at=now()-interval '1 minute' where user_id=$1`, [matrixRootId]);
   const expiredReleaseBooking = await withTransaction(async (client) => {
-    const created = await createBooking(client, deepest.user_id, "five-star-hotel-share");
+    const created = await createBooking(client, deepest.user_id, "five-star-hotel-share", { acceptBookingTerms: true });
     await confirmBooking(client, created.id, adminMe.member.user_id);
     await activateBooking(client, created.id);
     return created;
@@ -753,7 +822,7 @@ async function main() {
     { amount: rootRenewal.amount, status: rootRenewal.status, sponsor: matrixRoot.sponsor_user_id },
   );
   const restoredReleaseBooking = await withTransaction(async (client) => {
-    const created = await createBooking(client, deepest.user_id, "five-star-hotel-share");
+    const created = await createBooking(client, deepest.user_id, "five-star-hotel-share", { acceptBookingTerms: true });
     await confirmBooking(client, created.id, adminMe.member.user_id);
     await activateBooking(client, created.id);
     return created;
@@ -1006,7 +1075,7 @@ async function main() {
   record("admin can close an offer", closeRes.offer?.status === "closed", closeRes.offer);
   const closedBooking = await withTransaction(async (client) => {
     try {
-      await createBooking(client, adminMe.member.user_id, "chittagong-plot-share");
+      await createBooking(client, adminMe.member.user_id, "chittagong-plot-share", { acceptBookingTerms: true });
       return { ok: true };
     } catch (err: any) {
       return { ok: false, code: err?.code, message: err?.message };
@@ -1340,30 +1409,60 @@ async function main() {
   const badId = await json(await app.request("/api/bookings", {
     method: "POST",
     headers: { cookie: customer.cookie, "content-type": "application/json", "Idempotency-Key": "m-book-1" },
-    body: JSON.stringify({ offerSlug: "five-star-hotel-share" }),
+    body: JSON.stringify({ acceptBookingTerms: true, offerSlug: "five-star-hotel-share" }),
   }));
+  const invalidMerchantNoTerms = await json(await app.request(`/api/bookings/${badId.booking.id}/merchant-pay`, {
+    method: "POST",
+    headers: { cookie: customer.cookie, "content-type": "application/json", "Idempotency-Key": "m-pay-no-terms" },
+    body: JSON.stringify({ merchantUserId: merchantUser.member.user_id }),
+  }));
+  record(
+    "Pay by Merchant without Merchant Payment Terms is rejected",
+    invalidMerchantNoTerms.error?.code === "terms_required",
+    invalidMerchantNoTerms,
+  );
+  const forgedMerchantTerms = await json(await app.request(`/api/bookings/${badId.booking.id}/merchant-pay`, {
+    method: "POST",
+    headers: { cookie: customer.cookie, "content-type": "application/json", "Idempotency-Key": "m-pay-forged-terms" },
+    body: JSON.stringify({ merchantUserId: merchantUser.member.user_id, termsAccepted: true, accepted: true }),
+  }));
+  record(
+    "crafted Merchant accepted=true without Merchant Payment Terms is rejected",
+    forgedMerchantTerms.error?.code === "terms_required",
+    forgedMerchantTerms,
+  );
   const invalidMerchant = await json(await app.request(`/api/bookings/${badId.booking.id}/merchant-pay`, {
     method: "POST",
     headers: { cookie: customer.cookie, "content-type": "application/json", "Idempotency-Key": "m-pay-bad" },
-    body: JSON.stringify({ merchantUserId: "not-a-real-user" }),
+    body: JSON.stringify({ acceptMerchantTerms: true, merchantUserId: "not-a-real-user" }),
   }));
   record("invalid Merchant User ID is rejected", invalidMerchant.error?.code === "merchant_not_found" || invalidMerchant.error, invalidMerchant);
   const nonMerchant = await json(await app.request(`/api/bookings/${badId.booking.id}/merchant-pay`, {
     method: "POST",
     headers: { cookie: customer.cookie, "content-type": "application/json", "Idempotency-Key": "m-pay-non" },
-    body: JSON.stringify({ merchantUserId: memberMerchantNav.member.user_id }),
+    body: JSON.stringify({ acceptMerchantTerms: true, merchantUserId: memberMerchantNav.member.user_id }),
   }));
   record("non-Merchant User ID is rejected", nonMerchant.error?.code === "merchant_inactive" || nonMerchant.status === 400, nonMerchant);
 
   const pendingReq = await json(await app.request(`/api/bookings/${badId.booking.id}/merchant-pay`, {
     method: "POST",
     headers: { cookie: customer.cookie, "content-type": "application/json", "Idempotency-Key": "m-pay-1" },
-    body: JSON.stringify({ merchantUserId: merchantUser.member.user_id }),
+    body: JSON.stringify({ acceptMerchantTerms: true, merchantUserId: merchantUser.member.user_id }),
   }));
   record(
     "valid Pay by Merchant request is created pending with no debit",
     pendingReq.request?.status === "pending" && pendingReq.request?.amount === 50000,
     pendingReq.request,
+  );
+  const merchantPayConsent = await queryOne<{ document_key: string; document_version: string; context: string; reference_id: string }>(
+    `select document_key, document_version, context, reference_id from user_consents
+      where user_id=$1 and document_key='MERCHANT_PAYMENT_TERMS' and context='merchant_payment' and reference_id=$2`,
+    [customer.member.user_id, badId.booking.id],
+  );
+  record(
+    "Merchant Payment Terms consent is stored against the booking before reservation",
+    merchantPayConsent?.document_version === "1" && merchantPayConsent.reference_id === badId.booking.id,
+    merchantPayConsent,
   );
   const dashAfterRequest = await json(await app.request("/api/me/merchant", { headers: { cookie: merchantUser.cookie } }));
   record("request creation does not permanently debit Merchant Credit", dashAfterRequest.merchant?.available === 60000 && dashAfterRequest.merchant?.reserved === 0, dashAfterRequest.merchant);
@@ -1383,7 +1482,7 @@ async function main() {
   const secondReq = await json(await app.request(`/api/bookings/${badId.booking.id}/merchant-pay`, {
     method: "POST",
     headers: { cookie: customer.cookie, "content-type": "application/json", "Idempotency-Key": "m-pay-2" },
-    body: JSON.stringify({ merchantUserId: merchantUser.member.user_id }),
+    body: JSON.stringify({ acceptMerchantTerms: true, merchantUserId: merchantUser.member.user_id }),
   }));
   const approvedReq = await json(await app.request(`/api/me/merchant/requests/${secondReq.request.id}/approve`, {
     method: "POST", headers: { cookie: merchantUser.cookie, "Idempotency-Key": "m-appr-1" },
@@ -1452,12 +1551,12 @@ async function main() {
   const cancelBook = await json(await app.request("/api/bookings", {
     method: "POST",
     headers: { cookie: customer.cookie, "content-type": "application/json", "Idempotency-Key": "m-book-cancel" },
-    body: JSON.stringify({ offerSlug: "five-star-hotel-share" }),
+    body: JSON.stringify({ acceptBookingTerms: true, offerSlug: "five-star-hotel-share" }),
   }));
   const cancelReq = await json(await app.request(`/api/bookings/${cancelBook.booking.id}/merchant-pay`, {
     method: "POST",
     headers: { cookie: customer.cookie, "content-type": "application/json", "Idempotency-Key": "m-pay-cancel" },
-    body: JSON.stringify({ merchantUserId: merchantUser.member.user_id }),
+    body: JSON.stringify({ acceptMerchantTerms: true, merchantUserId: merchantUser.member.user_id }),
   }));
   await json(await app.request(`/api/me/merchant/requests/${cancelReq.request.id}/approve`, {
     method: "POST", headers: { cookie: merchantUser.cookie, "Idempotency-Key": "m-appr-cancel" },
@@ -1476,12 +1575,12 @@ async function main() {
   const selfBook = await json(await app.request("/api/bookings", {
     method: "POST",
     headers: { cookie: merchantUser.cookie, "content-type": "application/json", "Idempotency-Key": "m-book-self" },
-    body: JSON.stringify({ offerSlug: "five-star-hotel-share" }),
+    body: JSON.stringify({ acceptBookingTerms: true, offerSlug: "five-star-hotel-share" }),
   }));
   const selfReq = await json(await app.request(`/api/bookings/${selfBook.booking.id}/merchant-pay`, {
     method: "POST",
     headers: { cookie: merchantUser.cookie, "content-type": "application/json", "Idempotency-Key": "m-pay-self" },
-    body: JSON.stringify({ merchantUserId: merchantUser.member.user_id }),
+    body: JSON.stringify({ acceptMerchantTerms: true, merchantUserId: merchantUser.member.user_id }),
   }));
   record("Merchant self-pay uses the same request flow", selfReq.request?.status === "pending" && selfReq.request?.merchant_user_id === merchantUser.member.user_id);
   const selfApprove = await json(await app.request(`/api/me/merchant/requests/${selfReq.request.id}/approve`, {
@@ -1493,13 +1592,13 @@ async function main() {
   const insufficientBook = await json(await app.request("/api/bookings", {
     method: "POST",
     headers: { cookie: customer.cookie, "content-type": "application/json", "Idempotency-Key": "m-book-low" },
-    body: JSON.stringify({ offerSlug: "five-star-hotel-share" }),
+    body: JSON.stringify({ acceptBookingTerms: true, offerSlug: "five-star-hotel-share" }),
   }));
   await query(`update merchants set available = 1000 where user_id=$1`, [merchantUser.member.user_id]);
   const lowCredit = await json(await app.request(`/api/bookings/${insufficientBook.booking.id}/merchant-pay`, {
     method: "POST",
     headers: { cookie: customer.cookie, "content-type": "application/json", "Idempotency-Key": "m-pay-low" },
-    body: JSON.stringify({ merchantUserId: merchantUser.member.user_id }),
+    body: JSON.stringify({ acceptMerchantTerms: true, merchantUserId: merchantUser.member.user_id }),
   }));
   record("insufficient credit is rejected at request creation", lowCredit.error?.code === "insufficient_credit" || lowCredit.status === 409, lowCredit);
   await query(
@@ -1530,19 +1629,19 @@ async function main() {
   await submitAndApprovePayment(tightMerchant.cookie, "merchant_bundle", tightPurchase.purchase.id, "tight-bundle-pay");
   const bookA = await json(await app.request("/api/bookings", {
     method: "POST", headers: { cookie: concA.cookie, "content-type": "application/json", "Idempotency-Key": "m-book-ca" },
-    body: JSON.stringify({ offerSlug: "five-star-hotel-share" }),
+    body: JSON.stringify({ acceptBookingTerms: true, offerSlug: "five-star-hotel-share" }),
   }));
   const bookB = await json(await app.request("/api/bookings", {
     method: "POST", headers: { cookie: concB.cookie, "content-type": "application/json", "Idempotency-Key": "m-book-cb" },
-    body: JSON.stringify({ offerSlug: "five-star-hotel-share" }),
+    body: JSON.stringify({ acceptBookingTerms: true, offerSlug: "five-star-hotel-share" }),
   }));
   const reqA = await json(await app.request(`/api/bookings/${bookA.booking.id}/merchant-pay`, {
     method: "POST", headers: { cookie: concA.cookie, "content-type": "application/json", "Idempotency-Key": "m-pay-ca" },
-    body: JSON.stringify({ merchantUserId: tightMerchant.member.user_id }),
+    body: JSON.stringify({ acceptMerchantTerms: true, merchantUserId: tightMerchant.member.user_id }),
   }));
   const reqB = await json(await app.request(`/api/bookings/${bookB.booking.id}/merchant-pay`, {
     method: "POST", headers: { cookie: concB.cookie, "content-type": "application/json", "Idempotency-Key": "m-pay-cb" },
-    body: JSON.stringify({ merchantUserId: tightMerchant.member.user_id }),
+    body: JSON.stringify({ acceptMerchantTerms: true, merchantUserId: tightMerchant.member.user_id }),
   }));
   const [resA, resB] = await Promise.all([
     app.request(`/api/me/merchant/requests/${reqA.request.id}/approve`, {
@@ -1569,11 +1668,11 @@ async function main() {
   }));
   const susBook = await json(await app.request("/api/bookings", {
     method: "POST", headers: { cookie: customer.cookie, "content-type": "application/json", "Idempotency-Key": "m-book-sus" },
-    body: JSON.stringify({ offerSlug: "five-star-hotel-share" }),
+    body: JSON.stringify({ acceptBookingTerms: true, offerSlug: "five-star-hotel-share" }),
   }));
   const susReq = await json(await app.request(`/api/bookings/${susBook.booking.id}/merchant-pay`, {
     method: "POST", headers: { cookie: customer.cookie, "content-type": "application/json", "Idempotency-Key": "m-pay-sus" },
-    body: JSON.stringify({ merchantUserId: merchantUser.member.user_id }),
+    body: JSON.stringify({ acceptMerchantTerms: true, merchantUserId: merchantUser.member.user_id }),
   }));
   record("suspended Merchant cannot accept new payment requests", susReq.error?.code === "merchant_inactive" || susReq.status === 400, susReq);
 
@@ -1798,7 +1897,7 @@ async function main() {
   const pu5 = await signupOnboardActivate("promo-user-5@example.com", "Promo Five", adminMe.member.referral_code);
   const pu6 = await signupOnboardActivate("promo-user-6@example.com", "Promo Six", adminMe.member.referral_code);
 
-  const pendingBook = await withTransaction((client) => createBooking(client, pu1.member.user_id, "five-star-hotel-share"));
+  const pendingBook = await withTransaction((client) => createBooking(client, pu1.member.user_id, "five-star-hotel-share", { acceptBookingTerms: true }));
   const pendingQual = await query(`select id from promotion_qualifications where user_id=$1`, [pu1.member.user_id]);
   record("booking creation / pending booking does not qualify", pendingBook.status === "pending" && pendingQual.length === 0, { status: pendingBook.status, quals: pendingQual.length });
 
@@ -1832,7 +1931,7 @@ async function main() {
   record("same booking retry does not duplicate qualification", afterRetry.length === pu1Quals.length, afterRetry.length);
 
   const secondBook = await withTransaction(async (client) => {
-    const created = await createBooking(client, pu1.member.user_id, "five-star-hotel-share");
+    const created = await createBooking(client, pu1.member.user_id, "five-star-hotel-share", { acceptBookingTerms: true });
     await confirmBooking(client, created.id, adminMe.member.user_id);
     return created;
   });
@@ -1922,7 +2021,7 @@ async function main() {
   record("no unaudited Mark User Qualified endpoint", markQualified.status === 404 || markQualified.status === 405, markQualified.status);
 
   const wrongBook = await withTransaction(async (client) => {
-    const created = await createBooking(client, pu2.member.user_id, secondOffer.offer.slug);
+    const created = await createBooking(client, pu2.member.user_id, secondOffer.offer.slug, { acceptBookingTerms: true });
     await confirmBooking(client, created.id, adminMe.member.user_id);
     return created;
   });
@@ -1932,7 +2031,7 @@ async function main() {
   record("matching offer on a different campaign still qualifies independently", otherQual.length === 1, otherQual);
 
   const upcomingBook = await withTransaction(async (client) => {
-    const created = await createBooking(client, pu3.member.user_id, "five-star-hotel-share");
+    const created = await createBooking(client, pu3.member.user_id, "five-star-hotel-share", { acceptBookingTerms: true });
     await confirmBooking(client, created.id, adminMe.member.user_id);
     return created;
   });
@@ -1940,7 +2039,7 @@ async function main() {
   record("booking confirmed before start does not qualify", upcomingQual.length === 0, { booking: upcomingBook.id });
 
   const expiredBook = await withTransaction(async (client) => {
-    const created = await createBooking(client, pu4.member.user_id, "five-star-hotel-share");
+    const created = await createBooking(client, pu4.member.user_id, "five-star-hotel-share", { acceptBookingTerms: true });
     await confirmBooking(client, created.id, adminMe.member.user_id);
     return created;
   });
@@ -1948,7 +2047,7 @@ async function main() {
   record("booking confirmed after end does not qualify", expiredQual.length === 0, { booking: expiredBook.id });
 
   const closedBook = await withTransaction(async (client) => {
-    const created = await createBooking(client, pu5.member.user_id, "five-star-hotel-share");
+    const created = await createBooking(client, pu5.member.user_id, "five-star-hotel-share", { acceptBookingTerms: true });
     await confirmBooking(client, created.id, adminMe.member.user_id);
     return created;
   });
@@ -1993,12 +2092,12 @@ async function main() {
   const merchantBook = await json(await app.request("/api/bookings", {
     method: "POST",
     headers: { cookie: pu6.cookie, "content-type": "application/json", "Idempotency-Key": "promo-m-book" },
-    body: JSON.stringify({ offerSlug: "five-star-hotel-share" }),
+    body: JSON.stringify({ acceptBookingTerms: true, offerSlug: "five-star-hotel-share" }),
   }));
   const merchantReq = await json(await app.request(`/api/bookings/${merchantBook.booking.id}/merchant-pay`, {
     method: "POST",
     headers: { cookie: pu6.cookie, "content-type": "application/json", "Idempotency-Key": "promo-m-pay" },
-    body: JSON.stringify({ merchantUserId: promoMerchant.member.user_id }),
+    body: JSON.stringify({ acceptMerchantTerms: true, merchantUserId: promoMerchant.member.user_id }),
   }));
   const merchantAppr = await json(await app.request(`/api/me/merchant/requests/${merchantReq.request.id}/approve`, {
     method: "POST", headers: { cookie: promoMerchant.cookie, "Idempotency-Key": "promo-m-appr" },
@@ -2059,7 +2158,7 @@ async function main() {
   const bankBook = await json(await app.request("/api/bookings", {
     method: "POST",
     headers: { cookie: pu7.cookie, "content-type": "application/json", "Idempotency-Key": "promo-bank-book" },
-    body: JSON.stringify({ offerSlug: "five-star-hotel-share" }),
+    body: JSON.stringify({ acceptBookingTerms: true, offerSlug: "five-star-hotel-share" }),
   }));
   const bankPendingQual = await query(`select id from promotion_qualifications where booking_id=$1`, [bankBook.booking.id]);
   record(
@@ -2427,7 +2526,7 @@ async function main() {
     json(await app.request("/api/bookings", {
       method: "POST",
       headers: { cookie, "content-type": "application/json", "Idempotency-Key": key },
-      body: JSON.stringify({ offerSlug: "qa-shared-inventory" }),
+      body: JSON.stringify({ acceptBookingTerms: true, offerSlug: "qa-shared-inventory" }),
     }));
 
   const p1 = await bookInv("inv-p1");
@@ -2498,13 +2597,13 @@ async function main() {
   const soldOutCreate = await app.request("/api/bookings", {
     method: "POST",
     headers: { cookie: adminCookie, "content-type": "application/json", "Idempotency-Key": "inv-sold-out" },
-    body: JSON.stringify({ offerSlug: "qa-shared-inventory" }),
+    body: JSON.stringify({ acceptBookingTerms: true, offerSlug: "qa-shared-inventory" }),
   });
   const soldOutCreateBody = await json(soldOutCreate);
   const growthSoldOut = await app.request("/api/bookings", {
     method: "POST",
     headers: { cookie: memberCookie, "content-type": "application/json", "Idempotency-Key": "inv-growth-sold-out" },
-    body: JSON.stringify({ offerSlug: "qa-shared-inventory" }),
+    body: JSON.stringify({ acceptBookingTerms: true, offerSlug: "qa-shared-inventory" }),
   });
   const growthSoldOutBody = await json(growthSoldOut);
   record(
@@ -2653,7 +2752,7 @@ async function main() {
   const unboundedBook = await json(await app.request("/api/bookings", {
     method: "POST",
     headers: { cookie: adminCookie, "content-type": "application/json", "Idempotency-Key": "inv-flagship-still-open" },
-    body: JSON.stringify({ offerSlug: "five-star-hotel-share" }),
+    body: JSON.stringify({ acceptBookingTerms: true, offerSlug: "five-star-hotel-share" }),
   }));
   record(
     "unbounded flagship still accepts a new pending booking",
@@ -2711,7 +2810,7 @@ async function main() {
   const methodProbe = await json(await app.request("/api/bookings", {
     method: "POST",
     headers: { cookie: adminCookie, "content-type": "application/json", "Idempotency-Key": "pay-route-probe" },
-    body: JSON.stringify({ offerSlug: "five-star-hotel-share" }),
+    body: JSON.stringify({ acceptBookingTerms: true, offerSlug: "five-star-hotel-share" }),
   }));
   record("payment-route probe booking is pending", methodProbe.booking?.status === "pending", methodProbe.booking);
 

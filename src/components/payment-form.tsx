@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Surface } from "@/components/states";
+import { TermsAccept } from "@/components/terms-accept";
 
 type ManualTarget = "activation" | "booking" | "merchant_bundle";
 type PayMode = PaymentDestination["method"] | "merchant";
@@ -39,11 +40,13 @@ export function PaymentForm({
   const [proof, setProof] = useState<File | null>(null);
   const [notes, setNotes] = useState("");
   const [merchantUserId, setMerchantUserId] = useState("");
+  const [merchantTerms, setMerchantTerms] = useState<Record<string, boolean>>({});
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const selected = destinations.find((d) => d.method === method);
   const merchantMode = allowMerchant && method === "merchant";
+  const merchantTermsReady = Boolean(merchantTerms.MERCHANT_PAYMENT_TERMS);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -56,7 +59,12 @@ export function PaymentForm({
           setPending(false);
           return;
         }
-        await api.requestMerchantPay(targetId, merchantUserId.trim(), crypto.randomUUID());
+        if (!merchantTermsReady) {
+          setError("Merchant Payment Terms must be accepted.");
+          setPending(false);
+          return;
+        }
+        await api.requestMerchantPay(targetId, merchantUserId.trim(), crypto.randomUUID(), true);
         onSubmitted();
         return;
       }
@@ -120,7 +128,10 @@ export function PaymentForm({
               type="button"
               role="radio"
               aria-checked={selectedMethod}
-              onClick={() => setMethod(d.method)}
+              onClick={() => {
+                setMethod(d.method);
+                setMerchantTerms({});
+              }}
               className={
                 selectedMethod
                   ? "min-h-11 rounded-xl bg-pine px-4 py-3 text-left text-sm font-medium text-pine-fg"
@@ -161,10 +172,23 @@ export function PaymentForm({
           </Field>
           <p className="text-sm text-muted">
             This creates a payment request for {formatBdt(amount)}. Merchant Credit is reserved only if the Merchant
-            approves. Commission is not created at this step.
+            approves. Merchant approval does not confirm the booking, consume inventory, create commission, or qualify
+            a promotion. Merchant Credit is separate from the Commission Wallet.
           </p>
+          <TermsAccept
+            statement="Read the Merchant Payment Terms, then confirm. The box starts unchecked."
+            items={[
+              {
+                key: "MERCHANT_PAYMENT_TERMS",
+                label: "Merchant Payment Terms",
+                href: "/terms?key=merchant-payment",
+              },
+            ]}
+            accepted={merchantTerms}
+            onChange={(key, value) => setMerchantTerms((current) => ({ ...current, [key]: value }))}
+          />
           {error ? <p className="text-sm text-clay" role="alert">{error}</p> : null}
-          <Button type="submit" className="w-full" disabled={pending}>
+          <Button type="submit" className="w-full" disabled={pending || !merchantTermsReady}>
             {pending ? "Sending request…" : "Send Merchant payment request"}
           </Button>
         </form>
