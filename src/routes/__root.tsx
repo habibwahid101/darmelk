@@ -84,7 +84,7 @@ function Shell() {
       <div
         id="main-content"
         tabIndex={-1}
-        className={pathname === "/" ? "flex-1 outline-none" : "flex-1 pt-16 outline-none md:pt-[4.25rem]"}
+        className={pathname === "/" ? "flex-1 outline-none" : "flex-1 outline-none pt-16 md:pt-[4.25rem]"}
       >
         <Outlet />
       </div>
