@@ -18,3 +18,5 @@ export const notFound = (message = "Not found") =>
   new ApiError(404, "not_found", message);
 export const conflict = (message: string, code = "conflict") =>
   new ApiError(409, code, message);
+export const tooManyRequests = (message = "Please wait before sending another request") =>
+  new ApiError(429, "rate_limited", message);

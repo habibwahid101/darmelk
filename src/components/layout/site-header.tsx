@@ -83,7 +83,7 @@ export function SiteHeader() {
               to={item.to}
               hash={item.hash || undefined}
               className={cn(
-                "text-[13px] font-medium tracking-wide transition-colors duration-150",
+                "rounded-sm text-[13px] font-medium tracking-wide transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pine",
                 inverted ? "text-cream/80 hover:text-cream" : "text-ink/70 hover:text-ink",
               )}
             >
@@ -94,9 +94,11 @@ export function SiteHeader() {
 
         <div className="hidden items-center gap-2 lg:flex lg:justify-self-end">
           <AuthSlot inverted={inverted} />
-          <Button asChild variant={inverted ? "invert" : "primary"} size="lg">
-            <Link to="/login" search={{mode:"create"}}>Create Account</Link>
-          </Button>
+          <SignedOut>
+            <Button asChild variant={inverted ? "invert" : "primary"} size="lg">
+              <Link to="/login" search={{mode:"create"}}>Create Account</Link>
+            </Button>
+          </SignedOut>
         </div>
 
         <button
@@ -122,7 +124,7 @@ export function SiteHeader() {
                 to={item.to}
                 hash={item.hash || undefined}
                 onClick={() => setOpen(false)}
-                className="rounded-lg px-3 py-3 text-[15px] font-medium text-ink hover:bg-ink/5"
+                className="rounded-lg px-3 py-3 text-[15px] font-medium text-ink hover:bg-ink/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pine"
               >
                 {item.label}
               </Link>
@@ -137,17 +139,19 @@ export function SiteHeader() {
                   </Link>
                 </Button>
               ) : (
-                <Button asChild variant="secondary" className="w-full">
-                  <Link to="/login" onClick={() => setOpen(false)}>
-                    Sign in
-                  </Link>
-                </Button>
+                <>
+                  <Button asChild variant="secondary" className="w-full">
+                    <Link to="/login" onClick={() => setOpen(false)}>
+                      Sign in
+                    </Link>
+                  </Button>
+                  <Button asChild className="w-full">
+                    <Link to="/login" search={{mode:"create"}} onClick={() => setOpen(false)}>
+                      Create account
+                    </Link>
+                  </Button>
+                </>
               )}
-              <Button asChild className="w-full">
-                <Link to="/login" search={{mode:"create"}} onClick={() => setOpen(false)}>
-                  Create account
-                </Link>
-              </Button>
             </div>
           </nav>
         </div>

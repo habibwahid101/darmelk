@@ -42,7 +42,7 @@ function AdminOffers() {
           </Button>
         }
       />
-      {error ? <p className="text-sm text-clay">{error}</p> : null}
+      {error ? <p className="text-sm text-clay" role="alert">{error}</p> : null}
       {loading && !data ? (
         <p className="text-sm text-muted">Loading offers…</p>
       ) : offers.length === 0 ? (

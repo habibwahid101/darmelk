@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Check, X } from "lucide-react";
-import { PageHeader, StatCard, Surface } from "@/components/states";
+import { LoadingState, PageHeader, StatCard, Surface } from "@/components/states";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { useMemberSession } from "@/components/layout/use-member";
@@ -19,12 +19,13 @@ const primary = (rows: Booking[]) =>
 
 function OverviewPage() {
   const { user, member } = useMemberSession();
-  const { data: bookings } = useAsync(() => api.myBookings(), [member?.user_id], { enabled: Boolean(member) });
+  const { data: bookings, loading: bookingsLoading } = useAsync(() => api.myBookings(), [member?.user_id], { enabled: Boolean(member) });
   const { data: payments } = useAsync(() => api.myPayments(), [member?.user_id], { enabled: Boolean(member) });
   const { data: qual } = useAsync(() => api.myQualification(), [member?.user_id], { enabled: Boolean(member) && isGrowthParticipant(member) });
   const { data: comm } = useAsync(() => api.myCommissions(), [member?.user_id], { enabled: Boolean(member) && isGrowthParticipant(member) });
   const { data: tx } = useAsync(() => api.myTransactions(), [member?.user_id], { enabled: Boolean(member) });
   if (!member) return null;
+  if (bookingsLoading && !bookings) return <LoadingState label="Loading overview…" />;
   const booking = primary(bookings?.bookings ?? []);
   const active = member.activation_status === "active";
   const activationPayment = (payments?.payments ?? []).find((p) => p.target_type === "activation");

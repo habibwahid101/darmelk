@@ -52,7 +52,7 @@ function ResetPassword() {
   }
 
   return (
-    <main className="container-pg grid min-h-[100svh] place-items-center py-24">
+    <main className="container-pg grid min-h-0 flex-1 place-items-center py-10 md:py-14">
       <div className="w-full max-w-md rounded-2xl bg-cream p-6 shadow-[var(--shadow-card)] sm:p-8">
         <h1 className="font-display text-2xl font-semibold">Reset password</h1>
         {done ? (

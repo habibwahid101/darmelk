@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Wallet } from "lucide-react";
-import { EmptyState, PageHeader, StatCard, Surface } from "@/components/states";
+import { EmptyState, LoadingState, PageHeader, StatCard, Surface } from "@/components/states";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { useMemberSession } from "@/components/layout/use-member";
 import { formatBdt } from "@/lib/offers";
@@ -19,12 +19,13 @@ export const Route = createFileRoute("/app/commission")({
 
 function CommissionPage() {
   const { member } = useMemberSession();
-  const { data, reload: reloadCommissions } = useAsync(() => api.myCommissions(), [member?.user_id], { enabled: Boolean(member) });
+  const { data, reload: reloadCommissions, loading } = useAsync(() => api.myCommissions(), [member?.user_id], { enabled: Boolean(member) });
   const { data: payoutData } = useAsync(() => api.payoutMethods(), [member?.user_id], { enabled: Boolean(member) });
   const { data: withdrawalData, reload: reloadWithdrawals } = useAsync(() => api.myWithdrawals(), [member?.user_id], { enabled: Boolean(member) });
   const { data: bookingData } = useAsync(() => api.myBookings(), [member?.user_id], { enabled: Boolean(member) });
   const [amount,setAmount]=useState(1000); const [methodId,setMethodId]=useState(""); const [pending,setPending]=useState(false); const [error,setError]=useState<string|null>(null);
   if (!member) return null;
+  if (loading && !data) return <LoadingState label="Loading commission…" />;
 
   const wallet = data?.totals ?? { available: 0, pending: 0, paid: 0, reversed: 0, rejected: 0 };
   const rows = data?.commissions ?? [];
@@ -56,7 +57,7 @@ function CommissionPage() {
           <Field label="Saved payout method"><select className="field-control" value={methodId} onChange={(e)=>setMethodId(e.target.value)} required><option value="">Select method</option>{(payoutData?.methods??[]).map((m)=><option key={m.id} value={m.id}>{m.method_type.toUpperCase()} · {m.details.accountNumber}</option>)}</select></Field>
           <Field label="Requested amount"><Input type="number" min={1000} step={1} value={amount} onChange={(e)=>setAmount(Number(e.target.value))} required/></Field>
           <dl className="rounded-xl bg-mist p-4 text-sm sm:col-span-2"><Row label="Requested" value={formatBdt(amount||0)}/><Row label="Fee (2.5%)" value={formatBdt(fee)}/><Row label="Net payable" value={formatBdt(Math.max(0,(amount||0)-fee))}/></dl>
-          {error?<p className="text-sm text-clay sm:col-span-2">{error}</p>:null}<Button type="submit" disabled={pending || !eligible || !methodId}>{pending?"Submitting…":"Confirm withdrawal request"}</Button>
+          {error?<p className="text-sm text-clay sm:col-span-2" role="alert">{error}</p>:null}<Button type="submit" disabled={pending || !eligible || !methodId}>{pending?"Submitting…":"Confirm withdrawal request"}</Button>
         </form>
         {(withdrawalData?.withdrawals??[]).length?<ul className="mt-6 divide-y divide-line border-t border-line">{withdrawalData!.withdrawals.map((w)=><li key={w.id} className="flex items-center justify-between gap-3 py-3 text-sm"><span>{formatBdt(w.amount)} · net {formatBdt(w.net_amount)}</span><StatusBadge status={w.status}/></li>)}</ul>:null}
       </Surface>

@@ -31,7 +31,7 @@ function PropertyDetail() {
   const soldOut = isSoldOut(offer);
 
   return (
-    <div className="pb-16 pt-20 md:pt-24">
+    <div className="pb-16 pt-8 md:pt-10">
       <section className="container-pg grid min-w-0 gap-8 py-8 lg:grid-cols-[1.2fr_.8fr] lg:py-12">
         <div className="min-w-0">
           {hero ? (
@@ -81,7 +81,7 @@ function PropertyDetail() {
             <OfferCommercialTerms offer={offer} variant="public" />
             <OfferAvailabilityNote offer={offer} />
           </div>
-          <PropertyCta slug={offer.slug} bookable={bookable} soldOut={soldOut} />
+          <PropertyCta slug={offer.slug} status={offer.status} bookable={bookable} soldOut={soldOut} />
         </div>
       </section>
       <section className="border-y border-line bg-cream section-y">
@@ -148,7 +148,17 @@ function PropertyDetail() {
   );
 }
 
-function PropertyCta({ slug, bookable, soldOut }: { slug: string; bookable: boolean; soldOut: boolean }) {
+function PropertyCta({
+  slug,
+  status,
+  bookable,
+  soldOut,
+}: {
+  slug: string;
+  status: string;
+  bookable: boolean;
+  soldOut: boolean;
+}) {
   const { user } = useCurrentUserState();
   const { data: me } = useAsync(() => api.me(), [user?.id], { enabled: Boolean(user) });
   const active = me?.member.activation_status === "active";
@@ -156,7 +166,7 @@ function PropertyCta({ slug, bookable, soldOut }: { slug: string; bookable: bool
   if (!bookable) {
     return (
       <Button className="mt-6 w-full" disabled>
-        Booking closed
+        {status === "closed" ? "Closed" : "Coming soon"}
       </Button>
     );
   }
@@ -168,11 +178,7 @@ function PropertyCta({ slug, bookable, soldOut }: { slug: string; bookable: bool
           Request to Book
         </Link>
       </Button>
-      {soldOut ? (
-        <Button className="w-full" disabled>
-          Sold out
-        </Button>
-      ) : active ? (
+      {!soldOut && active ? (
         <Button asChild variant="secondary" className="w-full">
           <Link to="/app/book/$slug" params={{ slug }}>
             Start booking

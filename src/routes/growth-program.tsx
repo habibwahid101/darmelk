@@ -62,7 +62,7 @@ function GrowthProgramGateway() {
   }
 
   return (
-    <main className="container-pg grid min-h-[100svh] place-items-center py-24">
+    <main className="container-pg grid min-h-0 flex-1 place-items-center py-10 md:py-14">
       <div className="w-full max-w-lg overflow-hidden rounded-2xl bg-cream p-6 shadow-[var(--shadow-card)] sm:p-8">
         <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-pine">Growth Program</p>
         <h1 className="mt-3 font-display text-3xl font-semibold tracking-tight">Join the Growth Program</h1>

@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { FileText } from "lucide-react";
 import { useState } from "react";
-import { EmptyState, PageHeader, Surface } from "@/components/states";
+import { EmptyState, LoadingState, PageHeader, Surface } from "@/components/states";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { formatBdt } from "@/lib/offers";
@@ -14,7 +14,7 @@ export const Route = createFileRoute("/admin/bookings")({
 });
 
 function AdminBookings() {
-  const { data, reload } = useAsync(() => api.admin.bookings(), []);
+  const { data, reload, loading } = useAsync(() => api.admin.bookings(), []);
   const bookings = data?.bookings ?? [];
   const [busyId, setBusyId] = useState<string | null>(null);
 
@@ -36,7 +36,9 @@ function AdminBookings() {
         description="Confirming a booking uses that offer’s actual booking amount for any upline commission. Reversed rows stay in history."
       />
 
-      {bookings.length === 0 ? (
+      {loading && !data ? (
+        <LoadingState label="Loading bookings…" />
+      ) : bookings.length === 0 ? (
         <EmptyState
           icon={FileText}
           title="No bookings"

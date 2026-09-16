@@ -1,11 +1,15 @@
 import type { PoolClient } from "pg";
-import { badRequest, notFound } from "../errors.js";
+import { badRequest, notFound, tooManyRequests } from "../errors.js";
 import { uid } from "../ids.js";
 
 export const CONTACT_STATUSES = ["new", "reviewed", "closed"] as const;
 export type ContactStatus = (typeof CONTACT_STATUSES)[number];
 export const CONTACT_SOURCES = ["contact", "request_to_book"] as const;
 export type ContactSource = (typeof CONTACT_SOURCES)[number];
+
+const CONTACT_WINDOW_SQL = "10 minutes";
+const CONTACT_PER_MOBILE = 3;
+const CONTACT_GLOBAL_CAP = 30;
 
 export type ContactRequest = {
   id: string;
@@ -38,6 +42,10 @@ function optionalSlug(value: unknown): string | null {
     throw badRequest("Property reference is invalid", "invalid_contact");
   }
   return text;
+}
+
+function mobileDigits(mobile: string): string {
+  return mobile.replace(/\D/g, "");
 }
 
 export async function createContactRequest(
@@ -73,6 +81,26 @@ export async function createContactRequest(
     if (!rows[0]) throw badRequest("Property not found", "invalid_contact");
     offerTitle = rows[0].title;
     source = "request_to_book";
+  }
+
+  const digits = mobileDigits(mobile);
+  const { rows: mobileHits } = await client.query<{ n: number }>(
+    `select count(*)::int as n
+       from contact_requests
+      where created_at > now() - interval '${CONTACT_WINDOW_SQL}'
+        and regexp_replace(mobile, '[^0-9]', '', 'g') = $1`,
+    [digits],
+  );
+  if ((mobileHits[0]?.n ?? 0) >= CONTACT_PER_MOBILE) {
+    throw tooManyRequests("Please wait before sending another request");
+  }
+  const { rows: globalHits } = await client.query<{ n: number }>(
+    `select count(*)::int as n
+       from contact_requests
+      where created_at > now() - interval '${CONTACT_WINDOW_SQL}'`,
+  );
+  if ((globalHits[0]?.n ?? 0) >= CONTACT_GLOBAL_CAP) {
+    throw tooManyRequests("Please wait before sending another request");
   }
 
   const id = uid("cr");

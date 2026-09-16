@@ -105,7 +105,7 @@ function Login() {
   }
 
   return (
-    <main className="container-pg grid min-h-[100svh] place-items-center py-24">
+    <main className="container-pg grid min-h-0 flex-1 place-items-center py-10 md:py-14">
       <div className="grid w-full max-w-4xl overflow-hidden rounded-2xl bg-cream shadow-[var(--shadow-card)] lg:grid-cols-2">
         <div className="relative hidden min-h-[28rem] lg:block">
           <img src="/images/hero-platform.jpg" alt="" className="absolute inset-0 size-full object-cover" />
@@ -210,7 +210,11 @@ function Login() {
                 </label>
               </>
             ) : null}
-            {error ? <p className="text-sm text-clay">{error}</p> : null}
+            {error ? (
+              <p className="text-sm text-clay" role="alert">
+                {error}
+              </p>
+            ) : null}
             <Button type="submit" className="w-full" disabled={pending || !authEnabled}>
               {pending ? "Please wait…" : create ? "Create account" : "Sign in"}
             </Button>

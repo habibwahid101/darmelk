@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Users } from "lucide-react";
-import { EmptyState, PageHeader, Surface } from "@/components/states";
+import { EmptyState, LoadingState, PageHeader, Surface } from "@/components/states";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { api } from "@/lib/api-client";
 import { useAsync } from "@/lib/use-async";
@@ -8,7 +8,7 @@ import { useAsync } from "@/lib/use-async";
 export const Route = createFileRoute("/admin/users")({ component: AdminUsers });
 
 function AdminUsers() {
-  const { data } = useAsync(() => api.admin.users(), []);
+  const { data, loading } = useAsync(() => api.admin.users(), []);
   const members = data?.members ?? [];
 
   return (
@@ -18,7 +18,9 @@ function AdminUsers() {
         title="Users"
         description="Records created when someone signs in on this environment. No dummy members."
       />
-      {members.length === 0 ? (
+      {loading && !data ? (
+        <LoadingState label="Loading members…" />
+      ) : members.length === 0 ? (
         <EmptyState icon={Users} title="No members" description="Users appear after they create an account." />
       ) : (
         <Surface className="p-0 sm:p-0">

@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { Wallet } from "lucide-react";
-import { EmptyState, PageHeader, Surface } from "@/components/states";
+import { EmptyState, LoadingState, PageHeader, Surface } from "@/components/states";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -14,7 +14,7 @@ import { formatWhen } from "@/lib/platform";
 export const Route = createFileRoute("/admin/withdrawals")({ component: AdminWithdrawals });
 
 function AdminWithdrawals() {
-  const { data, reload } = useAsync(() => api.admin.withdrawals(), []);
+  const { data, reload, loading } = useAsync(() => api.admin.withdrawals(), []);
   const [busy, setBusy] = useState<string | null>(null);
   const rows = data?.withdrawals ?? [];
 
@@ -35,7 +35,9 @@ function AdminWithdrawals() {
         title="Withdrawals"
         description="Review eligibility and immutable payout snapshots before manual payment."
       />
-      {rows.length === 0 ? (
+      {loading && !data ? (
+        <LoadingState label="Loading withdrawals…" />
+      ) : rows.length === 0 ? (
         <EmptyState icon={Wallet} title="No withdrawal requests" description="Eligible member requests appear here." />
       ) : (
         <Surface className="p-0 sm:p-0">

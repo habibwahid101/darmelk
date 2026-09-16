@@ -66,7 +66,7 @@ export function ErrorState({
   action?: ReactNode;
 }) {
   return (
-    <div className="rounded-2xl bg-cream px-6 py-10 text-center shadow-[var(--shadow-card)]">
+    <div className="rounded-2xl bg-cream px-6 py-10 text-center shadow-[var(--shadow-card)]" role="alert">
       <p className="font-display text-2xl font-semibold">{title}</p>
       <p className="mx-auto mt-2 max-w-md text-sm text-muted">{description}</p>
       {action ? <div className="mt-6">{action}</div> : null}
@@ -116,6 +116,14 @@ export function AlertBanner({
 
 export function SkeletonBlock({ className }: { className?: string }) {
   return <div className={cn("animate-pulse rounded-2xl bg-ink/8", className)} />;
+}
+
+export function LoadingState({ label = "Loading…" }: { label?: string }) {
+  return (
+    <p className="text-sm text-muted" role="status">
+      {label}
+    </p>
+  );
 }
 
 export function StatCard({
