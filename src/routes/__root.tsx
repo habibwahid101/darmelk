@@ -6,6 +6,7 @@ import { SiteFooter } from "@/components/layout/site-footer";
 import { SiteHeader } from "@/components/layout/site-header";
 import { HashScroll } from "@/components/hash-scroll";
 import { Button } from "@/components/ui/button";
+import { SkipToContent } from "@/components/states";
 import appCss from "../styles.css?url";
 
 const APP_NAME = "Darmelk";
@@ -78,8 +79,13 @@ function Shell() {
   }
   return (
     <div className="flex min-h-dvh flex-col">
+      <SkipToContent />
       <SiteHeader />
-      <div className={pathname === "/" ? "flex-1" : "flex-1 pt-16 md:pt-[4.25rem]"}>
+      <div
+        id="main-content"
+        tabIndex={-1}
+        className={pathname === "/" ? "flex-1 outline-none" : "flex-1 outline-none pt-16 md:pt-[4.25rem]"}
+      >
         <Outlet />
       </div>
       <SiteFooter />

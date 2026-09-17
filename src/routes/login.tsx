@@ -143,7 +143,7 @@ function Login() {
 
           <form onSubmit={onSubmit} className="mt-6 space-y-3">
             {create ? (
-              <Field label="Full Name">
+              <Field label="Full Name" htmlFor="full-name">
                 <Input
                   id="full-name"
                   name="name"
@@ -154,7 +154,7 @@ function Login() {
                 />
               </Field>
             ) : null}
-            <Field label="Email">
+            <Field label="Email" htmlFor="email">
               <Input
                 id="email"
                 name="email"
@@ -188,7 +188,7 @@ function Login() {
                     aria-required="false"
                   />
                 </Field>
-                <label className="flex items-start gap-3 rounded-xl bg-paper px-3 py-3 text-sm leading-relaxed text-ink">
+                <label className="flex min-h-11 items-start gap-3 rounded-xl bg-paper px-3 py-3 text-sm leading-relaxed text-ink">
                   <input
                     type="checkbox"
                     className="mt-0.5 size-4 shrink-0 accent-[var(--color-pine)]"

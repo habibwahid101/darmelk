@@ -145,6 +145,14 @@ app.use(
   }),
 );
 
+app.use("*", async (c, next) => {
+  await next();
+  c.header("X-Content-Type-Options", "nosniff");
+  c.header("X-Frame-Options", "DENY");
+  c.header("Referrer-Policy", "strict-origin-when-cross-origin");
+  c.header("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+});
+
 app.get("/api/health", (c) => c.json({ ok: true, service: "darmelk-backend", time: new Date().toISOString() }));
 app.get("/api/payment-destinations", (c) => c.json({ destinations: destinationsForTarget(c.req.query("target")) }));
 app.get("/api/terms", (c) => {

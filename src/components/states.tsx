@@ -2,6 +2,17 @@ import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
+export function SkipToContent({ href = "#main-content" }: { href?: string }) {
+  return (
+    <a
+      href={href}
+      className="sr-only focus:not-sr-only focus:absolute focus:left-3 focus:top-3 focus:z-[80] focus:rounded-lg focus:bg-cream focus:px-4 focus:py-2.5 focus:text-sm focus:font-medium focus:text-ink focus:shadow-[var(--shadow-card)] focus:outline-none focus:ring-2 focus:ring-pine"
+    >
+      Skip to content
+    </a>
+  );
+}
+
 export function PageHeader({
   kicker,
   title,

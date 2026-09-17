@@ -2,7 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { BrandMark } from "@/components/brand-mark";
 
 const footerLink =
-  "inline-flex min-h-8 max-w-full items-center rounded-sm text-ink/80 hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pine";
+  "inline-flex min-h-11 max-w-full items-center rounded-sm text-ink/80 hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pine";
 
 export function SiteFooter() {
   return (

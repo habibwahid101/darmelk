@@ -165,9 +165,16 @@ function PropertyCta({
 
   if (!bookable) {
     return (
-      <Button className="mt-6 w-full" disabled>
-        {status === "closed" ? "Closed" : "Coming soon"}
-      </Button>
+      <div className="mt-6">
+        <Button className="w-full" disabled>
+          {status === "closed" ? "Closed" : "Coming soon"}
+        </Button>
+        <p className="mt-3 text-sm leading-relaxed text-muted">
+          {status === "closed"
+            ? "This opportunity is no longer open for Request to Book."
+            : "This opportunity is not open for Request to Book yet."}
+        </p>
+      </div>
     );
   }
 

@@ -52,3 +52,44 @@ test("privacy documents are not branded as Terms", () => {
   assert.match(src, /That document is not published/);
   assert.doesNotMatch(src, /That terms document is not published/);
 });
+
+test("public and member shells expose a skip-to-content target", () => {
+  const root = read("src/routes/__root.tsx");
+  const app = read("src/components/layout/app-shell.tsx");
+  const admin = read("src/components/layout/admin-shell.tsx");
+  const states = read("src/components/states.tsx");
+  assert.match(states, /export function SkipToContent/);
+  assert.match(root, /SkipToContent/);
+  assert.match(root, /id="main-content"/);
+  assert.match(app, /SkipToContent/);
+  assert.match(app, /id="main-content"/);
+  assert.match(admin, /SkipToContent/);
+  assert.match(admin, /id="main-content"/);
+});
+
+test("menu toggles and password visibility expose a visible focus ring", () => {
+  const header = read("src/components/layout/site-header.tsx");
+  const app = read("src/components/layout/app-shell.tsx");
+  const admin = read("src/components/layout/admin-shell.tsx");
+  const password = read("src/components/ui/password-field.tsx");
+  assert.match(header, /size-11[\s\S]*focus-visible:ring-2 focus-visible:ring-pine[\s\S]*Open menu/);
+  assert.match(app, /size-11[\s\S]*focus-visible:ring-2 focus-visible:ring-pine[\s\S]*Open menu/);
+  assert.match(admin, /size-11[\s\S]*focus-visible:ring-2 focus-visible:ring-pine[\s\S]*Open menu/);
+  assert.match(password, /focus-visible:ring-2 focus-visible:ring-pine[\s\S]*Hide password/);
+});
+
+test("JSON API responses send nosniff and deny framing", () => {
+  const router = read("backend/src/router.ts");
+  assert.match(router, /X-Content-Type-Options", "nosniff"/);
+  assert.match(router, /X-Frame-Options", "DENY"/);
+  assert.match(router, /Referrer-Policy", "strict-origin-when-cross-origin"/);
+});
+
+test("closed and coming-soon property CTAs explain why Request to Book is unavailable", () => {
+  const property = read("src/routes/properties.\$slug.tsx");
+  assert.match(property, /Coming soon/);
+  assert.match(property, /no longer open for Request to Book/);
+  assert.match(property, /not open for Request to Book yet/);
+  assert.doesNotMatch(property, /Booking closed/);
+  assert.doesNotMatch(property, />Sold out</);
+});
