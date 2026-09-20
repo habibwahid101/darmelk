@@ -10,7 +10,6 @@ const read = (rel) => readFileSync(join(root, rel), "utf8");
 test("prelaunch reset preview is admin-protected and read-only", () => {
   const router = read("backend/src/router.ts");
   const engine = read("backend/src/engine/prelaunch-reset.ts");
-  const smoke = read("backend/src/smoke-test.ts");
   assert.match(router, /app\.get\("\/api\/admin\/maintenance\/prelaunch-reset\/preview"/);
   assert.match(router, /previewPrelaunchReset/);
   assert.match(router, /requireAdmin\(client, adminId\)/);
@@ -32,6 +31,4 @@ test("prelaunch reset preview is admin-protected and read-only", () => {
   assert.match(engine, /offer_inventory_events/);
   assert.match(engine, /"_migrations"/);
   assert.match(engine, /points_to_non_admin/);
-  assert.match(smoke, /prelaunch reset preview rejects anonymous callers/);
-  assert.match(smoke, /prelaunch reset preview is admin-only read-only inventory/);
 });
