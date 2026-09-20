@@ -83,6 +83,7 @@ jobs:
         run: |
           node esbuild-smoke.mjs
           node dist/smoke-test.mjs
+          node dist/prelaunch-reset-smoke.mjs
 
   deploy:
     name: Deploy to AWS Lambda
@@ -104,7 +105,7 @@ jobs:
         working-directory: backend
         run: |
           cd dist
-          zip -qr ../lambda.zip . -x "smoke-test.mjs"
+          zip -qr ../lambda.zip . -x "smoke-test.mjs" -x "prelaunch-reset-smoke.mjs"
           cd ..
           ls -la lambda.zip
 
