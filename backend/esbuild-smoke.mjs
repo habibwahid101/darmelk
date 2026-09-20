@@ -17,3 +17,17 @@ await build({
   external: ["pg-native"],
   logLevel: "info",
 });
+
+await build({
+  entryPoints: [join(here, "src", "prelaunch-reset-smoke-main.ts")],
+  outfile: join(here, "dist", "prelaunch-reset-smoke.mjs"),
+  bundle: true,
+  platform: "node",
+  target: "node20",
+  format: "esm",
+  banner: {
+    js: "import { createRequire as __createRequire } from 'module'; const require = __createRequire(import.meta.url);",
+  },
+  external: ["pg-native"],
+  logLevel: "info",
+});
