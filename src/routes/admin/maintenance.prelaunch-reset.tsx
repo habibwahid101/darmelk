@@ -92,9 +92,31 @@ function PrelaunchResetPage() {
         </>
       ) : null}
       {result ? (
-        <AlertBanner tone="ok" title="Reset completed">
-          Flagship sold is now {result.after.flagship_sold}. Admin members {result.after.admin_members}. Non-admin members {result.after.non_admin_members}. Audit rows {result.after.reset_audit_count}.
-        </AlertBanner>
+        <>
+          <AlertBanner tone="ok" title="Reset completed">
+            Flagship sold is now {result.after.flagship_sold}. Admin members {result.after.admin_members}. Non-admin members {result.after.non_admin_members}. Audit rows {result.after.reset_audit_count}.
+          </AlertBanner>
+          <Surface>
+            <p className="font-display text-xl font-semibold">Before / after counts</p>
+            <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
+              {[
+                ["Non-admin members", result.before.non_admin_members.length, result.after.non_admin_members],
+                ["Auth-only non-admin users", result.before.auth_only_non_admin_users, result.after.auth_only_non_admin_users],
+                ["Bookings", result.before.reset_sensitive_counts.bookings ?? 0, result.after.reset_sensitive_counts.bookings ?? 0],
+                ["Inventory events", result.before.reset_sensitive_counts.offer_inventory_events ?? 0, result.after.reset_sensitive_counts.offer_inventory_events ?? 0],
+                ["Flagship sold", result.before.flagship.sold, result.after.flagship_sold],
+                ["Commission ledger", result.before.reset_sensitive_counts.commission_ledger ?? 0, result.after.reset_sensitive_counts.commission_ledger ?? 0],
+                ["Admin actions", result.before.reset_sensitive_counts.admin_actions ?? 0, result.after.reset_sensitive_counts.admin_actions ?? 0],
+                ["Offers preserved", result.before.preserve_catalog_counts.offers ?? 0, result.after.preserve_catalog_counts.offers ?? 0],
+                ["Migrations preserved", result.before.preserve_catalog_counts._migrations ?? 0, result.after.preserve_catalog_counts._migrations ?? 0],
+              ].map(([label, before, after]) => (
+                <p key={String(label)}>
+                  {label}: {before} → {after}
+                </p>
+              ))}
+            </div>
+          </Surface>
+        </>
       ) : null}
       {data?.already_clean ? (
         <AlertBanner tone="ok" title="Already clean">

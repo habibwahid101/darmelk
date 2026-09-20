@@ -9,7 +9,7 @@ import {
 type RecordFn = (step: string, ok: boolean, detail?: unknown) => void;
 
 export async function runPrelaunchResetSmoke(opts: {
-  app: Hono;
+  app: Hono<any, any, any>;
   adminCookie: string;
   rootCookie: string;
   adminUserId: string;
