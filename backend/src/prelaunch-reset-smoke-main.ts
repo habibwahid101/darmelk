@@ -1,9 +1,11 @@
-function extractCookie(res: Response): string {
+export {};
+
+function extractCookieHeader(res: Response): string {
   const setCookie = res.headers.get("set-cookie") ?? "";
   return setCookie.split(";")[0] ?? "";
 }
 
-async function main() {
+async function runStandalonePrelaunchResetSmoke() {
   process.env.ADMIN_EMAILS = process.env.ADMIN_EMAILS || "admin@example.com";
   process.env.DARMELK_PRELAUNCH_RESET_TEST = "1";
   const { app } = await import("./router.js");
@@ -27,12 +29,15 @@ async function main() {
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ email: "root-no-sponsor@example.com", password: "password123" }),
   });
-  const adminCookie = extractCookie(adminSignIn);
-  const rootCookie = extractCookie(memberSignIn);
-  const me = await adminSignIn.json().catch(async () => (await app.request("/api/me", { headers: { cookie: adminCookie } })).json());
-  const meLive = await (await app.request("/api/me", { headers: { cookie: adminCookie } })).json();
+  const adminCookie = extractCookieHeader(adminSignIn);
+  const rootCookie = extractCookieHeader(memberSignIn);
+  const meLive = (await (await app.request("/api/me", { headers: { cookie: adminCookie } })).json()) as {
+    member?: { user_id?: string };
+  };
   const soldOf = async (slug: string) => {
-    const preview = await (await app.request("/api/admin/maintenance/prelaunch-reset/preview", { headers: { cookie: adminCookie } })).json();
+    const preview = (await (
+      await app.request("/api/admin/maintenance/prelaunch-reset/preview", { headers: { cookie: adminCookie } })
+    ).json()) as { flagship?: { slug?: string; sold?: number } };
     return slug === preview.flagship?.slug ? Number(preview.flagship?.sold ?? 0) : 0;
   };
   record("prelaunch smoke can reuse smoke-test identities", adminSignIn.status === 200 && memberSignIn.status === 200 && Boolean(meLive.member?.user_id), {
@@ -43,7 +48,7 @@ async function main() {
     app,
     adminCookie,
     rootCookie,
-    adminUserId: meLive.member.user_id,
+    adminUserId: meLive.member?.user_id ?? "",
     record,
     soldOf,
   });
@@ -56,7 +61,7 @@ async function main() {
   }
 }
 
-main().catch((err) => {
+runStandalonePrelaunchResetSmoke().catch((err) => {
   console.error("prelaunch reset smoke crashed:", err);
   process.exit(1);
 });
