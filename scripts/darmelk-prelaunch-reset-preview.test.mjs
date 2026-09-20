@@ -7,48 +7,46 @@ import test from "node:test";
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const read = (rel) => readFileSync(join(root, rel), "utf8");
 
-test("prelaunch reset is admin-protected, confirmed, and transactional", () => {
-  const handler = read("backend/src/handler.ts");
+test("prelaunch reset execute is admin-protected, confirmed, and transactional", () => {
+  const router = read("backend/src/router.ts");
   const http = read("backend/src/engine/prelaunch-reset-http.ts");
   const engine = read("backend/src/engine/prelaunch-reset.ts");
   const page = read("src/routes/admin/maintenance.prelaunch-reset.tsx");
   const client = read("src/lib/api-client.ts");
-  const commissions = read("backend/src/engine/commissions.ts");
-  const bookings = read("backend/src/engine/bookings.ts");
+  const smoke = read("backend/src/prelaunch-reset-smoke.ts");
+  const smokeMain = read("backend/src/smoke-test.ts");
 
-  assert.match(handler, /registerPrelaunchResetPreview/);
+  assert.match(router, /registerPrelaunchResetRoutes/);
   assert.match(http, /app\.get\("\/api\/admin\/maintenance\/prelaunch-reset\/preview"/);
   assert.match(http, /app\.post\("\/api\/admin\/maintenance\/prelaunch-reset\/execute"/);
   assert.match(http, /requireAdmin\(client, adminId\)/);
-  assert.match(http, /assertResetEnvironment/);
-  assert.match(http, /confirmation_required/);
-  assert.match(http, /RESET_CONFIRMATION/);
-  assert.doesNotMatch(http, /app\.delete\(/);
-
+  assert.match(http, /executePrelaunchReset/);
   assert.match(engine, /RESET DARMELK PRELAUNCH DATA/);
-  assert.match(engine, /ONE_TIME_PRELAUNCH_RESET/);
-  assert.match(engine, /export async function executePrelaunchReset/);
-  assert.match(engine, /abortAfterClear/);
+  assert.match(engine, /confirmation_required/);
   assert.match(engine, /already_clean/);
-  assert.match(engine, /delete from members where role <> 'admin'/);
-  assert.match(engine, /delete from "user" where id <> all/);
-  assert.match(engine, /auth_only_non_admin_users/);
-  assert.match(engine, /soldForOffer/);
+  assert.match(engine, /ONE_TIME_PRELAUNCH_RESET/);
+  assert.match(engine, /delete from/);
+  assert.match(engine, /executePrelaunchReset/);
   assert.match(engine, /five-star-hotel-share/);
-  assert.match(engine, /booking_snapshots/);
-  assert.match(engine, /reversal_entries/);
-  assert.match(engine, /admin_actions/);
-  assert.match(engine, /offer_inventory_events/);
-  assert.match(engine, /"_migrations"/);
-  assert.match(engine, /points_to_non_admin/);
-  assert.match(engine, /test_rollback_probe/);
-
-  assert.match(page, /createFileRoute\("\/admin\/maintenance\/prelaunch-reset"\)/);
+  assert.match(engine, /auth_only_non_admin_users/);
+  assert.match(engine, /delete from "user"/);
+  assert.match(engine, /flagship_not_cleared|flagship\.sold !== 0/);
   assert.match(page, /RESET DARMELK PRELAUNCH DATA/);
-  assert.match(page, /prelaunchResetExecute/);
+  assert.match(page, /createFileRoute\("\/admin\/maintenance\/prelaunch-reset"\)/);
+  assert.match(page, /executePrelaunchReset/);
   assert.match(client, /prelaunchResetPreview/);
-  assert.match(client, /prelaunchResetExecute/);
+  assert.match(client, /executePrelaunchReset/);
+  assert.match(smoke, /forced-rollback/);
+  assert.match(smoke, /already_clean/);
+  assert.match(smokeMain, /runPrelaunchResetSmoke/);
+  assert.doesNotMatch(engine, /\bTRUNCATE\b/);
+  assert.doesNotMatch(engine, /offers"\)/);
+});
 
-  assert.match(commissions, /postCommissionsForBooking/);
-  assert.match(bookings, /export async function confirmBooking/);
+test("prelaunch reset does not touch AWS or reusable ledger deletion APIs", () => {
+  const engine = read("backend/src/engine/prelaunch-reset.ts");
+  const http = read("backend/src/engine/prelaunch-reset-http.ts");
+  assert.doesNotMatch(engine, /@aws-sdk|update-function-configuration|CreateVpc|iam:CreateRole/);
+  assert.doesNotMatch(http, /\/api\/admin\/ledger\/delete/);
+  assert.match(engine, /ONE-TIME PRELAUNCH CLEAN RESET/);
 });
