@@ -8,13 +8,15 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const read = (rel) => readFileSync(join(root, rel), "utf8");
 
 test("prelaunch reset preview is admin-protected and read-only", () => {
-  const router = read("backend/src/router.ts");
+  const handler = read("backend/src/handler.ts");
+  const http = read("backend/src/engine/prelaunch-reset-http.ts");
   const engine = read("backend/src/engine/prelaunch-reset.ts");
-  assert.match(router, /app\.get\("\/api\/admin\/maintenance\/prelaunch-reset\/preview"/);
-  assert.match(router, /previewPrelaunchReset/);
-  assert.match(router, /requireAdmin\(client, adminId\)/);
-  assert.doesNotMatch(router, /app\.post\("\/api\/admin\/maintenance\/prelaunch-reset/);
-  assert.doesNotMatch(router, /app\.delete\("\/api\/admin\/maintenance\/prelaunch-reset/);
+  assert.match(handler, /registerPrelaunchResetPreview/);
+  assert.match(http, /app\.get\("\/api\/admin\/maintenance\/prelaunch-reset\/preview"/);
+  assert.match(http, /requireAdmin\(client, adminId\)/);
+  assert.match(http, /previewPrelaunchReset/);
+  assert.doesNotMatch(http, /app\.post\(/);
+  assert.doesNotMatch(http, /app\.delete\(/);
   assert.doesNotMatch(engine, /\bDELETE\b/);
   assert.doesNotMatch(engine, /\bUPDATE\b/);
   assert.doesNotMatch(engine, /\bTRUNCATE\b/);
