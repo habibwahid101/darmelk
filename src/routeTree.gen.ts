@@ -55,6 +55,7 @@ import { Route as AppSettingsRouteImport } from './routes/app/settings'
 import { Route as AppTransactionsRouteImport } from './routes/app/transactions'
 import { Route as CareerIndexRouteImport } from './routes/career/index'
 import { Route as CareerSlugRouteImport } from './routes/career.$slug'
+import { Route as JoinCodeRouteImport } from './routes/join.$code'
 import { Route as PropertiesIndexRouteImport } from './routes/properties/index'
 import { Route as PropertiesSlugRouteImport } from './routes/properties.$slug'
 import { Route as AdminCareerIndexRouteImport } from './routes/admin/career.index'
@@ -325,6 +326,11 @@ const CareerSlugRoute = CareerSlugRouteImport.update({
   path: '/$slug',
   getParentRoute: () => CareerRoute,
 } as any)
+const JoinCodeRoute = JoinCodeRouteImport.update({
+  id: '/join/$code',
+  path: '/join/$code',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PropertiesIndexRoute = PropertiesIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -577,6 +583,7 @@ export interface FileRoutesByFullPath {
   '/app/settings': typeof AppSettingsRoute
   '/app/transactions': typeof AppTransactionsRoute
   '/career/$slug': typeof CareerSlugRoute
+  '/join/$code': typeof JoinCodeRoute
   '/properties/$slug': typeof PropertiesSlugRoute
   '/admin/': typeof AdminIndexRoute
   '/app/': typeof AppIndexRoute
@@ -654,6 +661,7 @@ export interface FileRoutesByTo {
   '/app/settings': typeof AppSettingsRoute
   '/app/transactions': typeof AppTransactionsRoute
   '/career/$slug': typeof CareerSlugRoute
+  '/join/$code': typeof JoinCodeRoute
   '/properties/$slug': typeof PropertiesSlugRoute
   '/admin': typeof AdminIndexRoute
   '/app': typeof AppIndexRoute
@@ -736,6 +744,7 @@ export interface FileRoutesById {
   '/app/settings': typeof AppSettingsRoute
   '/app/transactions': typeof AppTransactionsRoute
   '/career/$slug': typeof CareerSlugRoute
+  '/join/$code': typeof JoinCodeRoute
   '/properties/$slug': typeof PropertiesSlugRoute
   '/admin/': typeof AdminIndexRoute
   '/app/': typeof AppIndexRoute
@@ -825,6 +834,7 @@ export interface FileRouteTypes {
     | '/app/settings'
     | '/app/transactions'
     | '/career/$slug'
+    | '/join/$code'
     | '/properties/$slug'
     | '/admin/'
     | '/app/'
@@ -902,6 +912,7 @@ export interface FileRouteTypes {
     | '/app/settings'
     | '/app/transactions'
     | '/career/$slug'
+    | '/join/$code'
     | '/properties/$slug'
     | '/admin'
     | '/app'
@@ -983,6 +994,7 @@ export interface FileRouteTypes {
     | '/app/settings'
     | '/app/transactions'
     | '/career/$slug'
+    | '/join/$code'
     | '/properties/$slug'
     | '/admin/'
     | '/app/'
@@ -1043,6 +1055,7 @@ export interface RootRouteChildren {
   PropertiesRoute: typeof PropertiesRouteWithChildren
   ResetPasswordRoute: typeof ResetPasswordRoute
   TermsRoute: typeof TermsRoute
+  JoinCodeRoute: typeof JoinCodeRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
 }
 
@@ -1369,6 +1382,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/career/$slug'
       preLoaderRoute: typeof CareerSlugRouteImport
       parentRoute: typeof CareerRoute
+    }
+    '/join/$code': {
+      id: '/join/$code'
+      path: '/join/$code'
+      fullPath: '/join/$code'
+      preLoaderRoute: typeof JoinCodeRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/properties/': {
       id: '/properties/'
@@ -1973,17 +1993,9 @@ const rootRouteChildren: RootRouteChildren = {
   PropertiesRoute: PropertiesRouteWithChildren,
   ResetPasswordRoute: ResetPasswordRoute,
   TermsRoute: TermsRoute,
+  JoinCodeRoute: JoinCodeRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { createStart } from '@tanstack/react-start'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-  }
-}

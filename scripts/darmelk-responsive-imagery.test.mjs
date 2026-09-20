@@ -29,11 +29,13 @@ test("shared mobile foundation clears bottom nav and prevents overflow", () => {
   assert.match(rootDoc, /viewport-fit=cover/);
 });
 
-test("referral copy remains on the right of the code row on mobile", () => {
-  const src = read("src/routes/app/network.tsx");
-  assert.match(src, /flex min-w-0 items-center justify-between gap-3 sm:block/);
-  assert.match(src, /navigator\.clipboard\.writeText\(code\)/);
+test("referral copy remains available with code, link, and share actions", () => {
+  const src = read("src/components/referral-share.tsx");
+  assert.match(src, /Copy code/);
+  assert.match(src, /Copy link/);
+  assert.match(src, /navigator\.clipboard\.writeText/);
   assert.match(src, /Copied/);
+  assert.match(read("src/routes/app/network.tsx"), /ReferralShareCard/);
 });
 
 test("property detail uses approved images and never shows a placeholder card", () => {
