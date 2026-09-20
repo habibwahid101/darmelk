@@ -2,7 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { AlertBanner, LoadingState, PageHeader, StatCard, Surface } from "@/components/states";
 import { Button } from "@/components/ui/button";
-import { api, ApiError } from "@/lib/api-client";
+import { ApiError } from "@/lib/api-client";
+import { prelaunchResetExecute, prelaunchResetPreview } from "@/lib/prelaunch-reset-api";
 import { useAsync } from "@/lib/use-async";
 
 export const Route = createFileRoute("/admin/maintenance/prelaunch-reset")({
@@ -12,10 +13,10 @@ export const Route = createFileRoute("/admin/maintenance/prelaunch-reset")({
 const CONFIRMATION = "RESET DARMELK PRELAUNCH DATA";
 
 function PrelaunchResetPage() {
-  const { data, loading, error, reload } = useAsync(() => api.admin.prelaunchResetPreview(), []);
+  const { data, loading, error, reload } = useAsync(() => prelaunchResetPreview(), []);
   const [typed, setTyped] = useState("");
   const [busy, setBusy] = useState(false);
-  const [result, setResult] = useState<Awaited<ReturnType<typeof api.admin.prelaunchResetExecute>> | null>(null);
+  const [result, setResult] = useState<Awaited<ReturnType<typeof prelaunchResetExecute>> | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
   const canSubmit = typed === CONFIRMATION && !busy && data && !data.already_clean && !result;
@@ -43,7 +44,7 @@ function PrelaunchResetPage() {
     setBusy(true);
     setActionError(null);
     try {
-      const executed = await api.admin.prelaunchResetExecute(CONFIRMATION);
+      const executed = await prelaunchResetExecute(CONFIRMATION);
       setResult(executed);
       await reload();
     } catch (err) {
@@ -61,18 +62,15 @@ function PrelaunchResetPage() {
         title="One-time prelaunch reset"
         description="This clears prelaunch member and transaction rows from the active production database. Catalog, migrations, and the working admin account stay. This cannot be undone in this database."
       />
-
       <AlertBanner tone="danger" title="Irreversible in the active production database">
-        Normal Darmelk ledgers stay append-only. This page is the owner-authorized one-time prelaunch clean reset only. Type the exact phrase to enable execution. Do not use this as a general delete tool.
+        Normal Darmelk ledgers stay append-only. This page is the owner-authorized one-time prelaunch clean reset only. Type the exact phrase to enable execution.
       </AlertBanner>
-
       {loading && !data ? <LoadingState label="Loading live preview…" /> : null}
       {error ? (
         <AlertBanner tone="danger" title="Preview failed">
           {error.message}
         </AlertBanner>
       ) : null}
-
       {data ? (
         <>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -80,11 +78,10 @@ function PrelaunchResetPage() {
               <StatCard key={label} label={label} value={String(value)} />
             ))}
           </div>
-
           <Surface>
             <p className="font-display text-xl font-semibold">Preserved admin</p>
             <ul className="mt-3 space-y-2 text-sm">
-              {data.preserved_admins.map((admin) => (
+              {data.preserved_admins.map((admin: any) => (
                 <li key={admin.user_id}>
                   {admin.masked_email} · {admin.role} · auth {admin.auth_user_present ? "yes" : "no"} · accounts {admin.account_rows} · sessions {admin.session_rows}
                 </li>
@@ -92,50 +89,36 @@ function PrelaunchResetPage() {
             </ul>
             <p className="mt-4 text-sm text-muted">{data.ledger_notice}</p>
           </Surface>
-
-          <Surface>
-            <p className="font-display text-xl font-semibold">Flagship inventory</p>
-            <p className="mt-2 text-sm">
-              {data.flagship.slug}: sold {data.flagship.sold}, consume events {data.flagship.consume_events}. After a successful reset, sold must be 0.
-            </p>
-          </Surface>
         </>
       ) : null}
-
       {result ? (
         <AlertBanner tone="ok" title="Reset completed">
           Flagship sold is now {result.after.flagship_sold}. Admin members {result.after.admin_members}. Non-admin members {result.after.non_admin_members}. Audit rows {result.after.reset_audit_count}.
         </AlertBanner>
       ) : null}
-
       {data?.already_clean ? (
         <AlertBanner tone="ok" title="Already clean">
-          A second execution is refused. Review the counts above and leave this page.
+          A second execution is refused.
         </AlertBanner>
       ) : null}
-
       {actionError ? (
         <AlertBanner tone="danger" title="Execution refused">
           {actionError}
         </AlertBanner>
       ) : null}
-
       {!result && data && !data.already_clean ? (
         <Surface className="space-y-4">
           <p className="font-display text-xl font-semibold">Confirm execution</p>
           <p className="text-sm text-muted">
-            Type <span className="font-medium text-ink">{CONFIRMATION}</span> then run the reset. The request uses the signed-in admin session.
+            Type <span className="font-medium text-ink">{CONFIRMATION}</span> then run the reset.
           </p>
-          <label className="block text-sm">
-            Confirmation phrase
-            <input
-              className="mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-pine"
-              value={typed}
-              onChange={(event) => setTyped(event.target.value)}
-              autoComplete="off"
-              spellCheck={false}
-            />
-          </label>
+          <input
+            className="mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2.5 font-mono text-sm outline-none focus:ring-2 focus:ring-pine"
+            value={typed}
+            onChange={(event) => setTyped(event.target.value)}
+            autoComplete="off"
+            spellCheck={false}
+          />
           <Button type="button" disabled={!canSubmit} onClick={() => void execute()}>
             {busy ? "Resetting…" : "Execute one-time prelaunch reset"}
           </Button>
