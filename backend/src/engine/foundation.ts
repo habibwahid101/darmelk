@@ -11,6 +11,7 @@ export const FOUNDATION_LEVEL_COUNTS = { 0: 1, 1: 3, 2: 9, 3: 27, 4: 81 } as con
 export const FOUNDATION_EMAIL_DOMAIN = "foundation.darmelk.invalid";
 export const FOUNDATION_SITE_ORIGIN = "https://darmelk.com";
 export const FOUNDATION_ACTIVATION_WAIVER = "Habib Wahid 121-ID foundation setup";
+export const FOUNDATION_ACTIVATION_EXPIRES_AT = "9999-12-31T23:59:59.000Z";
 export const FOUNDATION_EVENT = "DARMELK_FOUNDATION_RESET_AND_SETUP";
 const FOUNDATION_PASSWORD = "HW@2026#Common";
 
@@ -55,6 +56,16 @@ export function foundationEmail(label: string): string {
 export function referralLinkFor(code: string, origin = FOUNDATION_SITE_ORIGIN): string {
   const base = origin.replace(/\/$/, "");
   return `${base}/join/${encodeURIComponent(code)}`;
+}
+
+export function activationExpiryIso(value: string | Date | null | undefined): string | null {
+  if (!value) return null;
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
+export function isFoundationActivationSentinel(value: string | Date | null | undefined): boolean {
+  return activationExpiryIso(value) === FOUNDATION_ACTIVATION_EXPIRES_AT;
 }
 
 export function assertTreeShape(nodes: FoundationNode[]): void {
@@ -283,7 +294,7 @@ export async function createFoundationNetwork(
   const idByLabel = new Map<string, string>();
   const codes: string[] = [];
   const byLevel: Record<0 | 1 | 2 | 3 | 4, number> = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0 };
-  const expires = new Date(Date.now() + 100 * 365 * 24 * 60 * 60 * 1000);
+  const expires = FOUNDATION_ACTIVATION_EXPIRES_AT;
   const passwordHash = await hashPassword(FOUNDATION_PASSWORD);
 
   for (const node of nodes) {
@@ -307,7 +318,7 @@ export async function createFoundationNetwork(
           network_parent_user_id, network_slot, onboarding_complete,
           activation_status, activation_expires_at
         ) values ($1,$2,'', 'member', $3, $4, $5, true, 'active', $6)`,
-      [userId, code, parentId, parentId, node.slot, expires.toISOString()],
+      [userId, code, parentId, parentId, node.slot, expires],
     );
     idByLabel.set(node.label, userId);
     codes.push(code);
@@ -334,6 +345,7 @@ export async function createFoundationNetwork(
           wallets: nodes.length,
           referralCodes: codes.length,
           activationExemption: FOUNDATION_ACTIVATION_WAIVER,
+          activationExpiresAt: FOUNDATION_ACTIVATION_EXPIRES_AT,
           activationFee: 0,
           walletModel: "commission_ledger by beneficiary_user_id",
         }),
@@ -400,6 +412,9 @@ export async function validateFoundation(client: PoolClient): Promise<{
     if (row.activation_status === "active") active += 1;
     if (row.activation_status === "active" && row.activation_expires_at && new Date(row.activation_expires_at) > new Date()) {
       commissionEligible += 1;
+    }
+    if (!isFoundationActivationSentinel(row.activation_expires_at)) {
+      errors.push(`${row.name} expiry is not the foundation sentinel`);
     }
     if (row.has_password) credentials += 1;
     if (codes.has(row.referral_code)) errors.push(`duplicate referral code ${row.referral_code}`);

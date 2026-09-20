@@ -39,19 +39,38 @@ test("existing Darmelk commission rates are unchanged", () => {
   assert.match(src, /4: 0\.04/);
   assert.match(src, /5: 0\.02/);
   assert.match(src, /getMatrixAncestors/);
+  assert.match(src, /m.activation_status = 'active'/);
+  assert.match(src, /m.activation_expires_at > now\(\)/);
   assert.doesNotMatch(src, /FOUNDATION/);
   const foundation = read("backend/src/engine/foundation.ts");
   assert.doesNotMatch(foundation, /from ["']\.\/commissions/);
   assert.match(foundation, /activation_status, activation_expires_at/);
 });
 
+test("foundation activation uses the 9999 sentinel, not 100-year Date.now() math", async () => {
+  const foundation = read("backend/src/engine/foundation.ts");
+  assert.match(foundation, /FOUNDATION_ACTIVATION_EXPIRES_AT = "9999-12-31T23:59:59\.000Z"/);
+  assert.doesNotMatch(foundation, /100 \* 365 \* 24 \* 60 \* 60 \* 1000/);
+  assert.doesNotMatch(foundation, /Date\.now\(\) \+/);
+  const { FOUNDATION_ACTIVATION_EXPIRES_AT, isFoundationActivationSentinel } = await import(
+    "../backend/src/engine/foundation.ts"
+  );
+  assert.equal(FOUNDATION_ACTIVATION_EXPIRES_AT, "9999-12-31T23:59:59.000Z");
+  assert.equal(isFoundationActivationSentinel(FOUNDATION_ACTIVATION_EXPIRES_AT), true);
+  assert.equal(isFoundationActivationSentinel(new Date(FOUNDATION_ACTIVATION_EXPIRES_AT)), true);
+  assert.equal(isFoundationActivationSentinel(new Date(Date.now() + 100 * 365 * 24 * 60 * 60 * 1000)), false);
+});
+
 test("annual activation fee remains BDT 1000 for ordinary members", () => {
   const src = read("backend/src/engine/activation.ts");
   assert.match(src, /const ACTIVATION_FEE = 1000/);
+  assert.match(src, /const YEAR_MS = 365 \* 24 \* 60 \* 60 \* 1000/);
+  assert.match(src, /update members set activation_status = 'active', activation_expires_at = \$2/);
   const sql = read("migrations/0003_darmelk_ledger.sql");
   assert.match(sql, /check \("amount" = 1000\)/);
   const foundation = read("backend/src/engine/foundation.ts");
   assert.doesNotMatch(foundation, /insert into annual_activations/);
+  assert.doesNotMatch(foundation, /insert into bookings/);
   assert.match(foundation, /Habib Wahid 121-ID foundation setup/);
 });
 
@@ -132,7 +151,9 @@ test("PGlite bootstrap creates 121 independent active members with genealogy", {
     validateFoundation,
     inspectResetScope,
     FOUNDATION_TOTAL,
+    FOUNDATION_ACTIVATION_EXPIRES_AT,
     referralLinkFor,
+    isFoundationActivationSentinel,
   } = await import("../backend/src/engine/foundation.ts");
   const { verifyPassword } = await import("better-auth/crypto");
 
@@ -194,9 +215,51 @@ test("PGlite bootstrap creates 121 independent active members with genealogy", {
   assert.equal(validation.codes, 121);
   assert.equal(validation.credentials, 121);
   assert.equal(validation.wallets, 121);
+  assert.deepEqual(validation.byLevel, { 0: 1, 1: 3, 2: 9, 3: 27, 4: 81 });
   assert.deepEqual(validation.sampleAncestry, ["HW-2.3.1.2", "HW-2.3.1", "HW-2.3", "HW-2", "Habib Wahid-Root ID"]);
   assert.ok(validation.sampleReferral);
   assert.equal(validation.sampleReferral.link, referralLinkFor(validation.sampleReferral.code));
+
+  const expiryRows = await client.query(
+    `select m.activation_status, m.activation_expires_at, m.referral_code, u.name
+       from members m
+       join "user" u on u.id = m.user_id
+      where u.name = $1 or u.name ~ '^HW-[0-9]'
+      order by u.name`,
+    ["Habib Wahid-Root ID"],
+  );
+  assert.equal(expiryRows.rows.length, 121);
+  const codes = new Set(expiryRows.rows.map((r) => r.referral_code));
+  assert.equal(codes.size, 121);
+  for (const row of expiryRows.rows) {
+    assert.equal(row.activation_status, "active", row.name);
+    assert.equal(isFoundationActivationSentinel(row.activation_expires_at), true, row.name);
+  }
+  const sentinelCount = await client.query(
+    `select count(*)::text as count
+       from members m
+       join "user" u on u.id = m.user_id
+      where (u.name = $1 or u.name ~ '^HW-[0-9]')
+        and m.activation_status = 'active'
+        and m.activation_expires_at = $2::timestamptz`,
+    ["Habib Wahid-Root ID", FOUNDATION_ACTIVATION_EXPIRES_AT],
+  );
+  assert.equal(Number(sentinelCount.rows[0].count), 121);
+  const commissionSql = await client.query(
+    `select count(*)::text as count
+       from members m
+       join "user" u on u.id = m.user_id
+      where (u.name = $1 or u.name ~ '^HW-[0-9]')
+        and m.activation_status = 'active'
+        and m.activation_expires_at > now()`,
+    ["Habib Wahid-Root ID"],
+  );
+  assert.equal(Number(commissionSql.rows[0].count), 121);
+  const links = [...codes].map((code) => referralLinkFor(code));
+  assert.equal(new Set(links).size, 121);
+  assert.ok(links.every((link) => link.startsWith("https://darmelk.com/join/")));
+  const level4 = expiryRows.rows.filter((r) => /^HW-[1-3]\.[1-3]\.[1-3]\.[1-3]$/.test(r.name));
+  assert.equal(level4.length, 81);
 
   const sample = await client.query(
     `select m.user_id, m.referral_code, a.password
@@ -242,4 +305,25 @@ test("PGlite bootstrap creates 121 independent active members with genealogy", {
     [sample.rows[0].referral_code],
   );
   assert.equal(resolved.rows[0].name, "HW-2.3.1.2");
+
+  const branchAncestry = await client.query(
+    `with recursive up as (
+       select m.user_id, u.name, m.network_parent_user_id, 0 as depth, u.name as leaf
+         from members m join "user" u on u.id = m.user_id
+        where u.name in ('HW-1.2.3.1', 'HW-2.3.1.2', 'HW-3.1.2.3')
+       union all
+       select m.user_id, u.name, m.network_parent_user_id, up.depth + 1, up.leaf
+         from members m
+         join "user" u on u.id = m.user_id
+         join up on m.user_id = up.network_parent_user_id
+     )
+     select leaf, array_agg(name order by depth) as names
+       from up
+      group by leaf
+      order by leaf`,
+  );
+  const byLeaf = Object.fromEntries(branchAncestry.rows.map((r) => [r.leaf, r.names]));
+  assert.deepEqual(byLeaf["HW-1.2.3.1"], ["HW-1.2.3.1", "HW-1.2.3", "HW-1.2", "HW-1", "Habib Wahid-Root ID"]);
+  assert.deepEqual(byLeaf["HW-2.3.1.2"], ["HW-2.3.1.2", "HW-2.3.1", "HW-2.3", "HW-2", "Habib Wahid-Root ID"]);
+  assert.deepEqual(byLeaf["HW-3.1.2.3"], ["HW-3.1.2.3", "HW-3.1.2", "HW-3.1", "HW-3", "Habib Wahid-Root ID"]);
 });
