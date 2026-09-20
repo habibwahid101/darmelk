@@ -34,6 +34,15 @@ export const PRELAUNCH_DELETE_ORDER = [
   "contact_requests", "idempotency_keys", "admin_actions",
 ] as const;
 
+const TRANSACTIONAL_ZERO_TABLES = [
+  "bookings", "booking_snapshots", "offer_inventory_events", "commission_ledger", "reversal_entries",
+  "withdrawals", "annual_activations", "payment_submissions", "payout_methods", "commission_payout_allocations",
+  "contact_requests", "verification", "user_consents", "merchants", "merchant_bundle_purchases",
+  "merchant_payment_requests", "merchant_credit_ledger", "merchant_gift_fulfillments",
+  "leadership_reward_cycles", "leadership_reward_tier_events", "leadership_reward_entitlements",
+  "promotion_qualifications", "promotion_reward_fulfillments", "promotion_reward_events", "idempotency_keys",
+] as const;
+
 const LEDGER_NOTICE =
   "commission/reversal/withdrawal/admin_action history, booking snapshots, inventory events, and financial/payment history are normally append-only. This describes a ONE-TIME PRELAUNCH CLEAN RESET, not normal production behavior.";
 
@@ -48,6 +57,25 @@ export function maskEmail(email: string): string {
 
 function quoted(table: string): string {
   return `"${table.replaceAll('"', "")}"`;
+}
+
+function databaseHost(url: string): string {
+  try {
+    return new URL(url.replace(/^postgres(ql)?:/i, "https:")).hostname;
+  } catch {
+    return "";
+  }
+}
+
+export function assertDarmelkDatabase(): void {
+  if (process.env.DARMELK_PRELAUNCH_RESET_TEST === "1" || process.env.GITHUB_ACTIONS === "true") {
+    return;
+  }
+  const host = databaseHost(process.env.DATABASE_URL ?? "");
+  const productionLike = host.endsWith(".rds.amazonaws.com") || /\bdarmelk\b/i.test(host);
+  if (!host || host === "localhost" || host === "127.0.0.1" || !productionLike) {
+    throw conflict("Prelaunch reset refused: not the production Darmelk database", "not_production_db");
+  }
 }
 
 async function countTable(client: PoolClient, table: string): Promise<number> {
@@ -103,16 +131,38 @@ export async function previewPrelaunchReset(client: PoolClient) {
     sponsor_user_id: row.sponsor_user_id,
     network_parent_user_id: row.network_parent_user_id,
     network_slot: row.network_slot,
-    points_to_non_admin: Boolean((row.sponsor_user_id && nonAdminIds.has(row.sponsor_user_id)) || (row.network_parent_user_id && nonAdminIds.has(row.network_parent_user_id))),
+    points_to_non_admin: Boolean(
+      (row.sponsor_user_id && nonAdminIds.has(row.sponsor_user_id)) ||
+        (row.network_parent_user_id && nonAdminIds.has(row.network_parent_user_id)),
+    ),
     auth_user_present: row.auth_user_present,
     account_rows: row.account_rows,
     session_rows: row.session_rows,
   }));
-  const { rows: flagshipOffer } = await client.query<{ total_quantity: number | null }>(`select total_quantity from offers where slug = $1`, [FLAGSHIP_SLUG]);
-  const { rows: consumeRows } = await client.query<{ n: number }>(`select count(*)::int as n from offer_inventory_events where offer_slug = $1 and event_type = 'consume'`, [FLAGSHIP_SLUG]);
+  const { rows: flagshipOffer } = await client.query<{ total_quantity: number | null }>(
+    `select total_quantity from offers where slug = $1`,
+    [FLAGSHIP_SLUG],
+  );
+  const { rows: consumeRows } = await client.query<{ n: number }>(
+    `select count(*)::int as n from offer_inventory_events where offer_slug = $1 and event_type = 'consume'`,
+    [FLAGSHIP_SLUG],
+  );
+  const { rows: bindingRows } = await client.query<{ n: number }>(
+    `select count(*)::int as n from bookings
+      where offer_slug = $1 and status in ('confirmed', 'activated', 'reversed')`,
+    [FLAGSHIP_SLUG],
+  );
+  const { rows: statusRows } = await client.query<{ status: string; n: number }>(
+    `select status, count(*)::int as n from bookings where offer_slug = $1 group by status order by status`,
+    [FLAGSHIP_SLUG],
+  );
+  const booking_statuses: Record<string, number> = {};
+  for (const row of statusRows) booking_statuses[row.status] = row.n;
   const sold = await soldForOffer(client, FLAGSHIP_SLUG);
   const inventory = deriveInventory(flagshipOffer[0]?.total_quantity ?? null, sold);
-  const { rows: nonAdminRows } = await client.query<{ user_id: string; email: string | null; created_at: string; role: string; activation_status: string; booking_count: number }>(
+  const { rows: nonAdminRows } = await client.query<{
+    user_id: string; email: string | null; created_at: string; role: string; activation_status: string; booking_count: number;
+  }>(
     `select m.user_id, u.email, m.created_at, m.role, m.activation_status,
             (select count(*)::int from bookings b where b.user_id = m.user_id) as booking_count
        from members m left join "user" u on u.id = m.user_id
@@ -120,15 +170,13 @@ export async function previewPrelaunchReset(client: PoolClient) {
   );
   const auth_only_non_admin_users = await countAuthOnlyNonAdminUsers(client);
   const reset_audit_count = await resetAuditCount(client);
-  const transactionalZero = [
-    "bookings", "booking_snapshots", "offer_inventory_events", "commission_ledger", "reversal_entries",
-    "withdrawals", "annual_activations", "payment_submissions", "payout_methods", "commission_payout_allocations",
-    "contact_requests", "verification", "user_consents", "merchants", "merchant_bundle_purchases",
-    "merchant_payment_requests", "merchant_credit_ledger", "merchant_gift_fulfillments",
-    "leadership_reward_cycles", "leadership_reward_tier_events", "leadership_reward_entitlements",
-    "promotion_qualifications", "promotion_reward_fulfillments", "promotion_reward_events", "idempotency_keys",
-  ].every((table) => (reset_sensitive_counts[table] ?? 0) === 0);
-  const already_clean = preserved_admins.length >= 1 && auth_only_non_admin_users === 0 && reset_audit_count >= 1 && transactionalZero && nonAdminRows.length === 0;
+  const transactionalZero = TRANSACTIONAL_ZERO_TABLES.every((table) => (reset_sensitive_counts[table] ?? 0) === 0);
+  const already_clean =
+    preserved_admins.length >= 1 &&
+    auth_only_non_admin_users === 0 &&
+    reset_audit_count >= 1 &&
+    transactionalZero &&
+    nonAdminRows.length === 0;
   return {
     ok: true as const,
     mode: "preview" as const,
@@ -142,8 +190,8 @@ export async function previewPrelaunchReset(client: PoolClient) {
       slug: FLAGSHIP_SLUG,
       total_quantity: flagshipOffer[0]?.total_quantity ?? null,
       consume_events: consumeRows[0]?.n ?? 0,
-      binding_bookings: 0,
-      booking_statuses: {},
+      binding_bookings: bindingRows[0]?.n ?? 0,
+      booking_statuses,
       sold: inventory.sold,
       reserved: inventory.reserved,
       available: inventory.available,
@@ -162,6 +210,27 @@ export async function previewPrelaunchReset(client: PoolClient) {
   };
 }
 
+export async function assertPreservationSet(
+  client: PoolClient,
+  adminUserId: string,
+  before: Awaited<ReturnType<typeof previewPrelaunchReset>>,
+): Promise<string[]> {
+  if (before.preserved_admins.length < 1) throw conflict("No admin member exists; refusing reset", "admin_missing");
+  const executing = before.preserved_admins.find((row) => row.user_id === adminUserId);
+  if (!executing) throw conflict("Executing admin is not a preserved admin", "admin_missing");
+  if (!executing.auth_user_present) throw conflict("Preserved admin is missing its auth user", "admin_auth_missing");
+  if (executing.account_rows < 1) throw conflict("Preserved admin is missing its account row", "admin_account_missing");
+  if (executing.points_to_non_admin) {
+    throw conflict("Preserved admin points at a non-admin network member", "unexpected_preservation_set");
+  }
+  const { rows: flagship } = await client.query(`select slug from offers where slug = $1`, [FLAGSHIP_SLUG]);
+  if (!flagship[0]) throw conflict("Flagship catalog offer is missing; prelaunch reset refused", "flagship_missing");
+  if ((await countTable(client, "_migrations")) < 19) {
+    throw conflict("Darmelk schema is incomplete; prelaunch reset refused", "schema_incomplete");
+  }
+  return before.preserved_admins.map((row) => row.user_id);
+}
+
 export async function executePrelaunchReset(
   client: PoolClient,
   opts: { adminUserId: string; confirmation: unknown; abortAfterClear?: boolean },
@@ -169,34 +238,42 @@ export async function executePrelaunchReset(
   if (opts.confirmation !== RESET_CONFIRMATION) {
     throw badRequest("Type the exact confirmation phrase to continue", "confirmation_required");
   }
+  assertDarmelkDatabase();
   const before = await previewPrelaunchReset(client);
   if (before.already_clean) {
     throw conflict("Prelaunch data is already clean; refusing a second execution", "already_clean");
   }
-  if (before.preserved_admins.length < 1) throw conflict("No admin member exists; refusing reset", "admin_missing");
-  const executing = before.preserved_admins.find((row) => row.user_id === opts.adminUserId);
-  if (!executing) throw conflict("Executing admin is not a preserved admin", "admin_missing");
-  if (!executing.auth_user_present) throw conflict("Preserved admin is missing its auth user", "admin_auth_missing");
-  if (executing.account_rows < 1) throw conflict("Preserved admin is missing its account row", "admin_account_missing");
-  if (executing.points_to_non_admin) throw conflict("Preserved admin points at a non-admin network member", "unexpected_preservation_set");
-  const { rows: flagship } = await client.query(`select slug from offers where slug = $1`, [FLAGSHIP_SLUG]);
-  if (!flagship[0]) throw conflict("Flagship catalog offer is missing; prelaunch reset refused", "flagship_missing");
-  if ((await countTable(client, "_migrations")) < 19) throw conflict("Darmelk schema is incomplete; prelaunch reset refused", "schema_incomplete");
+  const adminIds = await assertPreservationSet(client, opts.adminUserId, before);
 
   await client.query(`select user_id from members where user_id = $1 and role = 'admin' for update`, [opts.adminUserId]);
   for (const table of PRELAUNCH_DELETE_ORDER) {
     await client.query(`delete from ${quoted(table)}`);
   }
-  await client.query(`update members set sponsor_user_id = null, network_parent_user_id = null, network_slot = null, updated_at = now() where role <> 'admin'`);
+  await client.query(
+    `update members
+        set sponsor_user_id = null,
+            network_parent_user_id = null,
+            network_slot = null,
+            updated_at = now()
+      where role <> 'admin'`,
+  );
   await client.query(`delete from members where role <> 'admin'`);
-  const adminIds = before.preserved_admins.map((row) => row.user_id);
+  await client.query(`delete from "session" where "userId" <> all($1::text[])`, [adminIds]);
+  await client.query(`delete from "account" where "userId" <> all($1::text[])`, [adminIds]);
   await client.query(`delete from "user" where id <> all($1::text[])`, [adminIds]);
   if (opts.abortAfterClear) throw new Error("test_rollback_probe");
 
   const mid = await previewPrelaunchReset(client);
   if (mid.preserved_admins.length !== adminIds.length) throw conflict("Admin preservation failed", "admin_not_preserved");
-  if (mid.non_admin_members.length !== 0 || mid.auth_only_non_admin_users !== 0) throw conflict("Non-admin identities remain after reset", "identities_remain");
+  if (mid.non_admin_members.length !== 0 || mid.auth_only_non_admin_users !== 0) {
+    throw conflict("Non-admin identities remain after reset", "identities_remain");
+  }
   if (mid.flagship.sold !== 0) throw conflict("Flagship sold is not zero after reset", "flagship_not_cleared");
+  for (const table of TRANSACTIONAL_ZERO_TABLES) {
+    if ((mid.reset_sensitive_counts[table] ?? 0) !== 0) {
+      throw conflict(`Transactional table ${table} is not empty after reset`, "rows_remain");
+    }
+  }
   for (const table of PRESERVE_CATALOG_TABLES) {
     if (mid.preserve_catalog_counts[table] !== before.preserve_catalog_counts[table]) {
       throw conflict(`Catalog table ${table} changed during reset`, "catalog_changed");
@@ -207,17 +284,24 @@ export async function executePrelaunchReset(
   await client.query(
     `insert into admin_actions (id, admin_user_id, action_type, target_type, target_id, payload)
      values ($1, $2, $3, $4, $5, $6)`,
-    [auditId, opts.adminUserId, RESET_ACTION_TYPE, "system", "prelaunch-reset", JSON.stringify({
-      action: RESET_ACTION_TYPE,
-      reset_version: RESET_VERSION,
-      executed_at: new Date().toISOString(),
-      executing_admin_id: opts.adminUserId,
-      production_sha: (process.env.GITHUB_SHA ?? "").trim() || null,
-      before_counts: before.reset_sensitive_counts,
-      after_counts: mid.reset_sensitive_counts,
-      flagship_sold_before: before.flagship.sold,
-      flagship_sold_after: mid.flagship.sold,
-    })],
+    [
+      auditId,
+      opts.adminUserId,
+      RESET_ACTION_TYPE,
+      "system",
+      "prelaunch-reset",
+      JSON.stringify({
+        action: RESET_ACTION_TYPE,
+        reset_version: RESET_VERSION,
+        executed_at: new Date().toISOString(),
+        executing_admin_id: opts.adminUserId,
+        production_sha: (process.env.GITHUB_SHA ?? "").trim() || null,
+        before_counts: before.reset_sensitive_counts,
+        after_counts: mid.reset_sensitive_counts,
+        flagship_sold_before: before.flagship.sold,
+        flagship_sold_after: mid.flagship.sold,
+      }),
+    ],
   );
   const afterPreview = await previewPrelaunchReset(client);
   if (afterPreview.reset_audit_count !== 1) throw conflict("Reset audit was not created exactly once", "audit_missing");
