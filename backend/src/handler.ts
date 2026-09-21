@@ -1,10 +1,8 @@
 import { handle } from "hono/aws-lambda";
 import type { APIGatewayProxyEventV2, APIGatewayProxyResultV2, Context } from "aws-lambda";
 import { app } from "./router.js";
-import { registerPrelaunchResetRoutes } from "./engine/prelaunch-reset-http.js";
 import { runMigrations, describeSchema } from "./migrate.js";
 
-registerPrelaunchResetRoutes(app);
 const httpHandler = handle(app);
 
 type MaintenanceEvent = { action: "migrate" | "health" | "describe" };
