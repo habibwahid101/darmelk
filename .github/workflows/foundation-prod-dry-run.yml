@@ -1,0 +1,121 @@
+name: Foundation production dry-run
+
+# Read-only production inspect of the 121-ID foundation initializer.
+# Never pass --confirm-reset / --confirm-production / --force-rebuild.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  AWS_REGION: ap-south-1
+  DEPLOY_ROLE_ARN: arn:aws:iam::364410974458:role/darmelk-prod-github-deploy
+  LAMBDA_EXEC_ROLE_ARN: arn:aws:iam::364410974458:role/darmelk-prod-lambda-exec
+  LAMBDA_SUBNET_IDS: subnet-03a8f092b3d87546a,subnet-0e921de3a0d8ef10c
+  LAMBDA_SG_ID: sg-049842094a2d14958
+  FOUNDATION_SHA: b1d4fb1288c96d08c9cdce945eb4e01f03f23dd4
+  DRY_RUN_FN: darmelk-prod-foundation-dry-run
+
+jobs:
+  dry-run:
+    name: Production dry-run (no writes)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout foundation SHA
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.FOUNDATION_SHA }}
+
+      - name: Checkout dry-run helper from this workflow commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          path: wf-src
+          sparse-checkout: .github/foundation-dry-run-lambda.ts
+          sparse-checkout-cone-mode: false
+
+      - name: Place helper inside backend src
+        run: cp wf-src/.github/foundation-dry-run-lambda.ts backend/src/foundation-dry-run-lambda.ts
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Run production dry-run
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          CONFIG=$(aws secretsmanager get-secret-value --secret-id darmelk-prod/app --query SecretString --output text)
+          export DATABASE_URL=$(echo "$CONFIG" | jq -r .DATABASE_URL)
+          echo "::add-mask::${DATABASE_URL}"
+
+          if timeout 25s npm run darmelk -- --dry-run > artifacts/cli.json 2> artifacts/cli.err; then
+            echo "direct_cli=yes" >> "$GITHUB_ENV"
+            echo "Official CLI dry-run reached RDS."
+            cat artifacts/cli.json
+            jq -e '.dryRun == true' artifacts/cli.json
+          else
+            echo "direct_cli=no" >> "$GITHUB_ENV"
+            echo "Direct CLI could not reach private RDS (expected). Using approved VPC path."
+            cat artifacts/cli.err || true
+          fi
+
+          if timeout 25s node --experimental-strip-types -e 'import { handler } from "./backend/src/foundation-dry-run-lambda.ts"; const r = await handler(); console.log(JSON.stringify(r, null, 2));' > artifacts/lambda.json 2> artifacts/inspect.err; then
+            cat artifacts/lambda.json
+            jq -e '.dryRun == true and .ok == true and .productionWritesPerformed == false' artifacts/lambda.json
+            echo "Used direct inspect against DATABASE_URL"
+            exit 0
+          fi
+
+          echo "Direct inspect could not reach RDS. Falling back to ephemeral VPC Lambda."
+          cat artifacts/inspect.err || true
+          cd backend
+          npx esbuild src/foundation-dry-run-lambda.ts --bundle --platform=node --target=node20 --format=esm --outfile=dist/dry-run.mjs --banner:js="import { createRequire as __createRequire } from 'module'; const require = __createRequire(import.meta.url);" --external:pg-native
+          python3 - << 'PY'
+          import zipfile
+          z = zipfile.ZipFile("dry-run.zip", "w", zipfile.ZIP_DEFLATED)
+          z.write("dist/dry-run.mjs", "dry-run.mjs")
+          z.close()
+          PY
+
+          ENV_JSON=$(jq -n --arg db "$DATABASE_URL" '{Variables:{DATABASE_URL:$db}}')
+          IFS=',' read -ra SUBNETS <<< "$LAMBDA_SUBNET_IDS"
+          aws lambda delete-function --function-name "$DRY_RUN_FN" >/dev/null 2>&1 || true
+          aws lambda create-function \
+            --function-name "$DRY_RUN_FN" \
+            --runtime nodejs20.x \
+            --architectures arm64 \
+            --role "$LAMBDA_EXEC_ROLE_ARN" \
+            --handler dry-run.handler \
+            --zip-file fileb://dry-run.zip \
+            --timeout 60 --memory-size 512 \
+            --vpc-config "SubnetIds=${SUBNETS[0]},${SUBNETS[1]},SecurityGroupIds=$LAMBDA_SG_ID" \
+            --environment "$ENV_JSON" \
+            --tags Project=Darmelk,Environment=Production,Purpose=foundation-dry-run
+          aws lambda wait function-active --function-name "$DRY_RUN_FN"
+          aws lambda invoke --function-name "$DRY_RUN_FN" --cli-binary-format raw-in-base64-out --payload '{}' ../artifacts/lambda.json
+          cat ../artifacts/lambda.json
+          jq -e '.dryRun == true and .ok == true and .productionWritesPerformed == false' ../artifacts/lambda.json
+
+      - name: Delete ephemeral dry-run Lambda
+        if: always()
+        run: aws lambda delete-function --function-name "$DRY_RUN_FN" >/dev/null 2>&1 || true
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: foundation-dry-run
+          path: artifacts
