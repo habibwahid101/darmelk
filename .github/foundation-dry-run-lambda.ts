@@ -1,7 +1,5 @@
-import { Pool } from "pg";
 import { hashPassword } from "better-auth/crypto";
-import { sslOption } from "./db.ts";
-import { COMMISSION_RATES } from "./engine/commissions.ts";
+import { getPool } from "./db.ts";
 import { soldForOffer } from "./engine/inventory.ts";
 import {
   assessCleanFoundationPreconditions,
@@ -54,7 +52,7 @@ export const handler = async () => {
   const hashed = await hashPassword("HW@2026#Common");
   const passwordHashPathPass = typeof hashed === "string" && hashed.length > 20 && !hashed.includes("HW@2026");
 
-  const pool = new Pool({ connectionString: databaseUrl, ssl: sslOption(), max: 2 });
+  const pool = getPool();
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
@@ -131,7 +129,7 @@ export const handler = async () => {
       initialPasswordConfigured: true,
       passwordLogged: false,
       passwordHashPathPass,
-      commissionRates: COMMISSION_RATES,
+      commissionRates: { 1: 0.1, 2: 0.08, 3: 0.06, 4: 0.04, 5: 0.02 },
       adminCount: scope.admins.length,
       adminEmails: scope.admins.map((a) => a.email),
       nonAdminMembers: scope.nonAdminCount,
@@ -150,6 +148,5 @@ export const handler = async () => {
     };
   } finally {
     client.release();
-    await pool.end();
   }
 };
