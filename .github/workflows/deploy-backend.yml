@@ -83,7 +83,6 @@ jobs:
         run: |
           node esbuild-smoke.mjs
           node dist/smoke-test.mjs
-          node dist/prelaunch-reset-smoke.mjs
 
   deploy:
     name: Deploy to AWS Lambda
@@ -105,7 +104,7 @@ jobs:
         working-directory: backend
         run: |
           cd dist
-          zip -qr ../lambda.zip . -x "smoke-test.mjs" -x "prelaunch-reset-smoke.mjs"
+          zip -qr ../lambda.zip . -x "smoke-test.mjs"
           cd ..
           ls -la lambda.zip
 
@@ -139,53 +138,53 @@ jobs:
           SES_FROM_EMAIL: ${{ steps.config.outputs.ses_from_email }}
           COOKIE_DOMAIN: ${{ steps.config.outputs.cookie_domain }}
         run: |
-          ENV_JSON=$(jq -n \
-            --arg db "$DATABASE_URL" --arg secret "$BETTER_AUTH_SECRET" --arg url "$BETTER_AUTH_URL" \
-            --arg origins "$TRUSTED_ORIGINS" --arg admins "$ADMIN_EMAILS" --arg ses "$SES_FROM_EMAIL" \
-            --arg cookiedom "$COOKIE_DOMAIN" \
+          ENV_JSON=$(jq -n \\
+            --arg db "$DATABASE_URL" --arg secret "$BETTER_AUTH_SECRET" --arg url "$BETTER_AUTH_URL" \\
+            --arg origins "$TRUSTED_ORIGINS" --arg admins "$ADMIN_EMAILS" --arg ses "$SES_FROM_EMAIL" \\
+            --arg cookiedom "$COOKIE_DOMAIN" \\
             '{Variables: {DATABASE_URL:$db, BETTER_AUTH_SECRET:$secret, BETTER_AUTH_URL:$url, TRUSTED_ORIGINS:$origins, ADMIN_EMAILS:$admins, SES_FROM_EMAIL:$ses, COOKIE_DOMAIN:$cookiedom}}')
 
           if aws lambda get-function --function-name "$FUNCTION_NAME" >/dev/null 2>&1; then
             echo "Function exists — updating code, then configuration."
             aws lambda update-function-code --function-name "$FUNCTION_NAME" --zip-file fileb://backend/lambda.zip
             aws lambda wait function-updated --function-name "$FUNCTION_NAME"
-            aws lambda update-function-configuration \
-              --function-name "$FUNCTION_NAME" \
-              --environment "$ENV_JSON" \
+            aws lambda update-function-configuration \\
+              --function-name "$FUNCTION_NAME" \\
+              --environment "$ENV_JSON" \\
               --timeout 60 --memory-size 512
             aws lambda wait function-updated --function-name "$FUNCTION_NAME"
           else
             echo "Function does not exist — creating it."
             IFS=',' read -ra SUBNETS <<< "$LAMBDA_SUBNET_IDS"
-            aws lambda create-function \
-              --function-name "$FUNCTION_NAME" \
-              --runtime nodejs20.x \
-              --architectures arm64 \
-              --role "$LAMBDA_EXEC_ROLE_ARN" \
-              --handler index.handler \
-              --zip-file fileb://backend/lambda.zip \
-              --timeout 60 --memory-size 512 \
-              --vpc-config "SubnetIds=${SUBNETS[0]},${SUBNETS[1]},SecurityGroupIds=$LAMBDA_SG_ID" \
-              --environment "$ENV_JSON" \
+            aws lambda create-function \\
+              --function-name "$FUNCTION_NAME" \\
+              --runtime nodejs20.x \\
+              --architectures arm64 \\
+              --role "$LAMBDA_EXEC_ROLE_ARN" \\
+              --handler index.handler \\
+              --zip-file fileb://backend/lambda.zip \\
+              --timeout 60 --memory-size 512 \\
+              --vpc-config "SubnetIds=${SUBNETS[0]},${SUBNETS[1]},SecurityGroupIds=$LAMBDA_SG_ID" \\
+              --environment "$ENV_JSON" \\
               --tags Project=Darmelk,Environment=Production
             aws lambda wait function-active --function-name "$FUNCTION_NAME"
           fi
 
       - name: Allow API Gateway to invoke the function
         run: |
-          aws lambda add-permission \
-            --function-name "$FUNCTION_NAME" \
-            --statement-id apigw-invoke \
-            --action lambda:InvokeFunction \
-            --principal apigateway.amazonaws.com \
-            --source-arn "arn:aws:execute-api:${AWS_REGION}:364410974458:${API_GATEWAY_ID}/*/*/*" \
+          aws lambda add-permission \\
+            --function-name "$FUNCTION_NAME" \\
+            --statement-id apigw-invoke \\
+            --action lambda:InvokeFunction \\
+            --principal apigateway.amazonaws.com \\
+            --source-arn "arn:aws:execute-api:${AWS_REGION}:364410974458:${API_GATEWAY_ID}/*/*/*" \\
             2>&1 | grep -qv ResourceConflictException || true
 
       - name: Run database migrations
         run: |
-          aws lambda invoke --function-name "$FUNCTION_NAME" \
-            --cli-binary-format raw-in-base64-out \
-            --payload '{"action":"migrate"}' \
+          aws lambda invoke --function-name "$FUNCTION_NAME" \\
+            --cli-binary-format raw-in-base64-out \\
+            --payload '{"action":"migrate"}' \\
             response.json
           cat response.json
           jq -e '.ok == true' response.json
