@@ -12,5 +12,5 @@
     "types": ["node", "aws-lambda"]
   },
   "include": ["src/**/*.ts"],
-  "exclude": ["src/smoke-test.ts", "src/prelaunch-reset-smoke-main.ts"]
+  "exclude": ["src/smoke-test.ts"]
 }
