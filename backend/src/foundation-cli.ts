@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { Pool } from "pg";
 import { sslOption } from "./db.ts";
 import {
+  assessCleanFoundationPreconditions,
   assertTreeShape,
   buildFoundationTree,
   createFoundationNetwork,
@@ -110,12 +111,19 @@ async function main() {
   const client = await pool.connect();
   try {
     const scope = await inspectResetScope(client);
+    const clean = assessCleanFoundationPreconditions(scope);
     report.adminsPreserved = scope.admins.map((a) => a.email);
     report.adminCount = scope.admins.length;
-    report.nonAdminUsersWouldBeDeleted = scope.nonAdminCount;
+    report.nonAdminMembers = scope.nonAdminCount;
     report.existingFoundationAccounts = scope.foundationExisting;
-    report.orphanAuthUsersWouldBeDeleted = scope.orphanAuthUsers;
-    report.dependentRecordsExpectedToBeRemoved = scope.dependentRecords;
+    report.orphanAuthUsers = scope.orphanAuthUsers;
+    report.flagshipPresent = scope.flagshipPresent;
+    report.catalogOfferCount = scope.catalogOfferCount;
+    report.migrationCount = scope.migrationCount;
+    report.dependentRecordsOnNonAdmins = scope.dependentRecords;
+    report.cleanPrecondition = clean;
+    report.deletesDataOnExecute = false;
+    report.nonAdminUsersWouldBeDeleted = 0;
     report.backupSnapshot = isProductionDatabaseUrl(databaseUrl)
       ? "NOT VERIFIED in this CLI — require a current RDS automated backup/PITR before --confirm-production"
       : "non-production target";
@@ -136,7 +144,8 @@ async function main() {
       process.exit(1);
     }
 
-    if (scope.foundationExisting === FOUNDATION_TOTAL && !arg("--force-rebuild")) {
+    const forceRebuild = arg("--force-rebuild");
+    if (scope.foundationExisting === FOUNDATION_TOTAL && !forceRebuild) {
       const existing = await validateFoundation(client);
       if (existing.ok) {
         report.action = "FOUNDATION NETWORK ALREADY EXISTS — VALIDATION PASSED";
@@ -145,19 +154,29 @@ async function main() {
         return;
       }
       console.error("Partial or corrupt foundation detected:", existing.errors);
-      console.error("Re-run with --confirm-reset --force-rebuild to rebuild.");
+      console.error("Do not use --force-rebuild unless that corrupt state is proven after a failed execution.");
       process.exit(1);
     }
 
-    if (scope.foundationExisting > 0 && scope.foundationExisting !== FOUNDATION_TOTAL && !arg("--force-rebuild")) {
+    if (scope.foundationExisting > 0 && scope.foundationExisting !== FOUNDATION_TOTAL && !forceRebuild) {
       console.error(
-        `Partial foundation detected (${scope.foundationExisting}/${FOUNDATION_TOTAL}). Re-run with --confirm-reset --force-rebuild to rebuild.`,
+        `Partial foundation detected (${scope.foundationExisting}/${FOUNDATION_TOTAL}). Refusing to create more accounts.`,
       );
+      console.error("Do not use --force-rebuild unless that partial state is proven after a failed execution.");
+      process.exit(1);
+    }
+
+    if (!forceRebuild && !clean.ok) {
+      console.error("Clean-production precondition failed:", clean.errors.join("; "));
+      console.error("Foundation setup will not delete production data. Resolve contamination first.");
       process.exit(1);
     }
 
     await client.query("BEGIN");
-    const removed = await deleteNonAdminMembers(client);
+    let removed = 0;
+    if (forceRebuild) {
+      removed = await deleteNonAdminMembers(client);
+    }
     const actor = scope.admins[0]?.user_id ?? null;
     const created = await createFoundationNetwork(client, { actorUserId: actor, runId: randomUUID() });
     const validation = await validateFoundation(client);
@@ -167,7 +186,7 @@ async function main() {
       process.exit(1);
     }
     await client.query("COMMIT");
-    report.action = "reset-and-setup committed";
+    report.action = forceRebuild ? "force-rebuild committed" : "foundation-setup committed";
     report.legacyNonAdminRemoved = removed;
     report.created = created.created;
     report.byLevel = created.byLevel;
