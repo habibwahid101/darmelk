@@ -3,7 +3,7 @@ name: Foundation production dry-run
 # Read-only production inspect of the 121-ID foundation initializer.
 # Never pass --confirm-reset / --confirm-production / --force-rebuild.
 on:
-  workflow_dispatch:
+  workflow_dispatch: {}
 
 permissions:
   contents: read
@@ -26,16 +26,22 @@ jobs:
         with:
           ref: ${{ env.FOUNDATION_SHA }}
 
-      - name: Checkout dry-run helper from this workflow commit
+      - name: Checkout dry-run helpers from this workflow commit
         uses: actions/checkout@v4
         with:
           ref: ${{ github.sha }}
           path: wf-src
-          sparse-checkout: .github/foundation-dry-run-lambda.ts
+          sparse-checkout: |
+            .github/foundation-dry-run-lambda.ts
+            .github/patch-foundation-dry-run-handler.py
+            .github/run-foundation-inspect.mjs
           sparse-checkout-cone-mode: false
 
-      - name: Place helper inside backend src
-        run: cp wf-src/.github/foundation-dry-run-lambda.ts backend/src/foundation-dry-run-lambda.ts
+      - name: Place helpers
+        run: |
+          cp wf-src/.github/foundation-dry-run-lambda.ts backend/src/foundation-dry-run-lambda.ts
+          cp wf-src/.github/patch-foundation-dry-run-handler.py backend/patch-foundation-dry-run-handler.py
+          cp wf-src/.github/run-foundation-inspect.mjs backend/src/run-foundation-inspect.mjs
 
       - uses: actions/setup-node@v4
         with:
@@ -59,7 +65,6 @@ jobs:
           CONFIG=$(aws secretsmanager get-secret-value --secret-id darmelk-prod/app --query SecretString --output text)
           export DATABASE_URL=$(echo "$CONFIG" | jq -r .DATABASE_URL)
           echo "::add-mask::${DATABASE_URL}"
-
           set +e
           timeout 40s npm run darmelk -- --dry-run > artifacts/cli.json 2> artifacts/cli.err
           CLI_RC=$?
@@ -74,9 +79,8 @@ jobs:
           else
             echo "cli_ok=no" >> "$GITHUB_OUTPUT"
           fi
-
           set +e
-          timeout 40s node --experimental-strip-types -e 'import { handler } from "./backend/src/foundation-dry-run-lambda.ts"; const r = await handler(); console.log(JSON.stringify(r, null, 2));' > artifacts/inspect.json 2> artifacts/inspect.err
+          timeout 40s node --experimental-strip-types backend/src/run-foundation-inspect.mjs > artifacts/inspect.json 2> artifacts/inspect.err
           INS_RC=$?
           set -e
           echo "inspect_rc=${INS_RC}" >> "$GITHUB_OUTPUT"
@@ -97,35 +101,15 @@ jobs:
           mkdir -p artifacts
           aws lambda get-function --function-name "$FUNCTION_NAME" --query 'Code.Location' --output text > /tmp/code-url.txt
           curl -fsSL "$(cat /tmp/code-url.txt)" -o /tmp/original.zip
-          aws lambda get-function-configuration --function-name "$FUNCTION_NAME" > /tmp/orig-config.json
-          cp /tmp/orig-config.json artifacts/orig-config.json
-          echo "snapshotted original production zip ($(wc -c < /tmp/original.zip) bytes)"
+          aws lambda get-function-configuration --function-name "$FUNCTION_NAME" > artifacts/orig-config.json
+          echo "snapshotted original production zip"
 
       - name: Invoke read-only inspect through existing production Lambda
         if: steps.cli.outputs.inspect_ok != 'yes'
         working-directory: backend
         run: |
           set -euo pipefail
-          python3 - << 'PY'
-          from pathlib import Path
-          p = Path("src/handler.ts")
-          text = p.read_text()
-          if "foundation-dry-run" in text:
-              raise SystemExit("handler already patched unexpectedly")
-          old_imp = 'import { runMigrations, describeSchema } from "./migrate.js";'
-          new_imp = old_imp + '\nimport { handler as foundationDryRun } from "./foundation-dry-run-lambda.ts";'
-          if old_imp not in text:
-              raise SystemExit("handler.ts import line not found; refusing to patch")
-          text = text.replace(old_imp, new_imp, 1)
-          needle = 'if (event.action === "describe")'
-          inject = '''if (event.action === "foundation-dry-run") {
-        return foundationDryRun();
-      }
-      if (event.action === "describe")'''
-          if needle not in text:
-              raise SystemExit("handler.ts missing describe action; refusing to patch")
-          p.write_text(text.replace(needle, inject, 1))
-          PY
+          python3 patch-foundation-dry-run-handler.py
           npm run build
           cd dist
           zip -qr ../lambda.zip . -x "smoke-test.mjs"
