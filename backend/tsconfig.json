@@ -12,5 +12,6 @@
     "allowImportingTsExtensions": true,
     "types": ["node", "aws-lambda"]
   },
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts"],
+  "exclude": ["src/smoke-test.ts"]
 }
