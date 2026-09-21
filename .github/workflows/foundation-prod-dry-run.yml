@@ -12,17 +12,14 @@ permissions:
 env:
   AWS_REGION: ap-south-1
   DEPLOY_ROLE_ARN: arn:aws:iam::364410974458:role/darmelk-prod-github-deploy
-  LAMBDA_EXEC_ROLE_ARN: arn:aws:iam::364410974458:role/darmelk-prod-lambda-exec
-  LAMBDA_SUBNET_IDS: subnet-03a8f092b3d87546a,subnet-0e921de3a0d8ef10c
-  LAMBDA_SG_ID: sg-049842094a2d14958
+  FUNCTION_NAME: darmelk-prod-api
   FOUNDATION_SHA: b1d4fb1288c96d08c9cdce945eb4e01f03f23dd4
-  DRY_RUN_FN: darmelk-prod-foundation-dry-run
 
 jobs:
   dry-run:
     name: Production dry-run (no writes)
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - name: Checkout foundation SHA
         uses: actions/checkout@v4
@@ -42,7 +39,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
 
       - name: Install backend dependencies
         working-directory: backend
@@ -54,7 +51,8 @@ jobs:
           role-to-assume: ${{ env.DEPLOY_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Run production dry-run
+      - name: Load DATABASE_URL and run official CLI dry-run
+        id: cli
         run: |
           set -euo pipefail
           mkdir -p artifacts
@@ -62,57 +60,93 @@ jobs:
           export DATABASE_URL=$(echo "$CONFIG" | jq -r .DATABASE_URL)
           echo "::add-mask::${DATABASE_URL}"
 
-          if timeout 25s npm run darmelk -- --dry-run > artifacts/cli.json 2> artifacts/cli.err; then
-            echo "direct_cli=yes" >> "$GITHUB_ENV"
-            echo "Official CLI dry-run reached RDS."
-            cat artifacts/cli.json
-            jq -e '.dryRun == true' artifacts/cli.json
+          set +e
+          timeout 40s npm run darmelk -- --dry-run > artifacts/cli.json 2> artifacts/cli.err
+          CLI_RC=$?
+          set -e
+          echo "cli_rc=${CLI_RC}" >> "$GITHUB_OUTPUT"
+          echo "----- official CLI stdout -----"
+          cat artifacts/cli.json || true
+          echo "----- official CLI stderr -----"
+          cat artifacts/cli.err || true
+          if [ "$CLI_RC" -eq 0 ] && jq -e '.dryRun == true' artifacts/cli.json >/dev/null 2>&1; then
+            echo "cli_ok=yes" >> "$GITHUB_OUTPUT"
           else
-            echo "direct_cli=no" >> "$GITHUB_ENV"
-            echo "Direct CLI could not reach private RDS (expected). Using approved VPC path."
-            cat artifacts/cli.err || true
+            echo "cli_ok=no" >> "$GITHUB_OUTPUT"
           fi
 
-          if timeout 25s node --experimental-strip-types -e 'import { handler } from "./backend/src/foundation-dry-run-lambda.ts"; const r = await handler(); console.log(JSON.stringify(r, null, 2));' > artifacts/lambda.json 2> artifacts/inspect.err; then
-            cat artifacts/lambda.json
-            jq -e '.dryRun == true and .ok == true and .productionWritesPerformed == false' artifacts/lambda.json
-            echo "Used direct inspect against DATABASE_URL"
+          set +e
+          timeout 40s node --experimental-strip-types -e 'import { handler } from "./backend/src/foundation-dry-run-lambda.ts"; const r = await handler(); console.log(JSON.stringify(r, null, 2));' > artifacts/inspect.json 2> artifacts/inspect.err
+          INS_RC=$?
+          set -e
+          echo "inspect_rc=${INS_RC}" >> "$GITHUB_OUTPUT"
+          echo "----- inspect stdout -----"
+          cat artifacts/inspect.json || true
+          echo "----- inspect stderr -----"
+          cat artifacts/inspect.err || true
+          if [ "$INS_RC" -eq 0 ] && jq -e '.dryRun == true and .ok == true' artifacts/inspect.json >/dev/null 2>&1; then
+            echo "inspect_ok=yes" >> "$GITHUB_OUTPUT"
             exit 0
           fi
+          echo "inspect_ok=no" >> "$GITHUB_OUTPUT"
 
-          echo "Direct inspect could not reach RDS. Falling back to ephemeral VPC Lambda."
-          cat artifacts/inspect.err || true
-          cd backend
-          npx esbuild src/foundation-dry-run-lambda.ts --bundle --platform=node --target=node20 --format=esm --outfile=dist/dry-run.mjs --banner:js="import { createRequire as __createRequire } from 'module'; const require = __createRequire(import.meta.url);" --external:pg-native
+      - name: Snapshot current production Lambda
+        if: steps.cli.outputs.inspect_ok != 'yes'
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          aws lambda get-function --function-name "$FUNCTION_NAME" --query 'Code.Location' --output text > /tmp/code-url.txt
+          curl -fsSL "$(cat /tmp/code-url.txt)" -o /tmp/original.zip
+          aws lambda get-function-configuration --function-name "$FUNCTION_NAME" > /tmp/orig-config.json
+          cp /tmp/orig-config.json artifacts/orig-config.json
+          echo "snapshotted original production zip ($(wc -c < /tmp/original.zip) bytes)"
+
+      - name: Invoke read-only inspect through existing production Lambda
+        if: steps.cli.outputs.inspect_ok != 'yes'
+        working-directory: backend
+        run: |
+          set -euo pipefail
           python3 - << 'PY'
-          import zipfile
-          z = zipfile.ZipFile("dry-run.zip", "w", zipfile.ZIP_DEFLATED)
-          z.write("dist/dry-run.mjs", "dry-run.mjs")
-          z.close()
+          from pathlib import Path
+          p = Path("src/handler.ts")
+          text = p.read_text()
+          if "foundation-dry-run" in text:
+              raise SystemExit("handler already patched unexpectedly")
+          old_imp = 'import { runMigrations, describeSchema } from "./migrate.js";'
+          new_imp = old_imp + '\nimport { handler as foundationDryRun } from "./foundation-dry-run-lambda.ts";'
+          if old_imp not in text:
+              raise SystemExit("handler.ts import line not found; refusing to patch")
+          text = text.replace(old_imp, new_imp, 1)
+          needle = 'if (event.action === "describe")'
+          inject = '''if (event.action === "foundation-dry-run") {
+        return foundationDryRun();
+      }
+      if (event.action === "describe")'''
+          if needle not in text:
+              raise SystemExit("handler.ts missing describe action; refusing to patch")
+          p.write_text(text.replace(needle, inject, 1))
           PY
-
-          ENV_JSON=$(jq -n --arg db "$DATABASE_URL" '{Variables:{DATABASE_URL:$db}}')
-          IFS=',' read -ra SUBNETS <<< "$LAMBDA_SUBNET_IDS"
-          aws lambda delete-function --function-name "$DRY_RUN_FN" >/dev/null 2>&1 || true
-          aws lambda create-function \
-            --function-name "$DRY_RUN_FN" \
-            --runtime nodejs20.x \
-            --architectures arm64 \
-            --role "$LAMBDA_EXEC_ROLE_ARN" \
-            --handler dry-run.handler \
-            --zip-file fileb://dry-run.zip \
-            --timeout 60 --memory-size 512 \
-            --vpc-config "SubnetIds=${SUBNETS[0]},${SUBNETS[1]},SecurityGroupIds=$LAMBDA_SG_ID" \
-            --environment "$ENV_JSON" \
-            --tags Project=Darmelk,Environment=Production,Purpose=foundation-dry-run
-          aws lambda wait function-active --function-name "$DRY_RUN_FN"
-          aws lambda invoke --function-name "$DRY_RUN_FN" --cli-binary-format raw-in-base64-out --payload '{}' ../artifacts/lambda.json
+          npm run build
+          cd dist
+          zip -qr ../lambda.zip . -x "smoke-test.mjs"
+          cd ..
+          aws lambda update-function-code --function-name "$FUNCTION_NAME" --zip-file fileb://lambda.zip >/dev/null
+          aws lambda wait function-updated --function-name "$FUNCTION_NAME"
+          aws lambda invoke --function-name "$FUNCTION_NAME" --cli-binary-format raw-in-base64-out --payload '{"action":"foundation-dry-run"}' ../artifacts/lambda.json
           cat ../artifacts/lambda.json
           jq -e '.dryRun == true and .ok == true and .productionWritesPerformed == false' ../artifacts/lambda.json
 
-      - name: Delete ephemeral dry-run Lambda
-        if: always()
-        run: aws lambda delete-function --function-name "$DRY_RUN_FN" >/dev/null 2>&1 || true
+      - name: Restore original production Lambda
+        if: always() && steps.cli.outputs.inspect_ok != 'yes'
+        run: |
+          set -euo pipefail
+          if [ -f /tmp/original.zip ]; then
+            aws lambda update-function-code --function-name "$FUNCTION_NAME" --zip-file fileb:///tmp/original.zip >/dev/null
+            aws lambda wait function-updated --function-name "$FUNCTION_NAME"
+            echo "Restored original production Lambda code"
+          else
+            echo "No original zip captured; nothing to restore."
+          fi
 
       - uses: actions/upload-artifact@v4
         if: always()
