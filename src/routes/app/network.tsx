@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Check, Copy, GitFork } from "lucide-react";
-import { useState } from "react";
+import { GitFork } from "lucide-react";
+import { ReferralShareCard } from "@/components/referral-share";
 import { EmptyState, LoadingState, PageHeader, StatCard, Surface } from "@/components/states";
 import { useMemberSession } from "@/components/layout/use-member";
 import { COMMISSION_LEVELS, TOTAL_POSITIONS } from "@/lib/offers";
@@ -53,7 +53,7 @@ function NetworkPage() {
           hint="Eligible after the referred member’s booking is confirmed."
         />
         <StatCard label="Current Level Progress" value={current.value} hint={current.hint} />
-        <ReferralCodeCard code={member.referral_code} />
+        <ReferralShareCard code={member.referral_code} />
       </div>
 
       <Surface>
@@ -114,35 +114,3 @@ function NetworkPage() {
   );
 }
 
-function ReferralCodeCard({ code }: { code: string }) {
-  const [copied, setCopied] = useState(false);
-
-  async function copy() {
-    try {
-      await navigator.clipboard.writeText(code);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1600);
-    } catch {
-      setCopied(false);
-    }
-  }
-
-  return (
-    <Surface className="flex flex-col justify-between">
-      <p className="text-xs font-medium uppercase tracking-[0.16em] text-subtle">Your Referral Code</p>
-      <div className="mt-2 flex min-w-0 items-center justify-between gap-3 sm:block">
-        <p className="min-w-0 truncate font-display text-xl font-semibold tracking-wide sm:text-2xl">{code}</p>
-        <button
-          type="button"
-          onClick={() => void copy()}
-          className="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-lg px-3 text-sm font-medium text-pine hover:bg-pine/8 sm:mt-4"
-          aria-label={copied ? "Referral code copied" : "Copy referral code"}
-        >
-          {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
-          {copied ? "Copied" : "Copy"}
-        </button>
-      </div>
-      <p className="mt-1 text-xs text-muted">Share this code. Cross-offer sponsorship is supported.</p>
-    </Surface>
-  );
-}

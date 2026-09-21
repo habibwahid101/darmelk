@@ -18,6 +18,7 @@ import {
 } from "./engine/activation.js";
 import { getCommissionTotals } from "./engine/commissions.js";
 import { completeOnboarding, ensureMember, logAdminAction, requireAdmin, bindSponsorForGrowth } from "./engine/members.js";
+import { FOUNDATION_TOTAL, foundationRegistryCsv, listFoundationRegistry, validateFoundation } from "./engine/foundation.js";
 import { createContactRequest, listContactRequests, updateContactRequestStatus } from "./engine/contact.js";
 import { getPolicy, listCurrentPolicies, listUserConsents, policyBySlug, recordConsents } from "./engine/terms.js";
 import { getQualificationStatus, PERSONAL_SPONSOR_TARGET, TOTAL_POSITIONS } from "./engine/network.js";
@@ -892,6 +893,43 @@ app.post("/api/admin/payments/:id/:decision", async (c) => {
     return result;
   });
   return c.json({ payment });
+});
+
+
+app.get("/api/admin/foundation-registry", async (c) => {
+  const adminId = c.get("userId");
+  const format = (c.req.query("format") ?? "json").toLowerCase();
+  const result = await withTransaction(async (client) => {
+    await client.query("SET TRANSACTION READ ONLY");
+    await requireAdmin(client, adminId);
+    const rows = await listFoundationRegistry(client);
+    const validation = await validateFoundation(client);
+    return { rows, validation };
+  });
+  if (format === "csv") {
+    const csv = foundationRegistryCsv(result.rows);
+    return new Response(csv, {
+      headers: {
+        "content-type": "text/csv; charset=utf-8",
+        "content-disposition": 'attachment; filename="darmelk-foundation-registry.csv"',
+      },
+    });
+  }
+  return c.json({
+    readOnly: true,
+    expected: FOUNDATION_TOTAL,
+    rowCount: result.rows.length,
+    validation: {
+      ok: result.validation.ok,
+      errors: result.validation.errors,
+      byLevel: result.validation.byLevel,
+      active: result.validation.active,
+      commissionEligible: result.validation.commissionEligible,
+      codes: result.validation.codes,
+      credentials: result.validation.credentials,
+    },
+    rows: result.rows,
+  });
 });
 
 app.get("/api/admin/users", async (c) => {

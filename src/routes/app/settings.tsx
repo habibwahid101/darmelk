@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { PageHeader, Surface } from "@/components/states";
+import { ReferralShareCard } from "@/components/referral-share";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -55,6 +56,8 @@ function SettingsPage() {
       </Surface>
 
       <PayoutCredentials methods={payoutData?.methods ?? []} onSaved={reloadPayouts} />
+
+      <ReferralShareCard code={member.referral_code} />
 
       <Surface>
         <h2 className="font-display text-xl font-semibold">Membership</h2>
