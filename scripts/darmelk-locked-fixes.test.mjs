@@ -30,11 +30,12 @@ test("withdrawal request reserves available without a reservedBalance column", (
   assert.doesNotMatch(totals, /reserved_balance|reservedBalance/);
 });
 
-test("referral copy action sits on the right of the code row on mobile", () => {
-  const src = read("src/routes/app/network.tsx");
-  assert.match(src, /flex min-w-0 items-center justify-between gap-3 sm:block/);
-  assert.match(src, /sm:mt-4/);
-  assert.match(src, /navigator\.clipboard\.writeText\(code\)/);
+test("referral copy/link/share actions sit on the member referral card", () => {
+  const src = read("src/components/referral-share.tsx");
+  assert.match(src, /Copy code/);
+  assert.match(src, /Copy link/);
+  assert.match(src, /navigator\.clipboard\.writeText/);
+  assert.match(read("src/routes/app/network.tsx"), /ReferralShareCard/);
 });
 
 test("booking status badges gain mobile height without changing width behavior", () => {

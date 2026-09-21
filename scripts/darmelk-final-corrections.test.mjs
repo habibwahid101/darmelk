@@ -63,9 +63,12 @@ test("overview no longer shows Details after activation", () => {
   assert.doesNotMatch(src, />Details</);
 });
 
-test("referral card exposes a Copy action", () => {
-  const src = read("src/routes/app/network.tsx");
-  assert.match(src, /Your Referral Code/);
-  assert.match(src, /navigator\.clipboard\.writeText\(code\)/);
+test("referral card exposes Copy code, Copy link, and Share", () => {
+  const src = read("src/components/referral-share.tsx");
+  assert.match(src, /Your Referral/);
+  assert.match(src, /Copy code/);
+  assert.match(src, /Copy link/);
+  assert.match(src, /navigator\.clipboard\.writeText/);
   assert.match(src, /Copied/);
+  assert.match(read("src/routes/app/network.tsx"), /ReferralShareCard/);
 });

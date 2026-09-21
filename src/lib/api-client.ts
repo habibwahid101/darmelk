@@ -592,6 +592,31 @@ export const api = {
       post<{ activation: AnnualActivation }>(`/api/admin/activations/${id}/${decision}`),
 
     users: () => request<{ members: Array<Member & { name: string; email: string }> }>("/api/admin/users"),
+    foundationRegistry: () =>
+      request<{
+        readOnly: true;
+        expected: number;
+        rowCount: number;
+        validation: {
+          ok: boolean;
+          errors: string[];
+          byLevel: Record<0 | 1 | 2 | 3 | 4, number>;
+          active: number;
+          commissionEligible: number;
+          codes: number;
+          credentials: number;
+        };
+        rows: Array<{
+          label: string;
+          loginEmail: string;
+          referralCode: string;
+          referralUrl: string;
+          level: 0 | 1 | 2 | 3 | 4;
+          sponsorLabel: string | null;
+          networkParentLabel: string | null;
+          slot: 1 | 2 | 3 | null;
+        }>;
+      }>("/api/admin/foundation-registry"),
     setRole: (id: string, role: "admin" | "member") => post<{ member: Member }>(`/api/admin/users/${id}/role`, { role }),
     contactRequests: () => request<{ requests: ContactRequest[] }>("/api/admin/contact-requests"),
     updateContactRequest: (id: string, status: ContactRequest["status"]) =>

@@ -6,6 +6,7 @@ import {
   Building2,
   FileText,
   GitFork,
+  Share2,
   Inbox,
   LayoutDashboard,
   Menu,
@@ -32,6 +33,7 @@ type AdminPath =
   | "/admin/bookings"
   | "/admin/users"
   | "/admin/network"
+  | "/admin/foundation-registry"
   | "/admin/commission"
   | "/admin/activation"
   | "/admin/documents"
@@ -62,6 +64,7 @@ const NAV: NavItem[] = [
   { to: "/admin/contact-requests", label: "Contact Requests", icon: Inbox },
   { to: "/admin/career", label: "Career Management", icon: Briefcase },
   { to: "/admin/network", label: "Network", icon: GitFork },
+  { to: "/admin/foundation-registry", label: "Foundation 121", icon: Share2 },
   { to: "/admin/commission", label: "Commission", icon: Wallet },
   { to: "/admin/leadership-rewards", label: "Leadership Rewards", icon: Award },
   { to: "/admin/activation", label: "Activation", icon: BadgeCheck },

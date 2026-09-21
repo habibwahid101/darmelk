@@ -38,6 +38,7 @@ import { Route as AdminOffersRouteImport } from './routes/admin/offers'
 import { Route as AdminPaymentsRouteImport } from './routes/admin/payments'
 import { Route as AdminPromotionsRouteImport } from './routes/admin/promotions'
 import { Route as AdminSettingsRouteImport } from './routes/admin/settings'
+import { Route as AdminFoundationRegistryRouteImport } from './routes/admin/foundation-registry'
 import { Route as AdminUsersRouteImport } from './routes/admin/users'
 import { Route as AdminWithdrawalsRouteImport } from './routes/admin/withdrawals'
 import { Route as AppIndexRouteImport } from './routes/app/index'
@@ -55,6 +56,7 @@ import { Route as AppSettingsRouteImport } from './routes/app/settings'
 import { Route as AppTransactionsRouteImport } from './routes/app/transactions'
 import { Route as CareerIndexRouteImport } from './routes/career/index'
 import { Route as CareerSlugRouteImport } from './routes/career.$slug'
+import { Route as JoinCodeRouteImport } from './routes/join.$code'
 import { Route as PropertiesIndexRouteImport } from './routes/properties/index'
 import { Route as PropertiesSlugRouteImport } from './routes/properties.$slug'
 import { Route as AdminCareerIndexRouteImport } from './routes/admin/career.index'
@@ -240,6 +242,11 @@ const AdminSettingsRoute = AdminSettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminFoundationRegistryRoute = AdminFoundationRegistryRouteImport.update({
+  id: '/foundation-registry',
+  path: '/foundation-registry',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminUsersRoute = AdminUsersRouteImport.update({
   id: '/users',
   path: '/users',
@@ -324,6 +331,11 @@ const CareerSlugRoute = CareerSlugRouteImport.update({
   id: '/$slug',
   path: '/$slug',
   getParentRoute: () => CareerRoute,
+} as any)
+const JoinCodeRoute = JoinCodeRouteImport.update({
+  id: '/join/$code',
+  path: '/join/$code',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const PropertiesIndexRoute = PropertiesIndexRouteImport.update({
   id: '/',
@@ -562,6 +574,7 @@ export interface FileRoutesByFullPath {
   '/admin/payments': typeof AdminPaymentsRoute
   '/admin/promotions': typeof AdminPromotionsRouteWithChildren
   '/admin/settings': typeof AdminSettingsRoute
+  '/admin/foundation-registry': typeof AdminFoundationRegistryRoute
   '/admin/users': typeof AdminUsersRoute
   '/admin/withdrawals': typeof AdminWithdrawalsRoute
   '/app/activation': typeof AppActivationRoute
@@ -577,6 +590,7 @@ export interface FileRoutesByFullPath {
   '/app/settings': typeof AppSettingsRoute
   '/app/transactions': typeof AppTransactionsRoute
   '/career/$slug': typeof CareerSlugRoute
+  '/join/$code': typeof JoinCodeRoute
   '/properties/$slug': typeof PropertiesSlugRoute
   '/admin/': typeof AdminIndexRoute
   '/app/': typeof AppIndexRoute
@@ -640,6 +654,7 @@ export interface FileRoutesByTo {
   '/admin/network': typeof AdminNetworkRoute
   '/admin/payments': typeof AdminPaymentsRoute
   '/admin/settings': typeof AdminSettingsRoute
+  '/admin/foundation-registry': typeof AdminFoundationRegistryRoute
   '/admin/users': typeof AdminUsersRoute
   '/admin/withdrawals': typeof AdminWithdrawalsRoute
   '/app/activation': typeof AppActivationRoute
@@ -654,6 +669,7 @@ export interface FileRoutesByTo {
   '/app/settings': typeof AppSettingsRoute
   '/app/transactions': typeof AppTransactionsRoute
   '/career/$slug': typeof CareerSlugRoute
+  '/join/$code': typeof JoinCodeRoute
   '/properties/$slug': typeof PropertiesSlugRoute
   '/admin': typeof AdminIndexRoute
   '/app': typeof AppIndexRoute
@@ -721,6 +737,7 @@ export interface FileRoutesById {
   '/admin/payments': typeof AdminPaymentsRoute
   '/admin/promotions': typeof AdminPromotionsRouteWithChildren
   '/admin/settings': typeof AdminSettingsRoute
+  '/admin/foundation-registry': typeof AdminFoundationRegistryRoute
   '/admin/users': typeof AdminUsersRoute
   '/admin/withdrawals': typeof AdminWithdrawalsRoute
   '/app/activation': typeof AppActivationRoute
@@ -736,6 +753,7 @@ export interface FileRoutesById {
   '/app/settings': typeof AppSettingsRoute
   '/app/transactions': typeof AppTransactionsRoute
   '/career/$slug': typeof CareerSlugRoute
+  '/join/$code': typeof JoinCodeRoute
   '/properties/$slug': typeof PropertiesSlugRoute
   '/admin/': typeof AdminIndexRoute
   '/app/': typeof AppIndexRoute
@@ -810,6 +828,7 @@ export interface FileRouteTypes {
     | '/admin/payments'
     | '/admin/promotions'
     | '/admin/settings'
+    | '/admin/foundation-registry'
     | '/admin/users'
     | '/admin/withdrawals'
     | '/app/activation'
@@ -825,6 +844,7 @@ export interface FileRouteTypes {
     | '/app/settings'
     | '/app/transactions'
     | '/career/$slug'
+    | '/join/$code'
     | '/properties/$slug'
     | '/admin/'
     | '/app/'
@@ -888,6 +908,7 @@ export interface FileRouteTypes {
     | '/admin/network'
     | '/admin/payments'
     | '/admin/settings'
+    | '/admin/foundation-registry'
     | '/admin/users'
     | '/admin/withdrawals'
     | '/app/activation'
@@ -902,6 +923,7 @@ export interface FileRouteTypes {
     | '/app/settings'
     | '/app/transactions'
     | '/career/$slug'
+    | '/join/$code'
     | '/properties/$slug'
     | '/admin'
     | '/app'
@@ -968,6 +990,7 @@ export interface FileRouteTypes {
     | '/admin/payments'
     | '/admin/promotions'
     | '/admin/settings'
+    | '/admin/foundation-registry'
     | '/admin/users'
     | '/admin/withdrawals'
     | '/app/activation'
@@ -983,6 +1006,7 @@ export interface FileRouteTypes {
     | '/app/settings'
     | '/app/transactions'
     | '/career/$slug'
+    | '/join/$code'
     | '/properties/$slug'
     | '/admin/'
     | '/app/'
@@ -1043,6 +1067,7 @@ export interface RootRouteChildren {
   PropertiesRoute: typeof PropertiesRouteWithChildren
   ResetPasswordRoute: typeof ResetPasswordRoute
   TermsRoute: typeof TermsRoute
+  JoinCodeRoute: typeof JoinCodeRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
 }
 
@@ -1251,6 +1276,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminSettingsRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/foundation-registry': {
+      id: '/admin/foundation-registry'
+      path: '/foundation-registry'
+      fullPath: '/admin/foundation-registry'
+      preLoaderRoute: typeof AdminFoundationRegistryRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/users': {
       id: '/admin/users'
       path: '/users'
@@ -1369,6 +1401,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/career/$slug'
       preLoaderRoute: typeof CareerSlugRouteImport
       parentRoute: typeof CareerRoute
+    }
+    '/join/$code': {
+      id: '/join/$code'
+      path: '/join/$code'
+      fullPath: '/join/$code'
+      preLoaderRoute: typeof JoinCodeRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/properties/': {
       id: '/properties/'
@@ -1842,6 +1881,7 @@ interface AdminRouteChildren {
   AdminPaymentsRoute: typeof AdminPaymentsRoute
   AdminPromotionsRoute: typeof AdminPromotionsRouteWithChildren
   AdminSettingsRoute: typeof AdminSettingsRoute
+  AdminFoundationRegistryRoute: typeof AdminFoundationRegistryRoute
   AdminUsersRoute: typeof AdminUsersRoute
   AdminWithdrawalsRoute: typeof AdminWithdrawalsRoute
   AdminIndexRoute: typeof AdminIndexRoute
@@ -1861,6 +1901,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminPaymentsRoute: AdminPaymentsRoute,
   AdminPromotionsRoute: AdminPromotionsRouteWithChildren,
   AdminSettingsRoute: AdminSettingsRoute,
+  AdminFoundationRegistryRoute: AdminFoundationRegistryRoute,
   AdminUsersRoute: AdminUsersRoute,
   AdminWithdrawalsRoute: AdminWithdrawalsRoute,
   AdminIndexRoute: AdminIndexRoute,
@@ -1973,6 +2014,7 @@ const rootRouteChildren: RootRouteChildren = {
   PropertiesRoute: PropertiesRouteWithChildren,
   ResetPasswordRoute: ResetPasswordRoute,
   TermsRoute: TermsRoute,
+  JoinCodeRoute: JoinCodeRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
 }
 export const routeTree = rootRouteImport

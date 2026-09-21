@@ -36,7 +36,7 @@ function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
-  const [sponsorCode, setSponsorCode] = useState(ref ?? "");
+  const [sponsorCode, setSponsorCode] = useState((ref ?? "").toUpperCase());
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -175,7 +175,11 @@ function Login() {
             />
             {create ? (
               <>
-                <Field label="Referral ID (Optional)" hint="Have a referral ID? Enter it here.">
+                <Field
+                  label="Referral ID (Optional)"
+                  hint={ref ? "Filled from your referral link. Final assignment is validated on the server." : "Have a referral ID? Enter it here."}
+                  htmlFor="sponsor-code"
+                >
                   <Input
                     id="sponsor-code"
                     name="sponsorCode"
