@@ -5,6 +5,7 @@ import type { PoolClient } from "pg";
 import { badRequest, conflict, forbidden, notFound } from "../errors.js";
 import { uid } from "../ids.js";
 import { recordConsents, requireCurrentConsents } from "./terms.js";
+import { releaseMerchantPaymentForActivation, settleMerchantPaymentForActivation } from "./merchant.js";
 
 const ACTIVATION_FEE = 1000;
 const YEAR_MS = 365 * 24 * 60 * 60 * 1000;
@@ -112,6 +113,7 @@ export async function approveActivation(
     `update members set activation_status = 'active', activation_expires_at = $2, updated_at = now() where user_id = $1`,
     [activation.user_id, activation.period_end],
   );
+  await settleMerchantPaymentForActivation(client, activationId);
   return updated[0]!;
 }
 
@@ -134,6 +136,7 @@ export async function rejectActivation(
   await client.query(`update members set activation_status = 'inactive', updated_at = now() where user_id = $1`, [
     activation.user_id,
   ]);
+  await releaseMerchantPaymentForActivation(client, activationId);
   return updated[0]!;
 }
 

@@ -107,9 +107,9 @@ test("Batch 05 and 06 rails stay untouched and no new migration is added", () =>
   const leadership = read("backend/src/engine/leadership.ts");
   const inventory = read("backend/src/engine/inventory.ts");
   const smoke = read("backend/src/smoke-test.ts");
-  assert.match(form, /allowMerchant = targetType === "booking"/);
-  assert.match(book, /Pay via Darmelk Bank or Pay by Merchant/);
-  assert.match(payments, /targetType === "booking" && method !== "bank"/);
+  assert.match(form, /methods.find\(\(method\) => method.method === "merchant"\)\?\.available/);
+  assert.match(book, /describePaymentOptions/);
+  assert.match(payments, /resolveReceivingAccount/);
   assert.match(activation, /1000/);
   assert.doesNotMatch(activation, /payment_method_not_allowed/);
   assert.match(commissions, /1: 0\.1/);

@@ -185,6 +185,7 @@ export type AnnualActivation = {
   status: "pending" | "active" | "expired" | "rejected";
   requested_at: string;
   decided_at: string | null;
+  merchant_request_status?: string | null;
   consents?: Array<{ document_key: string; document_version: string; accepted_at: string }>;
 };
 
@@ -228,8 +229,68 @@ export type Withdrawal = {
   own_booking_eligible?: boolean;
 };
 
-export type PaymentDestination = { method: "bkash" | "nagad" | "bank"; label: string; account: string; accountType?: string; bankName?: string; accountName?: string; branch?: string; routingNumber?: string | null };
-export type PaymentSubmission = { id: string; target_type: "activation" | "booking" | "merchant_bundle"; target_id: string; user_id: string; amount: number; payment_method: "bkash" | "nagad" | "bank"; destination_snapshot: PaymentDestination; reference_id: string; proof_filename: string; proof_mime: string; notes: string | null; status: "submitted" | "under_review" | "approved" | "rejected"; submitted_at: string; reviewed_at: string | null; rejection_reason: string | null; user_name?: string; user_email?: string };
+export type PaymentDestination = {
+  id?: string;
+  method: string;
+  rail?: "bank" | "mfs";
+  provider?: string;
+  label: string;
+  account: string;
+  accountType?: string;
+  bankName?: string;
+  accountName?: string;
+  branch?: string;
+  routingNumber?: string | null;
+  instructions?: string;
+};
+export type PaymentOptions = {
+  context: "growth_activation" | "growth_booking" | "merchant_bundle";
+  methods: Array<{
+    method: "bank" | "mfs" | "merchant";
+    enabled: boolean;
+    available: boolean;
+    accounts: Array<{
+      id: string;
+      method: "bank" | "mfs";
+      provider: string;
+      label: string;
+      account_number: string;
+      account_holder_name: string;
+      account_type: string;
+      bank_name: string;
+      branch: string;
+      routing_number: string;
+      instructions: string;
+      display_order: number;
+    }>;
+  }>;
+};
+export type ReceivingAccount = {
+  id: string;
+  method: "bank" | "mfs";
+  provider: string;
+  label: string;
+  account_number: string;
+  account_holder_name: string;
+  account_type: string;
+  bank_name: string;
+  branch: string;
+  routing_number: string;
+  instructions: string;
+  enabled: boolean;
+  display_order: number;
+  archived_at: string | null;
+  created_at: string;
+  updated_at: string;
+  contexts: Array<"growth_activation" | "growth_booking">;
+};
+export type PaymentMethodSetting = {
+  context: "growth_activation" | "growth_booking";
+  method: "bank" | "mfs" | "merchant";
+  enabled: boolean;
+  updated_at: string;
+};
+export type PaymentSubmission = { id: string; target_type: "activation" | "booking" | "merchant_bundle"; target_id: string; user_id: string; amount: number; payment_method: string; receiving_account_id?: string | null; destination_snapshot: Record<string, unknown>; reference_id: string; proof_filename: string; proof_mime: string; notes: string | null; status: "submitted" | "under_review" | "approved" | "rejected"; submitted_at: string; reviewed_at: string | null; rejection_reason: string | null; user_name?: string; user_email?: string };
 export type PayoutMethod = { id: string; method_type: "bkash" | "nagad" | "bank"; details: Record<string, string>; created_at: string; updated_at: string };
 
 export type MerchantGift = { label: string; quantity: number };
@@ -293,7 +354,9 @@ export type MerchantPurchase = {
 };
 export type MerchantPaymentRequest = {
   id: string;
-  booking_id: string;
+  purpose?: "growth_activation" | "growth_booking";
+  booking_id: string | null;
+  activation_id?: string | null;
   customer_user_id: string;
   merchant_user_id: string;
   amount: number;
@@ -488,6 +551,10 @@ export const api = {
     request<{ destinations: PaymentDestination[] }>(
       `/api/payment-destinations${target ? `?target=${encodeURIComponent(target)}` : ""}`,
     ),
+  paymentOptions: (target?: "activation" | "booking" | "merchant_bundle") =>
+    request<{ options: PaymentOptions }>(
+      `/api/payment-options${target ? `?target=${encodeURIComponent(target)}` : ""}`,
+    ),
   terms: (keys?: string[]) =>
     request<{ documents: PolicyDocument[] }>(
       `/api/terms${keys?.length ? `?keys=${encodeURIComponent(keys.join(","))}` : ""}`,
@@ -542,6 +609,8 @@ export const api = {
     post<{ booking: Booking }>("/api/bookings", { offerSlug, acceptBookingTerms }, idempotencyKey),
   requestMerchantPay: (bookingId: string, merchantUserId: string, idempotencyKey: string, acceptMerchantTerms: boolean) =>
     post<{ request: MerchantPaymentRequest }>(`/api/bookings/${bookingId}/merchant-pay`, { merchantUserId, acceptMerchantTerms }, idempotencyKey),
+  requestActivationMerchantPay: (activationId: string, merchantUserId: string, idempotencyKey: string, acceptMerchantTerms: boolean) =>
+    post<{ request: MerchantPaymentRequest }>(`/api/activation/${activationId}/merchant-pay`, { merchantUserId, acceptMerchantTerms }, idempotencyKey),
 
   promotions: () => request<{ promotions: Promotion[]; serverNow: string }>("/api/promotions"),
   promotion: (id: string) =>
@@ -561,7 +630,7 @@ export const api = {
 
   requestActivation: (idempotencyKey: string, acceptGrowthTerms = true) =>
     post<{ activation: AnnualActivation }>("/api/activation/request", { acceptGrowthTerms }, idempotencyKey),
-  submitPayment: (data: { targetType: "activation" | "booking" | "merchant_bundle"; targetId: string; paymentMethod: "bkash" | "nagad" | "bank"; referenceId: string; proofFilename: string; proofMime: string; proofBase64: string; notes?: string }, idempotencyKey: string) =>
+  submitPayment: (data: { targetType: "activation" | "booking" | "merchant_bundle"; targetId: string; paymentMethod: string; receivingAccountId?: string; referenceId: string; proofFilename: string; proofMime: string; proofBase64: string; notes?: string }, idempotencyKey: string) =>
     post<{ payment: PaymentSubmission }>("/api/payments", data, idempotencyKey),
   requestWithdrawal: (amount: number, payoutMethodId: string, idempotencyKey: string) =>
     post<{ withdrawal: Withdrawal }>("/api/withdrawals", { amount, payoutMethodId }, idempotencyKey),
@@ -584,6 +653,22 @@ export const api = {
     reviewPayment: (id: string) => post<{ payment: PaymentSubmission }>(`/api/admin/payments/${id}/review`),
     decidePayment: (id: string, decision: "approve" | "reject", reason?: string) =>
       post<{ payment: PaymentSubmission }>(`/api/admin/payments/${id}/${decision}`, { reason }),
+    paymentSettings: () =>
+      request<{
+        settings: PaymentMethodSetting[];
+        accounts: ReceivingAccount[];
+        effective: { activation: PaymentOptions; booking: PaymentOptions };
+      }>("/api/admin/payment-settings"),
+    setPaymentMethod: (context: PaymentMethodSetting["context"], method: PaymentMethodSetting["method"], enabled: boolean) =>
+      post<{ setting: PaymentMethodSetting }>("/api/admin/payment-settings/methods", { context, method, enabled }),
+    createReceivingAccount: (data: Record<string, unknown>) =>
+      post<{ account: ReceivingAccount }>("/api/admin/payment-settings/accounts", data),
+    updateReceivingAccount: (id: string, data: Record<string, unknown>) =>
+      post<{ account: ReceivingAccount }>(`/api/admin/payment-settings/accounts/${encodeURIComponent(id)}`, data),
+    archiveReceivingAccount: (id: string) =>
+      post<{ account: ReceivingAccount }>(`/api/admin/payment-settings/accounts/${encodeURIComponent(id)}/archive`),
+    deleteReceivingAccount: (id: string) =>
+      post<{ ok: true }>(`/api/admin/payment-settings/accounts/${encodeURIComponent(id)}/delete`),
 
     activations: () => request<{ activations: Array<AnnualActivation & { user_name?: string; user_email?: string; consents?: UserConsent[] }> }>("/api/admin/activations"),
     consents: (userId: string) =>

@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useState } from "react";
 import { BadgeCheck } from "lucide-react";
 import { EmptyState, PageHeader, Surface } from "@/components/states";
 import { Button } from "@/components/ui/button";
@@ -19,6 +20,17 @@ function AdminActivation() {
   const { data: usersData } = useAsync(() => api.admin.users(), []);
   const activations = data?.activations ?? [];
   const names = new Map((usersData?.members ?? []).map((m) => [m.user_id, m.name]));
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  async function run(id: string, fn: () => Promise<unknown>) {
+    setBusyId(id);
+    try {
+      await fn();
+      reload();
+    } finally {
+      setBusyId(null);
+    }
+  }
 
   return (
     <div className="space-y-8">
@@ -54,7 +66,22 @@ function AdminActivation() {
                   <StatusBadge status={a.status} />
                 </div>
                 {a.status === "pending" ? (
-                  <p className="text-sm text-muted">Review the member’s payment evidence in Payment review.</p>
+                  <p className="text-sm text-muted">
+                    {a.merchant_request_status === "approved"
+                      ? "Merchant Credit is reserved. Confirming settles it and uses the same Growth activation path as bank/MFS."
+                      : a.merchant_request_status === "pending"
+                        ? "Awaiting Merchant approval."
+                        : "Review the member’s payment evidence in Payment review."}
+                  </p>
+                ) : null}
+                {a.status === "pending" && a.merchant_request_status === "approved" ? (
+                  <Button
+                    size="sm"
+                    disabled={busyId === a.id}
+                    onClick={() => void run(a.id, () => api.admin.decideActivation(a.id, "approve"))}
+                  >
+                    Confirm Merchant payment
+                  </Button>
                 ) : null}
               </li>
             ))}

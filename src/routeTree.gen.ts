@@ -31,14 +31,15 @@ import { Route as AdminCareerRouteImport } from './routes/admin/career'
 import { Route as AdminCommissionRouteImport } from './routes/admin/commission'
 import { Route as AdminContactRequestsRouteImport } from './routes/admin/contact-requests'
 import { Route as AdminDocumentsRouteImport } from './routes/admin/documents'
+import { Route as AdminFoundationRegistryRouteImport } from './routes/admin/foundation-registry'
 import { Route as AdminLeadershipRewardsRouteImport } from './routes/admin/leadership-rewards'
 import { Route as AdminMerchantRouteImport } from './routes/admin/merchant'
 import { Route as AdminNetworkRouteImport } from './routes/admin/network'
 import { Route as AdminOffersRouteImport } from './routes/admin/offers'
+import { Route as AdminPaymentSettingsRouteImport } from './routes/admin/payment-settings'
 import { Route as AdminPaymentsRouteImport } from './routes/admin/payments'
 import { Route as AdminPromotionsRouteImport } from './routes/admin/promotions'
 import { Route as AdminSettingsRouteImport } from './routes/admin/settings'
-import { Route as AdminFoundationRegistryRouteImport } from './routes/admin/foundation-registry'
 import { Route as AdminUsersRouteImport } from './routes/admin/users'
 import { Route as AdminWithdrawalsRouteImport } from './routes/admin/withdrawals'
 import { Route as AppIndexRouteImport } from './routes/app/index'
@@ -207,6 +208,11 @@ const AdminDocumentsRoute = AdminDocumentsRouteImport.update({
   path: '/documents',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminFoundationRegistryRoute = AdminFoundationRegistryRouteImport.update({
+  id: '/foundation-registry',
+  path: '/foundation-registry',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminLeadershipRewardsRoute = AdminLeadershipRewardsRouteImport.update({
   id: '/leadership-rewards',
   path: '/leadership-rewards',
@@ -227,6 +233,11 @@ const AdminOffersRoute = AdminOffersRouteImport.update({
   path: '/offers',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminPaymentSettingsRoute = AdminPaymentSettingsRouteImport.update({
+  id: '/payment-settings',
+  path: '/payment-settings',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminPaymentsRoute = AdminPaymentsRouteImport.update({
   id: '/payments',
   path: '/payments',
@@ -240,11 +251,6 @@ const AdminPromotionsRoute = AdminPromotionsRouteImport.update({
 const AdminSettingsRoute = AdminSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminFoundationRegistryRoute = AdminFoundationRegistryRouteImport.update({
-  id: '/foundation-registry',
-  path: '/foundation-registry',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminUsersRoute = AdminUsersRouteImport.update({
@@ -567,14 +573,15 @@ export interface FileRoutesByFullPath {
   '/admin/commission': typeof AdminCommissionRoute
   '/admin/contact-requests': typeof AdminContactRequestsRoute
   '/admin/documents': typeof AdminDocumentsRoute
+  '/admin/foundation-registry': typeof AdminFoundationRegistryRoute
   '/admin/leadership-rewards': typeof AdminLeadershipRewardsRouteWithChildren
   '/admin/merchant': typeof AdminMerchantRouteWithChildren
   '/admin/network': typeof AdminNetworkRoute
   '/admin/offers': typeof AdminOffersRouteWithChildren
+  '/admin/payment-settings': typeof AdminPaymentSettingsRoute
   '/admin/payments': typeof AdminPaymentsRoute
   '/admin/promotions': typeof AdminPromotionsRouteWithChildren
   '/admin/settings': typeof AdminSettingsRoute
-  '/admin/foundation-registry': typeof AdminFoundationRegistryRoute
   '/admin/users': typeof AdminUsersRoute
   '/admin/withdrawals': typeof AdminWithdrawalsRoute
   '/app/activation': typeof AppActivationRoute
@@ -651,10 +658,11 @@ export interface FileRoutesByTo {
   '/admin/commission': typeof AdminCommissionRoute
   '/admin/contact-requests': typeof AdminContactRequestsRoute
   '/admin/documents': typeof AdminDocumentsRoute
+  '/admin/foundation-registry': typeof AdminFoundationRegistryRoute
   '/admin/network': typeof AdminNetworkRoute
+  '/admin/payment-settings': typeof AdminPaymentSettingsRoute
   '/admin/payments': typeof AdminPaymentsRoute
   '/admin/settings': typeof AdminSettingsRoute
-  '/admin/foundation-registry': typeof AdminFoundationRegistryRoute
   '/admin/users': typeof AdminUsersRoute
   '/admin/withdrawals': typeof AdminWithdrawalsRoute
   '/app/activation': typeof AppActivationRoute
@@ -730,14 +738,15 @@ export interface FileRoutesById {
   '/admin/commission': typeof AdminCommissionRoute
   '/admin/contact-requests': typeof AdminContactRequestsRoute
   '/admin/documents': typeof AdminDocumentsRoute
+  '/admin/foundation-registry': typeof AdminFoundationRegistryRoute
   '/admin/leadership-rewards': typeof AdminLeadershipRewardsRouteWithChildren
   '/admin/merchant': typeof AdminMerchantRouteWithChildren
   '/admin/network': typeof AdminNetworkRoute
   '/admin/offers': typeof AdminOffersRouteWithChildren
+  '/admin/payment-settings': typeof AdminPaymentSettingsRoute
   '/admin/payments': typeof AdminPaymentsRoute
   '/admin/promotions': typeof AdminPromotionsRouteWithChildren
   '/admin/settings': typeof AdminSettingsRoute
-  '/admin/foundation-registry': typeof AdminFoundationRegistryRoute
   '/admin/users': typeof AdminUsersRoute
   '/admin/withdrawals': typeof AdminWithdrawalsRoute
   '/app/activation': typeof AppActivationRoute
@@ -821,14 +830,15 @@ export interface FileRouteTypes {
     | '/admin/commission'
     | '/admin/contact-requests'
     | '/admin/documents'
+    | '/admin/foundation-registry'
     | '/admin/leadership-rewards'
     | '/admin/merchant'
     | '/admin/network'
     | '/admin/offers'
+    | '/admin/payment-settings'
     | '/admin/payments'
     | '/admin/promotions'
     | '/admin/settings'
-    | '/admin/foundation-registry'
     | '/admin/users'
     | '/admin/withdrawals'
     | '/app/activation'
@@ -905,10 +915,11 @@ export interface FileRouteTypes {
     | '/admin/commission'
     | '/admin/contact-requests'
     | '/admin/documents'
+    | '/admin/foundation-registry'
     | '/admin/network'
+    | '/admin/payment-settings'
     | '/admin/payments'
     | '/admin/settings'
-    | '/admin/foundation-registry'
     | '/admin/users'
     | '/admin/withdrawals'
     | '/app/activation'
@@ -983,14 +994,15 @@ export interface FileRouteTypes {
     | '/admin/commission'
     | '/admin/contact-requests'
     | '/admin/documents'
+    | '/admin/foundation-registry'
     | '/admin/leadership-rewards'
     | '/admin/merchant'
     | '/admin/network'
     | '/admin/offers'
+    | '/admin/payment-settings'
     | '/admin/payments'
     | '/admin/promotions'
     | '/admin/settings'
-    | '/admin/foundation-registry'
     | '/admin/users'
     | '/admin/withdrawals'
     | '/app/activation'
@@ -1227,6 +1239,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminDocumentsRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/foundation-registry': {
+      id: '/admin/foundation-registry'
+      path: '/foundation-registry'
+      fullPath: '/admin/foundation-registry'
+      preLoaderRoute: typeof AdminFoundationRegistryRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/leadership-rewards': {
       id: '/admin/leadership-rewards'
       path: '/leadership-rewards'
@@ -1255,6 +1274,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminOffersRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/payment-settings': {
+      id: '/admin/payment-settings'
+      path: '/payment-settings'
+      fullPath: '/admin/payment-settings'
+      preLoaderRoute: typeof AdminPaymentSettingsRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/payments': {
       id: '/admin/payments'
       path: '/payments'
@@ -1274,13 +1300,6 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/admin/settings'
       preLoaderRoute: typeof AdminSettingsRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/foundation-registry': {
-      id: '/admin/foundation-registry'
-      path: '/foundation-registry'
-      fullPath: '/admin/foundation-registry'
-      preLoaderRoute: typeof AdminFoundationRegistryRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/users': {
@@ -1874,14 +1893,15 @@ interface AdminRouteChildren {
   AdminCommissionRoute: typeof AdminCommissionRoute
   AdminContactRequestsRoute: typeof AdminContactRequestsRoute
   AdminDocumentsRoute: typeof AdminDocumentsRoute
+  AdminFoundationRegistryRoute: typeof AdminFoundationRegistryRoute
   AdminLeadershipRewardsRoute: typeof AdminLeadershipRewardsRouteWithChildren
   AdminMerchantRoute: typeof AdminMerchantRouteWithChildren
   AdminNetworkRoute: typeof AdminNetworkRoute
   AdminOffersRoute: typeof AdminOffersRouteWithChildren
+  AdminPaymentSettingsRoute: typeof AdminPaymentSettingsRoute
   AdminPaymentsRoute: typeof AdminPaymentsRoute
   AdminPromotionsRoute: typeof AdminPromotionsRouteWithChildren
   AdminSettingsRoute: typeof AdminSettingsRoute
-  AdminFoundationRegistryRoute: typeof AdminFoundationRegistryRoute
   AdminUsersRoute: typeof AdminUsersRoute
   AdminWithdrawalsRoute: typeof AdminWithdrawalsRoute
   AdminIndexRoute: typeof AdminIndexRoute
@@ -1894,14 +1914,15 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminCommissionRoute: AdminCommissionRoute,
   AdminContactRequestsRoute: AdminContactRequestsRoute,
   AdminDocumentsRoute: AdminDocumentsRoute,
+  AdminFoundationRegistryRoute: AdminFoundationRegistryRoute,
   AdminLeadershipRewardsRoute: AdminLeadershipRewardsRouteWithChildren,
   AdminMerchantRoute: AdminMerchantRouteWithChildren,
   AdminNetworkRoute: AdminNetworkRoute,
   AdminOffersRoute: AdminOffersRouteWithChildren,
+  AdminPaymentSettingsRoute: AdminPaymentSettingsRoute,
   AdminPaymentsRoute: AdminPaymentsRoute,
   AdminPromotionsRoute: AdminPromotionsRouteWithChildren,
   AdminSettingsRoute: AdminSettingsRoute,
-  AdminFoundationRegistryRoute: AdminFoundationRegistryRoute,
   AdminUsersRoute: AdminUsersRoute,
   AdminWithdrawalsRoute: AdminWithdrawalsRoute,
   AdminIndexRoute: AdminIndexRoute,

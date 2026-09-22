@@ -34,8 +34,7 @@ test("Growth Program Activation fee, duration, and methods stay BDT 1,000 / year
   assert.match(page, /const ACTIVATION_FEE = 1000/);
   assert.match(page, /Growth Program Activation/);
   assert.match(page, /PaymentForm targetType="activation"/);
-  assert.match(page, /bKash, Nagad, or Darmelk Bank/);
-  assert.doesNotMatch(page, /Pay by Merchant/);
+  assert.match(page, /describePaymentOptions/);
   assert.match(form, /Darmelk Bank/);
   assert.match(engine, /growth_referral_required/);
   assert.match(engine, /acceptGrowthTerms/);
@@ -74,7 +73,8 @@ test("Growth activation requires sponsor and current Terms, and does not auto-ac
   assert.match(engine, /GROWTH_ACTIVATION_TERMS/);
   assert.match(engine, /status = 'pending'/);
   assert.match(router, /approveActivation\(client, result.target_id, adminId\)/);
-  assert.match(payments, /targetType === "activation" && method === "merchant"/);
+  assert.match(read("backend/src/engine/payment-settings.ts"), /METHOD_UNAVAILABLE/);
+  assert.match(payments, /toLowerCase\(\) === "merchant"/);
   assert.match(smoke, /acceptGrowthTerms: true/);
   assert.match(smoke, /sponsorless general account cannot request Growth Program Activation/);
   assert.match(smoke, /Growth activation without current Terms is rejected/);
@@ -105,9 +105,9 @@ test("Batch 05 payment routes and historical engines remain", () => {
   const merchant = read("backend/src/engine/merchant.ts");
   const promotions = read("backend/src/engine/promotions.ts");
   const inventory = read("backend/src/engine/inventory.ts");
-  assert.match(payments, /targetType === "booking" && method !== "bank"/);
-  assert.match(form, /allowMerchant = targetType === "booking"/);
-  assert.match(book, /Pay via Darmelk Bank or Pay by Merchant/);
+  assert.match(payments, /resolveReceivingAccount/);
+  assert.match(form, /methods.find\(\(method\) => method.method === "merchant"\)\?\.available/);
+  assert.match(book, /describePaymentOptions/);
   assert.match(network, /PERSONAL_SPONSOR_TARGET = 3/);
   assert.match(commissions, /1: 0\.1/);
   assert.match(merchant, /approveMerchantPaymentRequest/);
@@ -115,7 +115,8 @@ test("Batch 05 payment routes and historical engines remain", () => {
   assert.match(inventory, /consumeInventoryForConfirmation/);
   const files = readdirSync(join(root, "migrations")).filter((name) => name.endsWith(".sql") && name.startsWith("001"));
   assert.ok(files.includes("0019_darmelk_consents.sql"));
-  assert.equal(files.filter((name) => name.startsWith("002")).length, 0);
+  const two = readdirSync(join(root, "migrations")).filter((name) => name.endsWith(".sql") && name.startsWith("002"));
+  assert.deepEqual(two, ["0020_darmelk_payment_settings.sql"]);
 });
 
 test("Terms copy stays Darmelk-only and does not invent earnings", () => {

@@ -2877,6 +2877,22 @@ async function main() {
       !activationDest.destinations?.some((d: { method: string }) => d.method === "merchant"),
     activationDest.destinations,
   );
+  const paymentOptions = await json(await app.request("/api/payment-options?target=booking"));
+  record(
+    "booking payment options expose Bank and Merchant, not MFS",
+    paymentOptions.options?.methods?.find((m: { method: string }) => m.method === "bank")?.available === true &&
+      paymentOptions.options?.methods?.find((m: { method: string }) => m.method === "mfs")?.available === false &&
+      paymentOptions.options?.methods?.find((m: { method: string }) => m.method === "merchant")?.available === true,
+    paymentOptions.options?.methods,
+  );
+  const activationOptions = await json(await app.request("/api/payment-options?target=activation"));
+  record(
+    "activation payment options expose Bank and MFS, not Merchant",
+    activationOptions.options?.methods?.find((m: { method: string }) => m.method === "bank")?.available === true &&
+      activationOptions.options?.methods?.find((m: { method: string }) => m.method === "mfs")?.available === true &&
+      activationOptions.options?.methods?.find((m: { method: string }) => m.method === "merchant")?.available === false,
+    activationOptions.options?.methods,
+  );
   const publicTerms = await json(await app.request("/api/terms"));
   record(
     "current Terms documents are versioned and readable",
