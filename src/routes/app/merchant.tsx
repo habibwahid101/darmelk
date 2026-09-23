@@ -310,11 +310,11 @@ function MerchantDashboard({
           <p className="text-xs font-medium uppercase tracking-wide text-subtle">Confirm approval</p>
           <h2 className="mt-2 font-display text-2xl font-semibold">Reserve {formatBdt(confirming.amount)}?</h2>
           <p className="mt-2 text-sm text-muted">
-            {confirming.customer_name ?? "Customer"} · {confirming.offer_title} · {confirming.booking_id}
+            {confirming.customer_name ?? "Customer"} · {confirming.offer_title} · {confirming.purpose === "growth_activation" ? "Growth Program Activation" : confirming.booking_id}
           </p>
           <p className="mt-3 text-sm text-muted">
-            Approving reserves this amount from available Merchant Credit. It does not confirm the booking or create
-            commission.
+            Approving reserves this amount from available Merchant Credit. It does not confirm the booking, consume
+            inventory, or activate Growth Program privileges.
           </p>
           <div className="mt-5 flex flex-col gap-3 sm:flex-row">
             <Button disabled={busyId === confirming.id} onClick={() => void decide(confirming.id, "approve")}>
@@ -328,7 +328,7 @@ function MerchantDashboard({
       ) : null}
 
       <Surface>
-        <h2 className="font-display text-xl font-semibold">Property payment requests</h2>
+        <h2 className="font-display text-xl font-semibold">Payment requests</h2>
         {pendingIncoming.length === 0 ? (
           <p className="mt-3 text-sm text-muted">No pending approval requests.</p>
         ) : (
@@ -339,7 +339,7 @@ function MerchantDashboard({
                   <div className="min-w-0">
                     <p className="font-medium">{request.offer_title}</p>
                     <p className="break-all text-sm text-muted">
-                      {request.customer_name ?? request.customer_user_id} · {request.booking_id}
+                      {request.customer_name ?? request.customer_user_id} · {request.purpose === "growth_activation" ? "Growth Program Activation" : request.booking_id}
                     </p>
                   </div>
                   <p className="font-display text-xl font-semibold tabular-nums">{formatBdt(request.amount)}</p>
@@ -446,6 +446,10 @@ function labelEntry(type: string) {
       return "Booking payment reserved";
     case "booking_payment_settled":
       return "Booking payment settled";
+    case "activation_payment_reserved":
+      return "Activation payment reserved";
+    case "activation_payment_settled":
+      return "Activation payment settled";
     case "reservation_released":
       return "Reservation released";
     case "reversal":

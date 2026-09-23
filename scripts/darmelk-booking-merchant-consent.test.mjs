@@ -51,7 +51,7 @@ test("Pay by Merchant requires Merchant Payment Terms before request/reserve", (
   assert.match(form, /Merchant Payment Terms/);
   assert.match(form, /\/terms\?key=merchant-payment/);
   assert.match(form, /disabled=\{pending \|\| !merchantTermsReady\}/);
-  assert.match(form, /allowMerchant = targetType === "booking"/);
+  assert.match(form, /methods.find\(\(method\) => method.method === "merchant"\)\?\.available/);
   assert.doesNotMatch(form.slice(form.indexOf("Submit for review") - 400, form.indexOf("Submit for review")), /Merchant Payment Terms/);
   assert.match(smoke, /Pay by Merchant without Merchant Payment Terms is rejected/);
   assert.match(smoke, /crafted Merchant accepted=true without Merchant Payment Terms is rejected/);

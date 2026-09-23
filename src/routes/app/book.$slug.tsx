@@ -6,8 +6,9 @@ import { OfferAvailabilityNote, OfferCommercialTerms, offerBookingCopy } from "@
 import { useMemberSession } from "@/components/layout/use-member";
 import { formatBdt, fromApiOffer, getOffer, isBookable, isSoldOut } from "@/lib/offers";
 import { api, ApiError } from "@/lib/api-client";
-import { PaymentForm } from "@/components/payment-form";
+import { PaymentForm, describePaymentOptions } from "@/components/payment-form";
 import { TermsAccept } from "@/components/terms-accept";
+import { useAsync } from "@/lib/use-async";
 
 const ACTIVATION_FEE = 1000;
 
@@ -34,6 +35,7 @@ function BookOfferPage() {
   const [error, setError] = useState<string | null>(null);
   const [bookingId, setBookingId] = useState<string | null>(null);
   const [accepted, setAccepted] = useState<Record<string, boolean>>({});
+  const { data: optionData } = useAsync(() => api.paymentOptions("booking"), []);
   const soldOut = isSoldOut(offer);
   const termsReady = Boolean(accepted.PROPERTY_BOOKING_TERMS);
 
@@ -90,7 +92,7 @@ function BookOfferPage() {
         <PageHeader
           kicker="Booking payment"
           title={offer.title}
-          description="Pay via Darmelk Bank or Pay by Merchant. Darmelk confirms the booking after review."
+          description={describePaymentOptions(optionData?.options, "booking")}
         />
         <PaymentForm targetType="booking" targetId={bookingId} amount={offer.bookingAmount} onSubmitted={() => setStep(4)} />
       </div>

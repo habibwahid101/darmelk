@@ -8,6 +8,7 @@ import {
   GitFork,
   Share2,
   Inbox,
+  Landmark,
   LayoutDashboard,
   Menu,
   Megaphone,
@@ -39,6 +40,7 @@ type AdminPath =
   | "/admin/documents"
   | "/admin/settings"
   | "/admin/payments"
+  | "/admin/payment-settings"
   | "/admin/merchant"
   | "/admin/promotions"
   | "/admin/withdrawals"
@@ -57,6 +59,7 @@ const NAV: NavItem[] = [
   { to: "/admin/offers", label: "Properties", icon: Building2 },
   { to: "/admin/bookings", label: "Bookings", icon: FileText },
   { to: "/admin/payments", label: "Payments", icon: CreditCard },
+  { to: "/admin/payment-settings", label: "Payment Settings", icon: Landmark },
   { to: "/admin/merchant", label: "Merchant Management", icon: Store },
   { to: "/admin/promotions", label: "Promotion Management", icon: Megaphone },
   { to: "/admin/withdrawals", label: "Withdrawals", icon: Wallet },

@@ -33,7 +33,9 @@ function AdminMerchantRequests() {
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="font-medium">{row.offer_title}</p>
-                  <p className="mt-1 break-all text-sm text-muted">Booking {row.booking_id}</p>
+                  <p className="mt-1 break-all text-sm text-muted">
+                    {row.purpose === "growth_activation" ? "Growth Program Activation" : `Booking ${row.booking_id}`}
+                  </p>
                   <p className="mt-1 text-sm text-muted">
                     Customer {row.customer_name ?? row.customer_user_id} · Merchant {row.merchant_name ?? row.merchant_user_id}
                   </p>

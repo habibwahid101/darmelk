@@ -9,7 +9,7 @@ import { formatBdt } from "@/lib/offers";
 import { formatWhen } from "@/lib/platform";
 import { api, ApiError } from "@/lib/api-client";
 import { useAsync } from "@/lib/use-async";
-import { PaymentForm } from "@/components/payment-form";
+import { PaymentForm, describePaymentOptions } from "@/components/payment-form";
 import { isGrowthParticipant } from "@/lib/growth";
 
 const ACTIVATION_FEE = 1000;
@@ -26,6 +26,8 @@ function ActivationPage() {
   const [accepted, setAccepted] = useState<Record<string, boolean>>({});
   const { data: activationData, reload: reloadActivations } = useAsync(() => api.myActivations(), [member?.user_id], { enabled: Boolean(member) });
   const { data: paymentData, reload: reloadPayments } = useAsync(() => api.myPayments(), [member?.user_id], { enabled: Boolean(member) });
+  const { data: merchantData, reload: reloadMerchant } = useAsync(() => api.myMerchant(), [member?.user_id], { enabled: Boolean(member) });
+  const { data: optionData } = useAsync(() => api.paymentOptions("activation"), []);
 
   if (!member) return null;
   if (!isGrowthParticipant(member)) return <Navigate to="/growth-program" />;
@@ -51,6 +53,9 @@ function ActivationPage() {
 
   const pendingActivation = createdId ? activationData?.activations.find((a) => a.id === createdId) : activationData?.activations.find((a) => a.status === "pending");
   const submittedPayment = pendingActivation ? paymentData?.payments.find((p) => p.target_type === "activation" && p.target_id === pendingActivation.id && p.status !== "rejected") : undefined;
+  const merchantRequest = pendingActivation
+    ? merchantData?.outgoingRequests.find((request) => request.activation_id === pendingActivation.id && ["pending", "approved", "settled"].includes(request.status))
+    : undefined;
 
   return (
     <div className="mx-auto max-w-2xl space-y-8">
@@ -97,16 +102,16 @@ function ActivationPage() {
               {pending ? "Submitting…" : member.activation_status === "expired" ? "Request Growth Program renewal" : "Request Growth Program Activation"}
             </Button>
           </div>
-        ) : member.activation_status === "pending" && submittedPayment ? (
+        ) : member.activation_status === "pending" && (submittedPayment || merchantRequest) ? (
           <p className="mt-6 text-sm text-muted">
             Activation payment submitted for verification. Growth Program privileges begin only after admin approval.
           </p>
         ) : null}
       </Surface>
-      {pendingActivation && !submittedPayment ? (
+      {pendingActivation && !submittedPayment && !merchantRequest ? (
         <div className="space-y-3">
-          <p className="text-sm text-muted">Pay with bKash, Nagad, or Darmelk Bank. Merchant cannot pay activation.</p>
-          <PaymentForm targetType="activation" targetId={pendingActivation.id} amount={pendingActivation.amount} onSubmitted={() => { reloadPayments(); reloadActivations(); }} />
+          <p className="text-sm text-muted">{describePaymentOptions(optionData?.options, "activation")}</p>
+          <PaymentForm targetType="activation" targetId={pendingActivation.id} amount={pendingActivation.amount} onSubmitted={() => { reloadPayments(); reloadActivations(); reloadMerchant(); }} />
         </div>
       ) : null}
       <p className="text-center text-sm text-muted">

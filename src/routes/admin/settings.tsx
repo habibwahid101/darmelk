@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { PageHeader, Surface } from "@/components/states";
 import { COMMISSION_LEVELS, TOTAL_POSITIONS, formatBdt } from "@/lib/offers";
 import { ACTIVATION_FEE, PERSONAL_SPONSOR_TARGET } from "@/lib/platform";
@@ -31,6 +31,12 @@ function AdminSettings() {
           <Row label="Qualification benefit" value="Member’s own booked offer" />
           <Row label="Growth Program Activation" value={formatBdt(ACTIVATION_FEE)} />
         </dl>
+      </Surface>
+      <Surface>
+        <p className="text-sm text-muted">Payment methods and receiving accounts are managed separately.</p>
+        <Link to="/admin/payment-settings" className="mt-3 inline-flex min-h-11 items-center font-medium text-pine hover:underline">
+          Open Payment Settings
+        </Link>
       </Surface>
     </div>
   );

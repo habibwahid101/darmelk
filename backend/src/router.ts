@@ -24,7 +24,7 @@ import { getPolicy, listCurrentPolicies, listUserConsents, policyBySlug, recordC
 import { getQualificationStatus, PERSONAL_SPONSOR_TARGET, TOTAL_POSITIONS } from "./engine/network.js";
 import { listLeadershipRewardSummaries, syncLeadershipReward } from "./engine/leadership.js";
 import { decideWithdrawal, markWithdrawalPaid, requestWithdrawal } from "./engine/withdrawals.js";
-import { createPaymentSubmission, finalizePayment, getPaymentProof, markPaymentUnderReview, destinationsForTarget, type PaymentMethod, type PaymentTarget } from "./engine/payments.js";
+import { createPaymentSubmission, finalizePayment, getPaymentProof, markPaymentUnderReview, type PaymentMethod, type PaymentTarget } from "./engine/payments.js";
 import { uid } from "./ids.js";
 import {
   addOfferMedia,
@@ -51,9 +51,11 @@ import {
   adjustMerchantCredit,
   approveMerchantPaymentRequest,
   bookingHasApprovedMerchantPayment,
+  activationHasApprovedMerchantPayment,
   confirmMerchantPurchase,
   createBundle,
   createMerchantPaymentRequest,
+  createMerchantActivationPaymentRequest,
   declineMerchantPaymentRequest,
   getBundle,
   getMerchantAdminDetail,
@@ -90,6 +92,17 @@ import {
   setPromotionStatus,
   updatePromotion,
 } from "./engine/promotions.js";
+import {
+  archiveReceivingAccount,
+  createReceivingAccount,
+  deleteUnusedReceivingAccount,
+  getEffectivePaymentOptions,
+  listAdminReceivingAccounts,
+  listLegacyDestinations,
+  listPaymentMethodSettings,
+  setPaymentMethodEnabled,
+  updateReceivingAccount,
+} from "./engine/payment-settings.js";
 
 type Vars = { userId: string; userEmail: string };
 const app = new Hono<{ Variables: Vars }>();
@@ -155,7 +168,14 @@ app.use("*", async (c, next) => {
 });
 
 app.get("/api/health", (c) => c.json({ ok: true, service: "darmelk-backend", time: new Date().toISOString() }));
-app.get("/api/payment-destinations", (c) => c.json({ destinations: destinationsForTarget(c.req.query("target")) }));
+app.get("/api/payment-destinations", async (c) => {
+  const destinations = await withTransaction((client) => listLegacyDestinations(client, c.req.query("target")));
+  return c.json({ destinations });
+});
+app.get("/api/payment-options", async (c) => {
+  const options = await withTransaction((client) => getEffectivePaymentOptions(client, c.req.query("target")));
+  return c.json({ options });
+});
 app.get("/api/terms", (c) => {
   const keys = (c.req.query("keys") ?? "")
     .split(",")
@@ -212,6 +232,12 @@ app.use("/api/withdrawals/*", async (c, next) => {
   await next();
 });
 app.use("/api/activation/*", async (c, next) => {
+  const user = await requireUser(c);
+  c.set("userId", user.id);
+  c.set("userEmail", user.email);
+  await next();
+});
+app.use("/api/payments", async (c, next) => {
   const user = await requireUser(c);
   c.set("userId", user.id);
   c.set("userEmail", user.email);
@@ -603,14 +629,34 @@ app.post("/api/bookings/:id/merchant-pay", async (c) => {
   return c.json(result.body, result.status as 200 | 201);
 });
 
+app.post("/api/activation/:id/merchant-pay", async (c) => {
+  const userId = c.get("userId");
+  const activationId = c.req.param("id");
+  const body = await jsonBody<{ merchantUserId?: string; acceptMerchantTerms?: boolean }>(c);
+  const result = await withTransaction((client) =>
+    withIdempotency(
+      client,
+      { key: c.req.header("Idempotency-Key"), endpoint: `POST /api/activation/${activationId}/merchant-pay`, userId, requestBody: body },
+      async () => {
+        const request = await createMerchantActivationPaymentRequest(client, userId, activationId, body.merchantUserId, {
+          acceptMerchantTerms: body.acceptMerchantTerms,
+        });
+        return { status: 201, body: { request } };
+      },
+    ),
+  );
+  return c.json(result.body, result.status as 200 | 201);
+});
+
 app.post("/api/payments", async (c) => {
   const userId = c.get("userId");
-  const body = await jsonBody<{ targetType?: PaymentTarget; targetId?: string; paymentMethod?: PaymentMethod; referenceId?: string; proofFilename?: string; proofMime?: string; proofBase64?: string; notes?: string }>(c);
+  const body = await jsonBody<{ targetType?: PaymentTarget; targetId?: string; paymentMethod?: PaymentMethod; receivingAccountId?: string; referenceId?: string; proofFilename?: string; proofMime?: string; proofBase64?: string; notes?: string }>(c);
   const result = await withTransaction((client) => withIdempotency(
     client,
     { key: c.req.header("Idempotency-Key"), endpoint: "POST /api/payments", userId, requestBody: body },
     async () => ({ status: 201, body: { payment: await createPaymentSubmission(client, userId, {
-      targetType: body.targetType as PaymentTarget, targetId: body.targetId ?? "", paymentMethod: body.paymentMethod as PaymentMethod,
+      targetType: body.targetType as PaymentTarget, targetId: body.targetId ?? "", paymentMethod: body.paymentMethod,
+      receivingAccountId: body.receivingAccountId,
       referenceId: body.referenceId, proofFilename: body.proofFilename, proofMime: body.proofMime,
       proofBase64: body.proofBase64, notes: body.notes,
     }) } }),
@@ -797,6 +843,9 @@ app.get("/api/admin/activations", async (c) => {
   await withTransaction((client) => requireAdmin(client, adminId));
   const rows = await query(
     `select a.*, u.name as user_name, u.email as user_email,
+            (select mpr.status from merchant_payment_requests mpr
+              where mpr.activation_id = a.id
+              order by mpr.created_at desc limit 1) as merchant_request_status,
             coalesce((
               select json_agg(json_build_object(
                 'document_key', c.document_key,
@@ -832,7 +881,8 @@ app.post("/api/admin/activations/:id/:decision", async (c) => {
     await requireAdmin(client, adminId);
     if (decisionParam === "approve") {
       const paid = await client.query(`select 1 from payment_submissions where target_type='activation' and target_id=$1 and status='approved'`, [activationId]);
-      if (!paid.rows[0]) throw badRequest("Approved activation payment is required");
+      const merchantPaid = await activationHasApprovedMerchantPayment(client, activationId);
+      if (!paid.rows[0] && !merchantPaid) throw badRequest("Approved activation payment is required");
     }
     const result =
       decisionParam === "approve"
@@ -852,7 +902,7 @@ app.post("/api/admin/activations/:id/:decision", async (c) => {
 app.get("/api/admin/payments", async (c) => {
   await withTransaction((client) => requireAdmin(client, c.get("userId")));
   const rows = await query(
-    `select p.id,p.target_type,p.target_id,p.user_id,p.amount,p.payment_method,p.destination_snapshot,
+    `select p.id,p.target_type,p.target_id,p.user_id,p.amount,p.payment_method,p.receiving_account_id,p.destination_snapshot,
        p.reference_id,p.proof_filename,p.proof_mime,p.notes,p.status,p.submitted_at,p.reviewed_at,
        p.reviewed_by_admin_id,p.rejection_reason,u.name as user_name,u.email as user_email
        from payment_submissions p join "user" u on u.id=p.user_id order by p.submitted_at desc`,
@@ -893,6 +943,67 @@ app.post("/api/admin/payments/:id/:decision", async (c) => {
     return result;
   });
   return c.json({ payment });
+});
+
+app.get("/api/admin/payment-settings", async (c) => {
+  const adminId = c.get("userId");
+  const result = await withTransaction(async (client) => {
+    await requireAdmin(client, adminId);
+    const settings = await listPaymentMethodSettings(client);
+    const accounts = await listAdminReceivingAccounts(client);
+    const activation = await getEffectivePaymentOptions(client, "growth_activation");
+    const booking = await getEffectivePaymentOptions(client, "growth_booking");
+    return { settings, accounts, effective: { activation, booking } };
+  });
+  return c.json(result);
+});
+
+app.post("/api/admin/payment-settings/methods", async (c) => {
+  const adminId = c.get("userId");
+  const body = await jsonBody<{ context?: string; method?: string; enabled?: boolean }>(c);
+  const setting = await withTransaction(async (client) => {
+    await requireAdmin(client, adminId);
+    return setPaymentMethodEnabled(client, adminId, body);
+  });
+  return c.json({ setting });
+});
+
+app.post("/api/admin/payment-settings/accounts", async (c) => {
+  const adminId = c.get("userId");
+  const body = await jsonBody<Record<string, unknown>>(c);
+  const account = await withTransaction(async (client) => {
+    await requireAdmin(client, adminId);
+    return createReceivingAccount(client, adminId, body);
+  });
+  return c.json({ account }, 201);
+});
+
+app.post("/api/admin/payment-settings/accounts/:id", async (c) => {
+  const adminId = c.get("userId");
+  const body = await jsonBody<Record<string, unknown>>(c);
+  const account = await withTransaction(async (client) => {
+    await requireAdmin(client, adminId);
+    return updateReceivingAccount(client, adminId, c.req.param("id"), body);
+  });
+  return c.json({ account });
+});
+
+app.post("/api/admin/payment-settings/accounts/:id/archive", async (c) => {
+  const adminId = c.get("userId");
+  const account = await withTransaction(async (client) => {
+    await requireAdmin(client, adminId);
+    return archiveReceivingAccount(client, adminId, c.req.param("id"));
+  });
+  return c.json({ account });
+});
+
+app.post("/api/admin/payment-settings/accounts/:id/delete", async (c) => {
+  const adminId = c.get("userId");
+  await withTransaction(async (client) => {
+    await requireAdmin(client, adminId);
+    await deleteUnusedReceivingAccount(client, adminId, c.req.param("id"));
+  });
+  return c.json({ ok: true });
 });
 
 

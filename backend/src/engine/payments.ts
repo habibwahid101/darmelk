@@ -1,7 +1,15 @@
 import type { PoolClient } from "pg";
 import { badRequest, conflict, forbidden, notFound } from "../errors.js";
 import { uid } from "../ids.js";
+import {
+  ACCOUNT_UNAVAILABLE,
+  METHOD_UNAVAILABLE,
+  resolveReceivingAccount,
+  submissionPaymentMethod,
+  type PaymentTarget as SettingsPaymentTarget,
+} from "./payment-settings.js";
 
+/** Seed documentation only. Runtime destinations come from receiving_accounts. */
 export const PAYMENT_DESTINATIONS = {
   bkash: { method: "bkash", label: "bKash Merchant", account: "01813212777", accountType: "Merchant" },
   nagad: { method: "nagad", label: "Nagad Merchant", account: "01813212777", accountType: "Merchant" },
@@ -16,8 +24,8 @@ export const PAYMENT_DESTINATIONS = {
   },
 } as const;
 
-export type PaymentMethod = keyof typeof PAYMENT_DESTINATIONS;
-export type PaymentTarget = "activation" | "booking" | "merchant_bundle";
+export type PaymentMethod = string;
+export type PaymentTarget = SettingsPaymentTarget;
 
 const ALLOWED_MIME = new Set(["image/jpeg", "image/png", "image/webp", "application/pdf"]);
 const MAX_PROOF_BYTES = 4 * 1024 * 1024;
@@ -29,6 +37,7 @@ export type PaymentSubmission = {
   user_id: string;
   amount: number;
   payment_method: PaymentMethod;
+  receiving_account_id?: string | null;
   destination_snapshot: Record<string, unknown>;
   reference_id: string;
   proof_filename: string;
@@ -40,37 +49,6 @@ export type PaymentSubmission = {
   reviewed_by_admin_id: string | null;
   rejection_reason: string | null;
 };
-
-export function destinationsForTarget(target?: string | null) {
-  const all = Object.values(PAYMENT_DESTINATIONS);
-  if (target === "booking") return all.filter((d) => d.method === "bank");
-  return all;
-}
-
-export function assertPaymentMethodForTarget(targetType: PaymentTarget, method: unknown): PaymentMethod {
-  if (targetType === "activation" && method === "merchant") {
-    throw badRequest(
-      "Growth Program Activation can be paid via bKash, Nagad, or Darmelk Bank",
-      "payment_method_not_allowed",
-    );
-  }
-  if (method !== "bkash" && method !== "nagad" && method !== "bank") {
-    throw badRequest("Unsupported payment method", "unsupported_payment_method");
-  }
-  if (targetType === "booking" && method !== "bank") {
-    throw badRequest(
-      "This booking can be paid via Darmelk Bank or Pay by Merchant",
-      "payment_method_not_allowed",
-    );
-  }
-  if (targetType === "activation" && method !== "bkash" && method !== "nagad" && method !== "bank") {
-    throw badRequest(
-      "Growth Program Activation can be paid via bKash, Nagad, or Darmelk Bank",
-      "payment_method_not_allowed",
-    );
-  }
-  return method;
-}
 
 function cleanText(value: unknown, field: string, max: number): string {
   if (typeof value !== "string" || !value.trim()) throw badRequest(`${field} is required`);
@@ -85,7 +63,8 @@ export async function createPaymentSubmission(
   input: {
     targetType: PaymentTarget;
     targetId: string;
-    paymentMethod: PaymentMethod;
+    paymentMethod?: unknown;
+    receivingAccountId?: unknown;
     referenceId: unknown;
     proofFilename: unknown;
     proofMime: unknown;
@@ -93,8 +72,20 @@ export async function createPaymentSubmission(
     notes?: unknown;
   },
 ): Promise<PaymentSubmission> {
-  const paymentMethod = assertPaymentMethodForTarget(input.targetType, input.paymentMethod);
-  const destination = PAYMENT_DESTINATIONS[paymentMethod];
+  if (String(input.paymentMethod ?? "").trim().toLowerCase() === "merchant") {
+    throw badRequest(METHOD_UNAVAILABLE, "payment_method_not_allowed");
+  }
+  const targetType = input.targetType;
+  if (targetType !== "activation" && targetType !== "booking" && targetType !== "merchant_bundle") {
+    throw badRequest("Unsupported payment target");
+  }
+  const resolved = await resolveReceivingAccount(client, {
+    targetType,
+    receivingAccountId: input.receivingAccountId,
+    paymentMethod: input.paymentMethod,
+  });
+  const paymentMethod = submissionPaymentMethod(resolved.account);
+  const destination = resolved.snapshot;
   const targetId = cleanText(input.targetId, "targetId", 120);
   const referenceId = cleanText(input.referenceId, "referenceId", 120);
   const proofFilename = cleanText(input.proofFilename, "proofFilename", 180);
@@ -114,6 +105,12 @@ export async function createPaymentSubmission(
     if (!target || target.user_id !== userId) throw notFound("Activation request not found");
     if (target.status !== "pending") throw conflict(`Activation is ${target.status}`);
     amount = target.amount;
+    const openMerchant = await client.query(
+      `select 1 from merchant_payment_requests
+        where activation_id = $1 and status in ('pending', 'approved', 'settled')`,
+      [targetId],
+    );
+    if (openMerchant.rows[0]) throw conflict("A Merchant payment request is already open for this activation");
   } else if (input.targetType === "booking") {
     const { rows } = await client.query<{ user_id: string; booking_amount: number; status: string }>(
       `select user_id, booking_amount, status from bookings where id = $1 for update`, [targetId],
@@ -143,12 +140,12 @@ export async function createPaymentSubmission(
 
   const { rows } = await client.query<PaymentSubmission>(
     `insert into payment_submissions
-      (id, target_type, target_id, user_id, amount, payment_method, destination_snapshot,
+      (id, target_type, target_id, user_id, amount, payment_method, receiving_account_id, destination_snapshot,
        reference_id, proof_filename, proof_mime, proof_data, notes, status)
-     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'submitted') returning
-       id,target_type,target_id,user_id,amount,payment_method,destination_snapshot,reference_id,
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,'submitted') returning
+       id,target_type,target_id,user_id,amount,payment_method,receiving_account_id,destination_snapshot,reference_id,
        proof_filename,proof_mime,notes,status,submitted_at,reviewed_at,reviewed_by_admin_id,rejection_reason`,
-    [uid("pay"), input.targetType, targetId, userId, amount, paymentMethod,
+    [uid("pay"), input.targetType, targetId, userId, amount, paymentMethod, resolved.account.id,
       JSON.stringify(destination), referenceId, proofFilename, proofMime, proof, notes],
   );
   return rows[0]!;
@@ -171,7 +168,7 @@ export async function markPaymentUnderReview(client: PoolClient, paymentId: stri
   const { rows } = await client.query<PaymentSubmission>(
     `update payment_submissions set status = 'under_review', reviewed_by_admin_id = $2
       where id = $1 and status = 'submitted' returning
-       id,target_type,target_id,user_id,amount,payment_method,destination_snapshot,reference_id,
+       id,target_type,target_id,user_id,amount,payment_method,receiving_account_id,destination_snapshot,reference_id,
        proof_filename,proof_mime,notes,status,submitted_at,reviewed_at,reviewed_by_admin_id,rejection_reason`,
     [paymentId, adminId],
   );
@@ -194,9 +191,11 @@ export async function finalizePayment(
   const { rows: updated } = await client.query<PaymentSubmission>(
     `update payment_submissions set status = $2, reviewed_at = now(), reviewed_by_admin_id = $3,
        rejection_reason = $4 where id = $1 returning
-       id,target_type,target_id,user_id,amount,payment_method,destination_snapshot,reference_id,
+       id,target_type,target_id,user_id,amount,payment_method,receiving_account_id,destination_snapshot,reference_id,
        proof_filename,proof_mime,notes,status,submitted_at,reviewed_at,reviewed_by_admin_id,rejection_reason`,
     [paymentId, status, adminId, status === "rejected" ? reason!.trim().slice(0, 500) : null],
   );
   return updated[0]!;
 }
+
+export { ACCOUNT_UNAVAILABLE, METHOD_UNAVAILABLE };

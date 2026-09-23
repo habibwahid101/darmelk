@@ -42,6 +42,8 @@ function AdminMerchantLedger() {
               <option value="bonus_credit_issued">Bonus issued</option>
               <option value="booking_payment_reserved">Reserved</option>
               <option value="booking_payment_settled">Settled</option>
+              <option value="activation_payment_reserved">Activation reserved</option>
+              <option value="activation_payment_settled">Activation settled</option>
               <option value="reservation_released">Released</option>
               <option value="reversal">Reversal</option>
               <option value="admin_adjustment">Adjustment</option>
