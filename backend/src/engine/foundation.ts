@@ -192,6 +192,9 @@ export async function listFoundationRegistry(client: PoolClient): Promise<Founda
 export async function validateFoundation(client: PoolClient): Promise<{
   ok: boolean;
   errors: string[];
+  warnings: string[];
+  foundationBookings: number;
+  foundationStandardActivationRows: number;
   byLevel: Record<0 | 1 | 2 | 3 | 4, number>;
   active: number;
   commissionEligible: number;
@@ -312,21 +315,29 @@ export async function validateFoundation(client: PoolClient): Promise<{
     : null;
   if (!sampleReferral) errors.push("HW-2.3.1.2 referral missing");
 
-  const fakePays = await client.query<{ count: string }>(
+  // Post-launch activity is not a foundation-integrity failure. Foundation
+  // accounts are permanent members and may book, earn, or keep historical
+  // BDT 1000 activation rows. One-time bootstrap emptiness is not re-checked here.
+  const standardActivations = await client.query<{ count: string }>(
     `select count(*)::text as count from annual_activations a
        join "user" u on u.id = a.user_id
       where (u.name = $1 or u.name ~ '^HW-[0-9]') and a.amount = 1000`,
     [FOUNDATION_ROOT_LABEL],
   );
-  if (Number(fakePays.rows[0]?.count ?? 0) > 0) errors.push("fake BDT 1000 activation payments exist for foundation accounts");
-
-  const fakeBookings = await client.query<{ count: string }>(
+  const foundationStandardActivationRows = Number(standardActivations.rows[0]?.count ?? 0);
+  const bookingRows = await client.query<{ count: string }>(
     `select count(*)::text as count from bookings b
        join "user" u on u.id = b.user_id
       where u.name = $1 or u.name ~ '^HW-[0-9]'`,
     [FOUNDATION_ROOT_LABEL],
   );
-  if (Number(fakeBookings.rows[0]?.count ?? 0) > 0) errors.push("fake foundation bookings exist");
+  const foundationBookings = Number(bookingRows.rows[0]?.count ?? 0);
+  const warnings: string[] = [];
+  if (foundationStandardActivationRows > 0) {
+    warnings.push(
+      `${foundationStandardActivationRows} historical BDT 1000 annual activation row(s) exist for foundation accounts. Diagnostic only; foundation sentinel and activation status remain the integrity check.`,
+    );
+  }
 
   const wallets = rows.length;
   if (credentials !== rows.length) errors.push(`credential accounts ${credentials}/${rows.length}`);
@@ -334,6 +345,9 @@ export async function validateFoundation(client: PoolClient): Promise<{
   return {
     ok: errors.length === 0,
     errors,
+    warnings,
+    foundationBookings,
+    foundationStandardActivationRows,
     byLevel,
     active,
     commissionEligible,

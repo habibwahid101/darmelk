@@ -685,6 +685,9 @@ export const api = {
         validation: {
           ok: boolean;
           errors: string[];
+          warnings: string[];
+          foundationBookings: number;
+          foundationStandardActivationRows: number;
           byLevel: Record<0 | 1 | 2 | 3 | 4, number>;
           active: number;
           commissionEligible: number;
