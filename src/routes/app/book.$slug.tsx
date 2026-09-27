@@ -6,7 +6,7 @@ import { OfferAvailabilityNote, OfferCommercialTerms, offerBookingCopy } from "@
 import { useMemberSession } from "@/components/layout/use-member";
 import { formatBdt, fromApiOffer, getOffer, isBookable, isSoldOut } from "@/lib/offers";
 import { api, ApiError, type MerchantPaymentRequest } from "@/lib/api-client";
-import { PaymentForm, MerchantRequestStatus, describePaymentOptions } from "@/components/payment-form";
+import { PaymentForm, MerchantRequestStatus, MERCHANT_REQUEST_ALREADY_SUBMITTED, MERCHANT_REQUEST_SUBMITTED, describePaymentOptions } from "@/components/payment-form";
 import { TermsAccept } from "@/components/terms-accept";
 import { useAsync } from "@/lib/use-async";
 
@@ -35,6 +35,7 @@ function BookOfferPage() {
   const [error, setError] = useState<string | null>(null);
   const [bookingId, setBookingId] = useState<string | null>(null);
   const [merchantRequest, setMerchantRequest] = useState<MerchantPaymentRequest | null>(null);
+  const [merchantAlreadyOpen, setMerchantAlreadyOpen] = useState(false);
   const [accepted, setAccepted] = useState<Record<string, boolean>>({});
   const { data: optionData } = useAsync(() => api.paymentOptions("booking"), []);
   const soldOut = isSoldOut(offer);
@@ -64,7 +65,13 @@ function BookOfferPage() {
     return (
       <div className="mx-auto max-w-xl space-y-6">
         <SuccessBanner
-          title={merchantRequest ? "Merchant payment request sent" : "Payment submitted"}
+          title={
+            merchantRequest
+              ? merchantAlreadyOpen
+                ? MERCHANT_REQUEST_ALREADY_SUBMITTED
+                : MERCHANT_REQUEST_SUBMITTED
+              : "Payment submitted"
+          }
           description={
             merchantRequest
               ? "The selected Merchant can approve or decline this request. The booking stays pending until Darmelk confirms it."
@@ -100,7 +107,7 @@ function BookOfferPage() {
           title={offer.title}
           description={describePaymentOptions(optionData?.options, "booking")}
         />
-        <PaymentForm targetType="booking" targetId={bookingId} amount={offer.bookingAmount} onSubmitted={(result) => { setMerchantRequest(result?.merchantRequest ?? null); setStep(4); }} />
+        <PaymentForm targetType="booking" targetId={bookingId} amount={offer.bookingAmount} onSubmitted={(result) => { setMerchantRequest(result?.merchantRequest ?? null); setMerchantAlreadyOpen(result?.alreadyOpen === true); setStep(4); }} />
       </div>
     );
   }

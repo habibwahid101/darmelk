@@ -82,6 +82,7 @@ export type MerchantPaymentRequest = {
   customer_email?: string;
   merchant_name?: string;
   merchant_email?: string;
+  alreadyOpen?: boolean;
 };
 
 export type MerchantLedgerEntry = {
@@ -580,6 +581,10 @@ async function presentMerchantRequest(
   return rows[0] ?? request;
 }
 
+function markRequest(request: MerchantPaymentRequest, alreadyOpen: boolean): MerchantPaymentRequest {
+  return Object.assign(request, { alreadyOpen });
+}
+
 async function openMerchantRequestForBooking(
   client: PoolClient,
   bookingId: string,
@@ -653,7 +658,7 @@ export async function createMerchantPaymentRequest(
   const openMerchant = await openMerchantRequestForBooking(client, booking.id);
   if (openMerchant) {
     if (openMerchant.customer_user_id !== customerUserId) throw notFound("Booking not found");
-    return presentMerchantRequest(client, openMerchant);
+    return markRequest(await presentMerchantRequest(client, openMerchant), true);
   }
   await assertRailAvailable(client, "booking", "merchant");
 
@@ -695,11 +700,11 @@ export async function createMerchantPaymentRequest(
        returning *`,
       [uid("mpr"), booking.id, customerUserId, merchantUserId, booking.booking_amount, booking.offer_slug, offerTitle],
     );
-    return presentMerchantRequest(client, rows[0]!);
+    return markRequest(await presentMerchantRequest(client, rows[0]!), false);
   } catch (err) {
     if ((err as { code?: string }).code === "23505") {
       const existing = await openMerchantRequestForBooking(client, booking.id);
-      if (existing && existing.customer_user_id === customerUserId) return presentMerchantRequest(client, existing);
+      if (existing && existing.customer_user_id === customerUserId) return markRequest(await presentMerchantRequest(client, existing), true);
       throw conflict("A Merchant payment request is already open for this booking");
     }
     throw err;
@@ -740,7 +745,7 @@ export async function createMerchantActivationPaymentRequest(
   const openMerchant = await openMerchantRequestForActivation(client, activation.id);
   if (openMerchant) {
     if (openMerchant.customer_user_id !== customerUserId) throw notFound("Activation request not found");
-    return presentMerchantRequest(client, openMerchant);
+    return markRequest(await presentMerchantRequest(client, openMerchant), true);
   }
   await assertRailAvailable(client, "activation", "merchant");
 
@@ -782,15 +787,32 @@ export async function createMerchantActivationPaymentRequest(
        returning *`,
       [uid("mpr"), activation.id, customerUserId, merchantUserId, activation.amount],
     );
-    return presentMerchantRequest(client, rows[0]!);
+    return markRequest(await presentMerchantRequest(client, rows[0]!), false);
   } catch (err) {
     if ((err as { code?: string }).code === "23505") {
       const existing = await openMerchantRequestForActivation(client, activation.id);
-      if (existing && existing.customer_user_id === customerUserId) return presentMerchantRequest(client, existing);
+      if (existing && existing.customer_user_id === customerUserId) return markRequest(await presentMerchantRequest(client, existing), true);
       throw conflict("A Merchant payment request is already open for this activation");
     }
     throw err;
   }
+}
+
+async function completeMerchantFundedActivation(
+  client: PoolClient,
+  activationId: string,
+  actorUserId: string,
+): Promise<void> {
+  const { rows } = await client.query<{ status: string }>(
+    `select status from annual_activations where id = $1 for update`,
+    [activationId],
+  );
+  const activation = rows[0];
+  if (!activation) throw conflict("Activation is no longer awaiting payment");
+  if (activation.status === "active") return;
+  if (activation.status !== "pending") throw conflict(`Activation is ${activation.status}`);
+  const { approveActivation } = await import("./activation.js");
+  await approveActivation(client, activationId, actorUserId);
 }
 
 export async function approveMerchantPaymentRequest(
@@ -805,7 +827,13 @@ export async function approveMerchantPaymentRequest(
   const request = rows[0];
   if (!request) throw notFound("Merchant payment request not found");
   if (request.merchant_user_id !== merchantUserId) throw forbidden("Only the intended Merchant may approve this request");
-  if (request.status === "approved" || request.status === "settled") return request;
+  if (request.status === "approved" || request.status === "settled") {
+    if ((request.purpose === "growth_activation" || request.activation_id) && request.activation_id) {
+      await completeMerchantFundedActivation(client, request.activation_id, merchantUserId);
+      return presentMerchantRequest(client, request);
+    }
+    return request;
+  }
   if (request.status !== "pending") throw conflict(`Request is ${request.status}`);
 
   if (request.purpose === "growth_activation" || request.activation_id) {
@@ -815,6 +843,7 @@ export async function approveMerchantPaymentRequest(
     );
     const activation = activationRows[0];
     if (!activation || activation.status !== "pending") throw conflict("Activation is no longer awaiting payment");
+    await assertRailAvailable(client, "activation", "merchant");
 
     const { rows: merchantRows } = await client.query<MerchantAccount>(
       `select * from merchants where user_id = $1 for update`,
@@ -846,7 +875,8 @@ export async function approveMerchantPaymentRequest(
       idempotencyKey: `reserve:${request.id}`,
       requireActive: true,
     });
-    return updatedActivation[0];
+    await completeMerchantFundedActivation(client, request.activation_id!, merchantUserId);
+    return presentMerchantRequest(client, updatedActivation[0]);
   }
 
   const { rows: bookingRows } = await client.query<{ status: string }>(

@@ -629,7 +629,7 @@ app.post("/api/bookings/:id/merchant-pay", async (c) => {
         const request = await createMerchantPaymentRequest(client, userId, bookingId, body.merchantUserId, {
           acceptMerchantTerms: body.acceptMerchantTerms,
         });
-        return { status: 201, body: { request } };
+        return { status: 201, body: { request, alreadyOpen: request.alreadyOpen === true } };
       },
     ),
   );
@@ -648,7 +648,7 @@ app.post("/api/activation/:id/merchant-pay", async (c) => {
         const request = await createMerchantActivationPaymentRequest(client, userId, activationId, body.merchantUserId, {
           acceptMerchantTerms: body.acceptMerchantTerms,
         });
-        return { status: 201, body: { request } };
+        return { status: 201, body: { request, alreadyOpen: request.alreadyOpen === true } };
       },
     ),
   );

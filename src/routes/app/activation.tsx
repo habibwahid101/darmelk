@@ -9,7 +9,7 @@ import { formatBdt } from "@/lib/offers";
 import { formatWhen } from "@/lib/platform";
 import { api, ApiError, type MerchantPaymentRequest } from "@/lib/api-client";
 import { useAsync } from "@/lib/use-async";
-import { PaymentForm, MerchantRequestStatus, describePaymentOptions } from "@/components/payment-form";
+import { PaymentForm, MerchantRequestStatus, MERCHANT_REQUEST_ALREADY_SUBMITTED, MERCHANT_REQUEST_SUBMITTED, describePaymentOptions } from "@/components/payment-form";
 import { isGrowthParticipant } from "@/lib/growth";
 
 const ACTIVATION_FEE = 1000;
@@ -24,6 +24,7 @@ function ActivationPage() {
   const [error, setError] = useState<string | null>(null);
   const [createdId, setCreatedId] = useState<string | null>(null);
   const [createdMerchantRequest, setCreatedMerchantRequest] = useState<MerchantPaymentRequest | null>(null);
+  const [merchantAlreadyOpen, setMerchantAlreadyOpen] = useState(false);
   const [accepted, setAccepted] = useState<Record<string, boolean>>({});
   const { data: activationData, reload: reloadActivations } = useAsync(() => api.myActivations(), [member?.user_id], { enabled: Boolean(member) });
   const { data: paymentData, reload: reloadPayments } = useAsync(() => api.myPayments(), [member?.user_id], { enabled: Boolean(member) });
@@ -54,11 +55,11 @@ function ActivationPage() {
 
   const pendingActivation = createdId ? activationData?.activations.find((a) => a.id === createdId) : activationData?.activations.find((a) => a.status === "pending");
   const submittedPayment = pendingActivation ? paymentData?.payments.find((p) => p.target_type === "activation" && p.target_id === pendingActivation.id && p.status !== "rejected") : undefined;
-  const merchantRequest = createdMerchantRequest?.activation_id === pendingActivation?.id
-    ? createdMerchantRequest
-    : pendingActivation
-      ? merchantData?.outgoingRequests.find((request) => request.activation_id === pendingActivation.id && ["pending", "approved", "settled", "declined"].includes(request.status))
-      : undefined;
+  const serverRequest = pendingActivation
+    ? merchantData?.outgoingRequests.find((request) => request.activation_id === pendingActivation.id && ["pending", "approved", "settled", "declined"].includes(request.status))
+    : undefined;
+  const merchantRequest = serverRequest
+    ?? (createdMerchantRequest?.activation_id === pendingActivation?.id ? createdMerchantRequest : undefined);
 
   return (
     <div className="mx-auto max-w-2xl space-y-8">
@@ -108,16 +109,25 @@ function ActivationPage() {
         ) : member.activation_status === "pending" && (submittedPayment || merchantRequest) ? (
           <p className="mt-6 text-sm text-muted">
             {merchantRequest
-              ? "Merchant approval reserves credit only. Growth Program privileges begin only after Darmelk confirms the activation."
+              ? merchantRequest.status === "declined"
+                ? "This Merchant declined the request. Growth Program Activation was not completed."
+                : merchantRequest.status === "pending"
+                  ? "Waiting for this Merchant. Approval completes Growth Program Activation. No separate Darmelk approval is required."
+                  : "Growth Program Activation is complete."
               : "Activation payment submitted for verification. Growth Program privileges begin only after admin approval."}
           </p>
         ) : null}
       </Surface>
+      {createdMerchantRequest && createdMerchantRequest.activation_id === pendingActivation?.id ? (
+        <p className="text-sm font-medium" role="status">
+          {merchantAlreadyOpen ? MERCHANT_REQUEST_ALREADY_SUBMITTED : MERCHANT_REQUEST_SUBMITTED}
+        </p>
+      ) : null}
       {merchantRequest ? <MerchantRequestStatus request={merchantRequest} /> : null}
       {pendingActivation && !submittedPayment && !(merchantRequest && ["pending", "approved", "settled"].includes(merchantRequest.status)) ? (
         <div className="space-y-3">
           <p className="text-sm text-muted">{describePaymentOptions(optionData?.options, "activation")}</p>
-          <PaymentForm targetType="activation" targetId={pendingActivation.id} amount={pendingActivation.amount} onSubmitted={(result) => { if (result?.merchantRequest) setCreatedMerchantRequest(result.merchantRequest); reloadPayments(); reloadActivations(); reloadMerchant(); }} />
+          <PaymentForm targetType="activation" targetId={pendingActivation.id} amount={pendingActivation.amount} onSubmitted={(result) => { if (result?.merchantRequest) setCreatedMerchantRequest(result.merchantRequest); setMerchantAlreadyOpen(result?.alreadyOpen === true); reloadPayments(); reloadActivations(); reloadMerchant(); }} />
         </div>
       ) : null}
       <p className="text-center text-sm text-muted">

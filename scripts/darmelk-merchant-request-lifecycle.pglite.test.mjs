@@ -65,8 +65,11 @@ test("merchant request UI returns and renders the persisted status", () => {
     engine.indexOf("export async function declineMerchantPaymentRequest"),
   );
   assert.match(form, /Pending Merchant Approval/);
-  assert.match(form, /onSubmitted\(\{ merchantRequest: created\.request \}\)/);
-  assert.match(book, /Merchant payment request sent/);
+  assert.match(form, /Payment request has been submitted successfully\./);
+  assert.match(form, /Your payment request has already been submitted\./);
+  assert.match(form, /alreadyOpen: created\.alreadyOpen === true/);
+  assert.match(book, /MERCHANT_REQUEST_SUBMITTED/);
+  assert.match(book, /MERCHANT_REQUEST_ALREADY_SUBMITTED/);
   assert.match(book, /MerchantRequestStatus/);
   assert.match(detail, /error\.status === 404/);
   assert.match(detail, /Could not load this booking/);
@@ -75,10 +78,23 @@ test("merchant request UI returns and renders the persisted status", () => {
   assert.match(merchantPage, /request\.status === "pending"/);
   assert.doesNotMatch(create, /join offers/);
   assert.match(create, /from bookings/);
-  assert.match(create, /return presentMerchantRequest/);
-  assert.doesNotMatch(approve, /confirmBooking|activateBooking|consumeInventoryForConfirmation|evaluatePromotions|postCommissions|approveActivation/);
+  assert.match(create, /markRequest\(/);
+  const activationApprove = approve.slice(0, approve.indexOf("select status from bookings"));
+  const bookingApprove = approve.slice(approve.indexOf("select status from bookings"));
+  assert.match(activationApprove, /completeMerchantFundedActivation/);
+  assert.match(engine, /const \{ approveActivation \} = await import\("\.\/activation\.js"\)/);
+  assert.doesNotMatch(bookingApprove, /confirmBooking|activateBooking|consumeInventoryForConfirmation|evaluatePromotions|postCommissions|approveActivation|completeMerchantFundedActivation/);
   assert.match(read("backend/src/engine/bookings.ts"), /await settleMerchantPaymentForBooking\(client, bookingId\)/);
   assert.match(read("backend/src/engine/activation.ts"), /await settleMerchantPaymentForActivation\(client, activationId\)/);
+  const referral = read("src/components/referral-share.tsx");
+  assert.match(referral, /Copy code/);
+  assert.match(referral, /Copy link/);
+  assert.match(referral, /referralLinkFor\(code, REFERRAL_ORIGIN\)/);
+  assert.match(read("src/lib/referral.ts"), /https:\/\/darmelk.com/);
+  assert.doesNotMatch(referral, /navigator\.share|Share referral link/);
+  assert.match(read("src/routes/app/network.tsx"), /ReferralShareCard/);
+  assert.match(read("src/routes/app/settings.tsx"), /ReferralShareCard/);
+  assert.match(read("src/routes/join.$code.tsx"), /ref: String\(params\.code \?\? ""\)\.trim\(\)\.toUpperCase\(\)/);
 });
 
 test("PGlite: merchant payment request lifecycle", async () => {
@@ -137,6 +153,8 @@ test("PGlite: merchant payment request lifecycle", async () => {
     acceptMerchantTerms: true,
   });
   assert.equal(again.id, created.id);
+  assert.equal(again.alreadyOpen, true);
+  assert.equal(created.alreadyOpen, false);
   assert.equal(await count(db, `select count(*)::int as n from merchant_payment_requests where booking_id = 'bk_life_ok'`), 1);
 
   const intended = await merchant.listMerchantDashboard(db, "user_merchant");
@@ -218,17 +236,98 @@ test("PGlite: merchant payment request lifecycle", async () => {
   await db.query(
     `update payment_method_settings set enabled = true where context = 'growth_activation' and method = 'merchant'`,
   );
+  await db.query(`update members set activation_status = 'pending' where user_id = 'user_customer'`);
+  await db.query(
+    `insert into annual_activations (id, user_id, amount, period_start, period_end, status)
+     values ('act_decline', 'user_customer', 1000, now(), now() + interval '1 year', 'pending'),
+            ('act_short', 'user_customer', 1000, now(), now() + interval '1 year', 'pending'),
+            ('act_off', 'user_customer', 1000, now(), now() + interval '1 year', 'pending')`,
+  );
+  const bookingsBeforeActivation = await count(db, `select count(*)::int as n from bookings`);
+  const inventoryBeforeActivation = await count(db, `select count(*)::int as n from offer_inventory_events`);
+  const commissionsBeforeActivation = await count(db, `select count(*)::int as n from commission_ledger`);
+
+  const declinedActivation = await merchant.createMerchantActivationPaymentRequest(db, "user_customer", "act_decline", "user_merchant", {
+    acceptMerchantTerms: true,
+  });
+  assert.equal((await merchant.listMerchantDashboard(db, "user_other")).incomingRequests.some((row) => row.id === declinedActivation.id), false);
+  await assert.rejects(
+    () => merchant.approveMerchantPaymentRequest(db, "user_other", declinedActivation.id),
+    (err) => err.status === 403,
+  );
+  const declinedActivationResult = await merchant.declineMerchantPaymentRequest(db, "user_merchant", declinedActivation.id);
+  assert.equal(declinedActivationResult.status, "declined");
+  assert.equal((await db.query(`select status from annual_activations where id = 'act_decline'`)).rows[0].status, "pending");
+  assert.equal((await db.query(`select activation_status from members where user_id = 'user_customer'`)).rows[0].activation_status, "pending");
+  assert.equal(Number((await db.query(`select available from merchants where user_id = 'user_merchant'`)).rows[0].available), 150000);
+
+  const shortRequest = await merchant.createMerchantActivationPaymentRequest(db, "user_customer", "act_short", "user_merchant", {
+    acceptMerchantTerms: true,
+  });
+  await db.query(`update merchants set available = 0 where user_id = 'user_merchant'`);
+  await assert.rejects(
+    () => merchant.approveMerchantPaymentRequest(db, "user_merchant", shortRequest.id),
+    (err) => err.code === "insufficient_credit",
+  );
+  assert.equal((await db.query(`select status from annual_activations where id = 'act_short'`)).rows[0].status, "pending");
+  assert.equal((await db.query(`select status from merchant_payment_requests where id = $1`, [shortRequest.id])).rows[0].status, "pending");
+  assert.equal(await count(db, `select count(*)::int as n from merchant_credit_ledger where payment_request_id = $1`, [shortRequest.id]), 0);
+  await db.query(`update merchants set available = 150000 where user_id = 'user_merchant'`);
+
+  const disabledRequest = await merchant.createMerchantActivationPaymentRequest(db, "user_customer", "act_off", "user_merchant", {
+    acceptMerchantTerms: true,
+  });
+  await db.query(
+    `update payment_method_settings set enabled = false where context = 'growth_activation' and method = 'merchant'`,
+  );
+  await assert.rejects(
+    () => merchant.approveMerchantPaymentRequest(db, "user_merchant", disabledRequest.id),
+    (err) => err.code === "payment_method_not_allowed",
+  );
+  assert.equal((await db.query(`select status from annual_activations where id = 'act_off'`)).rows[0].status, "pending");
+  assert.equal(await count(db, `select count(*)::int as n from merchant_credit_ledger where payment_request_id = $1`, [disabledRequest.id]), 0);
+  await db.query(
+    `insert into annual_activations (id, user_id, amount, period_start, period_end, status)
+     values ('act_blocked', 'user_customer', 1000, now(), now() + interval '1 year', 'pending')`,
+  );
+  await assert.rejects(
+    () => merchant.createMerchantActivationPaymentRequest(db, "user_customer", "act_blocked", "user_merchant", { acceptMerchantTerms: true }),
+    (err) => err.code === "payment_method_not_allowed",
+  );
+  await db.query(
+    `update payment_method_settings set enabled = true where context = 'growth_activation' and method = 'merchant'`,
+  );
+
   const activation = await merchant.createMerchantActivationPaymentRequest(db, "user_customer", "act_life", "user_merchant", {
     acceptMerchantTerms: true,
   });
   assert.equal(activation.purpose, "growth_activation");
   assert.equal(activation.booking_id, null);
   assert.equal(activation.activation_id, "act_life");
+  assert.equal(activation.alreadyOpen, false);
+  const activationAgain = await merchant.createMerchantActivationPaymentRequest(db, "user_customer", "act_life", "user_merchant", {
+    acceptMerchantTerms: true,
+  });
+  assert.equal(activationAgain.id, activation.id);
+  assert.equal(activationAgain.alreadyOpen, true);
   const activationDash = await merchant.listMerchantDashboard(db, "user_merchant");
   assert.ok(activationDash.incomingRequests.some((row) => row.id === activation.id && row.status === "pending"));
   assert.equal((await merchant.listMerchantDashboard(db, "user_other")).incomingRequests.some((row) => row.id === activation.id), false);
   const activationApproved = await merchant.approveMerchantPaymentRequest(db, "user_merchant", activation.id);
-  assert.equal(activationApproved.status, "approved");
-  assert.equal((await db.query(`select status from annual_activations where id = 'act_life'`)).rows[0].status, "pending");
-  assert.equal(await count(db, `select count(*)::int as n from bookings where id like 'bk_%' and user_id = 'user_customer'`), 4);
+  assert.equal(activationApproved.status, "settled");
+  assert.equal((await db.query(`select status from annual_activations where id = 'act_life'`)).rows[0].status, "active");
+  assert.equal((await db.query(`select activation_status from members where user_id = 'user_customer'`)).rows[0].activation_status, "active");
+  const afterActivation = await db.query(`select available, reserved, settled from merchants where user_id = 'user_merchant'`);
+  assert.equal(Number(afterActivation.rows[0].available), 149000);
+  assert.equal(Number(afterActivation.rows[0].reserved), 0);
+  assert.equal(Number(afterActivation.rows[0].settled), 51000);
+  const activationRepeat = await merchant.approveMerchantPaymentRequest(db, "user_merchant", activation.id);
+  assert.equal(activationRepeat.status, "settled");
+  const afterRepeat = await db.query(`select available, reserved, settled from merchants where user_id = 'user_merchant'`);
+  assert.equal(Number(afterRepeat.rows[0].available), 149000);
+  assert.equal(Number(afterRepeat.rows[0].settled), 51000);
+  assert.equal(await count(db, `select count(*)::int as n from merchant_credit_ledger where payment_request_id = $1`, [activation.id]), 2);
+  assert.equal(await count(db, `select count(*)::int as n from bookings`), bookingsBeforeActivation);
+  assert.equal(await count(db, `select count(*)::int as n from offer_inventory_events`), inventoryBeforeActivation);
+  assert.equal(await count(db, `select count(*)::int as n from commission_ledger`), commissionsBeforeActivation);
 });

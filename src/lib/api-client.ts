@@ -611,13 +611,13 @@ export const api = {
   createBooking: (offerSlug: string, idempotencyKey: string, acceptBookingTerms: boolean) =>
     post<{ booking: Booking }>("/api/bookings", { offerSlug, acceptBookingTerms }, idempotencyKey),
   requestMerchantPay: (bookingId: string, merchantUserId: string, idempotencyKey: string, acceptMerchantTerms: boolean) =>
-    post<{ request: MerchantPaymentRequest }>(
+    post<{ request: MerchantPaymentRequest; alreadyOpen?: boolean }>(
       `/api/bookings/${encodeURIComponent(bookingId)}/merchant-pay`,
       { merchantUserId, acceptMerchantTerms },
       idempotencyKey,
     ),
   requestActivationMerchantPay: (activationId: string, merchantUserId: string, idempotencyKey: string, acceptMerchantTerms: boolean) =>
-    post<{ request: MerchantPaymentRequest }>(
+    post<{ request: MerchantPaymentRequest; alreadyOpen?: boolean }>(
       `/api/activation/${encodeURIComponent(activationId)}/merchant-pay`,
       { merchantUserId, acceptMerchantTerms },
       idempotencyKey,

@@ -71,7 +71,10 @@ test("Merchant approval remains a rail and does not confirm or consume", () => {
   const bookings = read("backend/src/engine/bookings.ts");
   const approve = merchant.slice(merchant.indexOf("export async function approveMerchantPaymentRequest"));
   assert.doesNotMatch(approve.slice(0, 2500), /confirmBooking|activateBooking|consumeInventoryForConfirmation|postCommissionsForBooking|evaluatePromotions/);
-  assert.doesNotMatch(approve, /approveActivation/);
+  const bookingApprove = approve.slice(approve.indexOf("select status from bookings"));
+  assert.match(approve.slice(0, approve.indexOf("select status from bookings")), /completeMerchantFundedActivation/);
+  assert.match(merchant, /const \{ approveActivation \} = await import\("\.\/activation\.js"\)/);
+  assert.doesNotMatch(bookingApprove, /approveActivation|completeMerchantFundedActivation|confirmBooking|activateBooking|consumeInventoryForConfirmation|postCommissionsForBooking|evaluatePromotions/);
   assert.match(bookings, /settleMerchantPaymentForBooking/);
   assert.match(bookings, /consumeInventoryForConfirmation/);
   assert.match(read("src/components/payment-form.tsx"), /The booking stays pending until Darmelk confirms it/);
