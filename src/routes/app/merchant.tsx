@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { Store } from "lucide-react";
 import { useMemo, useState } from "react";
 import { AmountRow, EmptyState, PageHeader, StatCard, Surface } from "@/components/states";
-import { PaymentForm } from "@/components/payment-form";
+import { PaymentForm, merchantRequestStatusLabel } from "@/components/payment-form";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { useMemberSession } from "@/components/layout/use-member";
@@ -329,40 +329,55 @@ function MerchantDashboard({
 
       <Surface>
         <h2 className="font-display text-xl font-semibold">Payment requests</h2>
-        {pendingIncoming.length === 0 ? (
-          <p className="mt-3 text-sm text-muted">No pending approval requests.</p>
+        {(data?.incomingRequests ?? []).length === 0 ? (
+          <p className="mt-3 text-sm text-muted">No payment requests yet.</p>
         ) : (
           <ul className="mt-4 space-y-4">
-            {pendingIncoming.map((request) => (
+            {[...(data?.incomingRequests ?? [])]
+              .sort((a, b) => {
+                const rank = (status: string) => (status === "pending" ? 0 : 1);
+                const byStatus = rank(a.status) - rank(b.status);
+                if (byStatus !== 0) return byStatus;
+                return a.created_at < b.created_at ? 1 : -1;
+              })
+              .map((request) => (
               <li key={request.id} className="rounded-xl bg-paper p-4">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0">
-                    <p className="font-medium">{request.offer_title}</p>
-                    <p className="break-all text-sm text-muted">
-                      {request.customer_name ?? request.customer_user_id} · {request.purpose === "growth_activation" ? "Growth Program Activation" : request.booking_id}
+                    <p className="font-medium">{request.customer_name ?? request.customer_user_id}</p>
+                    <p className="text-sm text-muted">
+                      {request.purpose === "growth_activation" ? "Growth Program Activation" : "Growth Booking"}
+                      {" · "}
+                      {request.purpose === "growth_activation" ? "Activation" : request.offer_title || request.booking_id}
                     </p>
+                    <p className="mt-1 text-xs text-subtle">{formatWhen(request.created_at)}</p>
                   </div>
-                  <p className="font-display text-xl font-semibold tabular-nums">{formatBdt(request.amount)}</p>
+                  <div className="text-left sm:text-right">
+                    <p className="font-display text-xl font-semibold tabular-nums">{formatBdt(request.amount)}</p>
+                    <p className="mt-1 text-sm font-medium">{merchantRequestStatusLabel(request.status)}</p>
+                  </div>
                 </div>
-                <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-                  {canApprove ? (
-                    <>
-                      <Button size="sm" disabled={busyId === request.id} onClick={() => setConfirmId(request.id)}>
-                        Approve
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        disabled={busyId === request.id}
-                        onClick={() => void decide(request.id, "decline")}
-                      >
-                        Decline
-                      </Button>
-                    </>
-                  ) : (
-                    <p className="text-sm text-muted">Approvals are paused while this Merchant account is not active.</p>
-                  )}
-                </div>
+                {request.status === "pending" ? (
+                  <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+                    {canApprove ? (
+                      <>
+                        <Button size="sm" disabled={busyId === request.id} onClick={() => setConfirmId(request.id)}>
+                          Approve
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          disabled={busyId === request.id}
+                          onClick={() => void decide(request.id, "decline")}
+                        >
+                          Decline
+                        </Button>
+                      </>
+                    ) : (
+                      <p className="text-sm text-muted">Approvals are paused while this Merchant account is not active.</p>
+                    )}
+                  </div>
+                ) : null}
               </li>
             ))}
           </ul>

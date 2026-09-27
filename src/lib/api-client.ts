@@ -604,13 +604,24 @@ export const api = {
   savePayoutMethod: (methodType: PayoutMethod["method_type"], details: Record<string, string>) =>
     post<{ method: PayoutMethod }>("/api/me/payout-methods", { methodType, details }),
 
-  booking: (id: string) => request<{ booking: Booking; merchantRequest: MerchantPaymentRequest | null }>(`/api/bookings/${id}`),
+  booking: (id: string) =>
+    request<{ booking: Booking; merchantRequest: MerchantPaymentRequest | null }>(
+      `/api/bookings/${encodeURIComponent(id)}`,
+    ),
   createBooking: (offerSlug: string, idempotencyKey: string, acceptBookingTerms: boolean) =>
     post<{ booking: Booking }>("/api/bookings", { offerSlug, acceptBookingTerms }, idempotencyKey),
   requestMerchantPay: (bookingId: string, merchantUserId: string, idempotencyKey: string, acceptMerchantTerms: boolean) =>
-    post<{ request: MerchantPaymentRequest }>(`/api/bookings/${bookingId}/merchant-pay`, { merchantUserId, acceptMerchantTerms }, idempotencyKey),
+    post<{ request: MerchantPaymentRequest }>(
+      `/api/bookings/${encodeURIComponent(bookingId)}/merchant-pay`,
+      { merchantUserId, acceptMerchantTerms },
+      idempotencyKey,
+    ),
   requestActivationMerchantPay: (activationId: string, merchantUserId: string, idempotencyKey: string, acceptMerchantTerms: boolean) =>
-    post<{ request: MerchantPaymentRequest }>(`/api/activation/${activationId}/merchant-pay`, { merchantUserId, acceptMerchantTerms }, idempotencyKey),
+    post<{ request: MerchantPaymentRequest }>(
+      `/api/activation/${encodeURIComponent(activationId)}/merchant-pay`,
+      { merchantUserId, acceptMerchantTerms },
+      idempotencyKey,
+    ),
 
   promotions: () => request<{ promotions: Promotion[]; serverNow: string }>("/api/promotions"),
   promotion: (id: string) =>

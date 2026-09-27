@@ -604,7 +604,14 @@ app.get("/api/bookings/:id", async (c) => {
     await withTransaction((client) => requireAdmin(client, userId));
   }
   const merchantRequest = await queryOne(
-    `select * from merchant_payment_requests where booking_id = $1 order by created_at desc limit 1`,
+    `select r.*, mu.name as merchant_name, mu.email as merchant_email,
+            cu.name as customer_name
+       from merchant_payment_requests r
+       left join "user" mu on mu.id = r.merchant_user_id
+       left join "user" cu on cu.id = r.customer_user_id
+      where r.booking_id = $1
+      order by r.created_at desc
+      limit 1`,
     [c.req.param("id")],
   );
   return c.json({ booking, merchantRequest: merchantRequest ?? null });
