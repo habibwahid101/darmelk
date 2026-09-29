@@ -20,7 +20,7 @@ function AdminMerchantRequests() {
       <PageHeader
         kicker="Merchant Management"
         title="Payment requests"
-        description="Merchant approval reserves credit. Booking confirmation settles it. This screen does not bypass ledger safeguards."
+        description="Merchant approval settles credit and completes the booking or activation. This screen is audit history and does not add a second approval."
       />
       {loading && !data ? (
         <p className="text-sm text-muted">Loading requests…</p>

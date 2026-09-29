@@ -66,18 +66,27 @@ test("manual bank approval still uses the central booking confirmation path", ()
   assert.match(smoke, /manual bank approval consumes shared inventory exactly once/);
 });
 
-test("Merchant approval remains a rail and does not confirm or consume", () => {
+test("Merchant booking approval confirms through the existing booking path and removes the admin second approval", () => {
   const merchant = read("backend/src/engine/merchant.ts");
   const bookings = read("backend/src/engine/bookings.ts");
+  const router = read("backend/src/router.ts");
   const approve = merchant.slice(merchant.indexOf("export async function approveMerchantPaymentRequest"));
   assert.doesNotMatch(approve.slice(0, 2500), /confirmBooking|activateBooking|consumeInventoryForConfirmation|postCommissionsForBooking|evaluatePromotions/);
   const bookingApprove = approve.slice(approve.indexOf("select status from bookings"));
   assert.match(approve.slice(0, approve.indexOf("select status from bookings")), /completeMerchantFundedActivation/);
   assert.match(merchant, /const \{ approveActivation \} = await import\("\.\/activation\.js"\)/);
+  assert.match(merchant, /const \{ confirmBooking \} = await import\("\.\/bookings\.js"\)/);
+  assert.match(bookingApprove, /completeMerchantFundedBooking/);
   assert.doesNotMatch(bookingApprove, /approveActivation|completeMerchantFundedActivation|confirmBooking|activateBooking|consumeInventoryForConfirmation|postCommissionsForBooking|evaluatePromotions/);
   assert.match(bookings, /settleMerchantPaymentForBooking/);
   assert.match(bookings, /consumeInventoryForConfirmation/);
-  assert.match(read("src/components/payment-form.tsx"), /The booking stays pending until Darmelk confirms it/);
+  assert.match(read("src/components/payment-form.tsx"), /Merchant approval confirms the booking\. It does not wait for Darmelk/);
+  assert.doesNotMatch(read("src/routes/admin/bookings.tsx"), /Confirm Merchant payment/);
+  assert.doesNotMatch(read("src/routes/admin/activation.tsx"), /Confirm Merchant payment/);
+  const paymentDecision = router.slice(router.indexOf('app.post("/api/admin/payments/:id/:decision"'));
+  assert.match(paymentDecision, /await confirmBooking\(client, result.target_id, adminId\)/);
+  assert.match(paymentDecision, /await activateBooking\(client, result.target_id\)/);
+  assert.match(paymentDecision, /await approveActivation\(client, result.target_id, adminId\)/);
 });
 
 test("General Marketplace has no direct payment UI and Request to Book is unchanged", () => {

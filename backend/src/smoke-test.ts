@@ -1570,15 +1570,15 @@ async function main() {
   const approvedReq = await json(await app.request(`/api/me/merchant/requests/${secondReq.request.id}/approve`, {
     method: "POST", headers: { cookie: merchantUser.cookie, "Idempotency-Key": "m-appr-1" },
   }));
-  record("Merchant can approve a valid request and recheck available credit", approvedReq.request?.status === "approved", approvedReq.request);
+  record("Merchant can approve a valid request and settle credit once", approvedReq.request?.status === "settled", approvedReq.request);
   const dashAfterApprove = await json(await app.request("/api/me/merchant", { headers: { cookie: merchantUser.cookie } }));
   record(
-    "approval reserves credit without settling or double debit",
-    dashAfterApprove.merchant?.available === 10000 && dashAfterApprove.merchant?.reserved === 50000 && dashAfterApprove.merchant?.settled === 0,
+    "approval settles credit once without a second debit",
+    dashAfterApprove.merchant?.available === 10000 && dashAfterApprove.merchant?.reserved === 0 && dashAfterApprove.merchant?.settled === 50000,
     dashAfterApprove.merchant,
   );
   const bookingAfterApprove = await json(await app.request(`/api/bookings/${badId.booking.id}`, { headers: { cookie: customer.cookie } }));
-  record("Merchant approval alone does not confirm or activate the booking", bookingAfterApprove.booking?.status === "pending", bookingAfterApprove.booking?.status);
+  record("Merchant approval confirms the booking and does not activate it", bookingAfterApprove.booking?.status === "confirmed", bookingAfterApprove.booking?.status);
   const commAfterApprove = await query(`select id from commission_ledger where source_booking_id=$1`, [badId.booking.id]);
   record("Merchant approval alone causes no commission", commAfterApprove.length === 0);
 
@@ -1586,14 +1586,18 @@ async function main() {
     method: "POST", headers: { cookie: merchantUser.cookie, "Idempotency-Key": "m-appr-2" },
   });
   const doubleBody = await json(doubleApprove);
+  const dashAfterRetry = await json(await app.request("/api/me/merchant", { headers: { cookie: merchantUser.cookie } }));
   record("same request cannot be approved twice / retry does not double debit",
-    (doubleBody.request?.status === "approved" || doubleApprove.status === 409) && (await json(await app.request("/api/me/merchant", { headers: { cookie: merchantUser.cookie } }))).merchant?.reserved === 50000,
-    { status: doubleApprove.status, reserved: (await json(await app.request("/api/me/merchant", { headers: { cookie: merchantUser.cookie } }))).merchant?.reserved });
+    doubleApprove.status === 200 && doubleBody.request?.status === "settled"
+      && dashAfterRetry.merchant?.available === 10000 && dashAfterRetry.merchant?.reserved === 0 && dashAfterRetry.merchant?.settled === 50000,
+    { status: doubleApprove.status, reserved: dashAfterRetry.merchant?.reserved, settled: dashAfterRetry.merchant?.settled });
 
-  const confirmMerchantBooking = await json(await app.request(`/api/admin/bookings/${badId.booking.id}/confirm`, {
+  const confirmMerchantBooking = await app.request(`/api/admin/bookings/${badId.booking.id}/confirm`, {
     method: "POST", headers: { cookie: adminCookie },
-  }));
-  record("Merchant-funded booking reaches confirmed through existing admin confirmation", confirmMerchantBooking.booking?.status === "confirmed", confirmMerchantBooking.booking);
+  });
+  record("Merchant-funded booking does not accept a second admin confirmation", confirmMerchantBooking.status === 409, confirmMerchantBooking.status);
+  const confirmedMerchantBooking = await json(await app.request(`/api/bookings/${badId.booking.id}`, { headers: { cookie: customer.cookie } }));
+  record("Merchant-funded booking reaches confirmed through existing confirmation", confirmedMerchantBooking.booking?.status === "confirmed", confirmedMerchantBooking.booking);
   const dashAfterSettle = await json(await app.request("/api/me/merchant", { headers: { cookie: merchantUser.cookie } }));
   record(
     "settlement consumes reserved credit exactly once without a second available debit",
@@ -1641,17 +1645,19 @@ async function main() {
     headers: { cookie: customer.cookie, "content-type": "application/json", "Idempotency-Key": "m-pay-cancel" },
     body: JSON.stringify({ acceptMerchantTerms: true, merchantUserId: merchantUser.member.user_id }),
   }));
-  await json(await app.request(`/api/me/merchant/requests/${cancelReq.request.id}/approve`, {
-    method: "POST", headers: { cookie: merchantUser.cookie, "Idempotency-Key": "m-appr-cancel" },
-  }));
-  await json(await app.request(`/api/admin/bookings/${cancelBook.booking.id}/cancel`, {
+  const cancelResult = await json(await app.request(`/api/admin/bookings/${cancelBook.booking.id}/cancel`, {
     method: "POST", headers: { cookie: adminCookie },
   }));
   const dashAfterCancel = await json(await app.request("/api/me/merchant", { headers: { cookie: merchantUser.cookie } }));
   const commAfterCancel = await query(`select id from commission_ledger where source_booking_id=$1`, [cancelBook.booking.id]);
   record(
-    "cancelled approved Merchant booking releases reserved credit exactly once and posts no commission",
-    dashAfterCancel.merchant?.available === 60000 && dashAfterCancel.merchant?.reserved === 0 && commAfterCancel.length === 0,
+    "cancelled pending Merchant booking takes no credit and posts no commission",
+    cancelReq.request?.status === "pending"
+      && cancelResult.booking?.status === "cancelled"
+      && dashAfterCancel.merchant?.available === 60000
+      && dashAfterCancel.merchant?.reserved === 0
+      && dashAfterCancel.merchant?.settled === 0
+      && commAfterCancel.length === 0,
     dashAfterCancel.merchant,
   );
 
@@ -1669,8 +1675,14 @@ async function main() {
   const selfApprove = await json(await app.request(`/api/me/merchant/requests/${selfReq.request.id}/approve`, {
     method: "POST", headers: { cookie: merchantUser.cookie, "Idempotency-Key": "m-appr-self" },
   }));
-  record("self-pay approval follows the same reserve rules", selfApprove.request?.status === "approved");
-  await json(await app.request(`/api/admin/bookings/${selfBook.booking.id}/cancel`, { method: "POST", headers: { cookie: adminCookie } }));
+  record("self-pay approval settles once and confirms the booking", selfApprove.request?.status === "settled");
+  const selfConfirmed = await json(await app.request(`/api/bookings/${selfBook.booking.id}`, { headers: { cookie: merchantUser.cookie } }));
+  record("self-pay booking is confirmed without a second admin payment approval", selfConfirmed.booking?.status === "confirmed", selfConfirmed.booking?.status);
+  await json(await app.request(`/api/admin/bookings/${selfBook.booking.id}/reverse`, {
+    method: "POST",
+    headers: { cookie: adminCookie, "content-type": "application/json" },
+    body: JSON.stringify({ reason: "Merchant self-pay QA reversal" }),
+  }));
 
   const insufficientBook = await json(await app.request("/api/bookings", {
     method: "POST",
@@ -1736,12 +1748,12 @@ async function main() {
   ]);
   const bodyA = await json(resA);
   const bodyB = await json(resB);
-  const approvedCount = [bodyA.request?.status, bodyB.request?.status].filter((s) => s === "approved").length;
+  const settledCount = [bodyA.request?.status, bodyB.request?.status].filter((s) => s === "settled").length;
   const tightDash = await json(await app.request("/api/me/merchant", { headers: { cookie: tightMerchant.cookie } }));
   record(
     "two simultaneous approvals cannot overspend available Merchant Credit",
-    approvedCount === 1 && tightDash.merchant?.available === 0 && tightDash.merchant?.reserved === 50000,
-    { approvedCount, available: tightDash.merchant?.available, reserved: tightDash.merchant?.reserved, a: bodyA.request?.status ?? bodyA.error, b: bodyB.request?.status ?? bodyB.error },
+    settledCount === 1 && tightDash.merchant?.available === 0 && tightDash.merchant?.reserved === 0 && tightDash.merchant?.settled === 50000,
+    { settledCount, available: tightDash.merchant?.available, reserved: tightDash.merchant?.reserved, settled: tightDash.merchant?.settled, a: bodyA.request?.status ?? bodyA.error, b: bodyB.request?.status ?? bodyB.error },
   );
 
   await json(await app.request(`/api/admin/merchant/accounts/${merchantUser.member.user_id}/status`, {
@@ -2187,25 +2199,31 @@ async function main() {
   }));
   const merchantQualBefore = await query(`select id from promotion_qualifications where booking_id=$1`, [merchantBook.booking.id]);
   const merchantInvBefore = await query(`select id from offer_inventory_events where booking_id=$1 and event_type='consume'`, [merchantBook.booking.id]);
+  const merchantBookingRow = await queryOne<{ status: string }>(`select status from bookings where id=$1`, [merchantBook.booking.id]);
   record(
-    "Merchant approval alone does not qualify for a promotion",
-    merchantAppr.request?.status === "approved" && merchantQualBefore.length === 0,
-    { request: merchantAppr.request?.status, quals: merchantQualBefore.length },
+    "Merchant approval confirms the booking and qualifies through existing confirmation",
+    merchantAppr.request?.status === "settled" && merchantBookingRow?.status === "confirmed" && merchantQualBefore.length > 0,
+    { request: merchantAppr.request?.status, status: merchantBookingRow?.status, quals: merchantQualBefore.length },
   );
   record(
-    "Merchant approval does not consume inventory",
-    merchantInvBefore.length === 0,
+    "Merchant approval consumes inventory once",
+    merchantInvBefore.length === 1,
     merchantInvBefore.length,
   );
-  const merchantConfirm = await json(await app.request(`/api/admin/bookings/${merchantBook.booking.id}/confirm`, {
+  const merchantConfirm = await app.request(`/api/admin/bookings/${merchantBook.booking.id}/confirm`, {
     method: "POST", headers: { cookie: adminCookie },
-  }));
+  });
+  record(
+    "Merchant-funded booking does not accept a second admin confirmation",
+    merchantConfirm.status === 409,
+    merchantConfirm.status,
+  );
   const merchantQualAfter = await query(`select id from promotion_qualifications where booking_id=$1 and user_id=$2`, [merchantBook.booking.id, pu6.member.user_id]);
   const merchantInvAfter = await query(`select id from offer_inventory_events where booking_id=$1 and event_type='consume'`, [merchantBook.booking.id]);
   record(
-    "Merchant-funded booking qualifies only after existing confirmation",
-    merchantConfirm.booking?.status === "confirmed" && merchantQualAfter.length > 0,
-    { status: merchantConfirm.booking?.status, quals: merchantQualAfter.length },
+    "Merchant-funded booking qualifies only through existing confirmation",
+    merchantQualAfter.length === merchantQualBefore.length && merchantQualAfter.length > 0,
+    { status: merchantBookingRow?.status, quals: merchantQualAfter.length },
   );
   record("Merchant-funded confirmation consumes inventory once", merchantInvAfter.length === 1, merchantInvAfter.length);
   const merchantComm = await query(`select id from commission_ledger where source_booking_id=$1`, [merchantBook.booking.id]);

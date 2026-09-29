@@ -85,7 +85,7 @@ test("direct API bypasses are rejected by receiving-account validation", () => {
   assert.match(read("backend/src/router.ts"), /receivingAccountId: body.receivingAccountId/);
 });
 
-test("merchant remains a rail: booking reserve-only, activation uses approveActivation", () => {
+test("merchant booking approval confirms once and activation still uses approveActivation", () => {
   const merchant = read("backend/src/engine/merchant.ts");
   const activation = read("backend/src/engine/activation.ts");
   const router = read("backend/src/router.ts");
@@ -93,6 +93,8 @@ test("merchant remains a rail: booking reserve-only, activation uses approveActi
   const bookingApprove = approve.slice(approve.indexOf("select status from bookings"));
   assert.match(approve.slice(0, approve.indexOf("select status from bookings")), /completeMerchantFundedActivation/);
   assert.match(merchant, /const \{ approveActivation \} = await import\("\.\/activation\.js"\)/);
+  assert.match(bookingApprove, /completeMerchantFundedBooking/);
+  assert.match(bookingApprove, /assertRailAvailable\(client, "booking", "merchant"\)/);
   assert.doesNotMatch(bookingApprove, /confirmBooking|activateBooking|consumeInventoryForConfirmation|postCommissionsForBooking|evaluatePromotions|approveActivation|completeMerchantFundedActivation/);
   assert.match(merchant, /activation_payment_reserved/);
   assert.match(merchant, /activation_payment_settled/);

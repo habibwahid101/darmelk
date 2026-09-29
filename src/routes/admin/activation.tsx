@@ -1,8 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
 import { BadgeCheck } from "lucide-react";
 import { EmptyState, PageHeader, Surface } from "@/components/states";
-import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { formatBdt } from "@/lib/offers";
 import { formatWhen } from "@/lib/platform";
@@ -16,21 +14,10 @@ export const Route = createFileRoute("/admin/activation")({
 });
 
 function AdminActivation() {
-  const { data, reload } = useAsync(() => api.admin.activations(), []);
+  const { data } = useAsync(() => api.admin.activations(), []);
   const { data: usersData } = useAsync(() => api.admin.users(), []);
   const activations = data?.activations ?? [];
   const names = new Map((usersData?.members ?? []).map((m) => [m.user_id, m.name]));
-  const [busyId, setBusyId] = useState<string | null>(null);
-
-  async function run(id: string, fn: () => Promise<unknown>) {
-    setBusyId(id);
-    try {
-      await fn();
-      reload();
-    } finally {
-      setBusyId(null);
-    }
-  }
 
   return (
     <div className="space-y-8">
@@ -68,20 +55,11 @@ function AdminActivation() {
                 {a.status === "pending" ? (
                   <p className="text-sm text-muted">
                     {a.merchant_request_status === "approved"
-                      ? "Merchant Credit is reserved. Confirming settles it and uses the same Growth activation path as bank/MFS."
+                      ? "This Merchant-approved activation was not auto-completed. It still needs owner review and was not changed by this release."
                       : a.merchant_request_status === "pending"
                         ? "Awaiting Merchant approval."
                         : "Review the member’s payment evidence in Payment review."}
                   </p>
-                ) : null}
-                {a.status === "pending" && a.merchant_request_status === "approved" ? (
-                  <Button
-                    size="sm"
-                    disabled={busyId === a.id}
-                    onClick={() => void run(a.id, () => api.admin.decideActivation(a.id, "approve"))}
-                  >
-                    Confirm Merchant payment
-                  </Button>
                 ) : null}
               </li>
             ))}

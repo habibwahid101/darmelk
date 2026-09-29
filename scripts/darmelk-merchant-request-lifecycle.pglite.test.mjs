@@ -83,7 +83,11 @@ test("merchant request UI returns and renders the persisted status", () => {
   const bookingApprove = approve.slice(approve.indexOf("select status from bookings"));
   assert.match(activationApprove, /completeMerchantFundedActivation/);
   assert.match(engine, /const \{ approveActivation \} = await import\("\.\/activation\.js"\)/);
-  assert.doesNotMatch(bookingApprove, /confirmBooking|activateBooking|consumeInventoryForConfirmation|evaluatePromotions|postCommissions|approveActivation|completeMerchantFundedActivation/);
+  assert.match(engine, /const \{ confirmBooking \} = await import\("\.\/bookings\.js"\)/);
+  assert.match(bookingApprove, /completeMerchantFundedBooking/);
+  assert.match(bookingApprove, /assertRailAvailable\(client, "booking", "merchant"\)/);
+  assert.doesNotMatch(bookingApprove, /activateBooking|consumeInventoryForConfirmation|evaluatePromotions|postCommissions|approveActivation|completeMerchantFundedActivation/);
+  assert.doesNotMatch(engine, /evaluatePromotionsForConfirmedBooking/);
   assert.match(read("backend/src/engine/bookings.ts"), /await settleMerchantPaymentForBooking\(client, bookingId\)/);
   assert.match(read("backend/src/engine/activation.ts"), /await settleMerchantPaymentForActivation\(client, activationId\)/);
   const referral = read("src/components/referral-share.tsx");
@@ -94,6 +98,13 @@ test("merchant request UI returns and renders the persisted status", () => {
   assert.doesNotMatch(referral, /navigator\.share|Share referral link/);
   assert.match(read("src/routes/app/network.tsx"), /ReferralShareCard/);
   assert.match(read("src/routes/app/settings.tsx"), /ReferralShareCard/);
+  assert.match(read("src/routes/admin/bookings.tsx"), /not auto-completed/);
+  assert.match(read("src/routes/admin/activation.tsx"), /not auto-completed/);
+  assert.doesNotMatch(read("src/routes/admin/bookings.tsx"), /Confirm Merchant payment/);
+  assert.doesNotMatch(read("src/routes/admin/activation.tsx"), /Confirm Merchant payment/);
+  assert.match(read("src/routes/admin/bookings.tsx"), /Activate/);
+  assert.match(read("src/components/payment-form.tsx"), /Merchant approval confirmed this booking/);
+  assert.match(book, /does not wait for Darmelk/);
   assert.match(read("src/routes/join.$code.tsx"), /ref: String\(params\.code \?\? ""\)\.trim\(\)\.toUpperCase\(\)/);
 });
 
@@ -163,35 +174,70 @@ test("PGlite: merchant payment request lifecycle", async () => {
   assert.equal(other.incomingRequests.some((row) => row.id === created.id), false);
 
   const approved = await merchant.approveMerchantPaymentRequest(db, "user_merchant", created.id);
-  assert.equal(approved.status, "approved");
+  assert.equal(approved.status, "settled");
   const bookingAfterApprove = await db.query(`select status from bookings where id = 'bk_life_ok'`);
-  assert.equal(bookingAfterApprove.rows[0].status, "pending");
-  assert.equal(await count(db, `select count(*)::int as n from offer_inventory_events where booking_id = 'bk_life_ok'`), 0);
+  assert.equal(bookingAfterApprove.rows[0].status, "confirmed");
+  assert.equal(await count(db, `select count(*)::int as n from offer_inventory_events where booking_id = 'bk_life_ok' and event_type = 'consume'`), 1);
   assert.equal(await count(db, `select count(*)::int as n from commission_ledger where source_booking_id = 'bk_life_ok'`), 0);
+  assert.equal(await count(db, `select count(*)::int as n from booking_snapshots where booking_id = 'bk_life_ok'`), 0);
   const reserved = await db.query(`select available, reserved, settled from merchants where user_id = 'user_merchant'`);
   assert.equal(Number(reserved.rows[0].available), 150000);
-  assert.equal(Number(reserved.rows[0].reserved), 50000);
-  assert.equal(Number(reserved.rows[0].settled), 0);
+  assert.equal(Number(reserved.rows[0].reserved), 0);
+  assert.equal(Number(reserved.rows[0].settled), 50000);
   await assert.rejects(
     () => merchant.approveMerchantPaymentRequest(db, "user_other", created.id),
     (err) => err.status === 403,
   );
-
-  const confirmed = await bookings.confirmBooking(db, "bk_life_ok", "user_admin");
-  assert.equal(confirmed.status, "confirmed");
+  const approvedAgain = await merchant.approveMerchantPaymentRequest(db, "user_merchant", created.id);
+  assert.equal(approvedAgain.status, "settled");
   assert.equal(await count(db, `select count(*)::int as n from offer_inventory_events where booking_id = 'bk_life_ok' and event_type = 'consume'`), 1);
   assert.equal(await count(db, `select count(*)::int as n from commission_ledger where source_booking_id = 'bk_life_ok'`), 0);
-  const settled = await db.query(`select available, reserved, settled from merchants where user_id = 'user_merchant'`);
-  assert.equal(Number(settled.rows[0].available), 150000);
-  assert.equal(Number(settled.rows[0].reserved), 0);
-  assert.equal(Number(settled.rows[0].settled), 50000);
-  const settledRequest = await db.query(`select status from merchant_payment_requests where id = $1`, [created.id]);
-  assert.equal(settledRequest.rows[0].status, "settled");
+  assert.equal(await count(db, `select count(*)::int as n from merchant_credit_ledger where payment_request_id = $1`, [created.id]), 2);
+  const afterBookingRepeat = await db.query(`select available, reserved, settled from merchants where user_id = 'user_merchant'`);
+  assert.equal(Number(afterBookingRepeat.rows[0].available), 150000);
+  assert.equal(Number(afterBookingRepeat.rows[0].reserved), 0);
+  assert.equal(Number(afterBookingRepeat.rows[0].settled), 50000);
   await assert.rejects(
     () => bookings.confirmBooking(db, "bk_life_ok", "user_admin"),
     (err) => err.status === 409,
   );
-  assert.equal(await count(db, `select count(*)::int as n from offer_inventory_events where booking_id = 'bk_life_ok' and event_type = 'consume'`), 1);
+
+  await db.exec(`
+    insert into bookings (id, user_id, offer_slug, retail_value, booking_amount, qualification_benefit, commission_eligible_amount)
+    values
+      ('bk_life_short', 'user_customer', 'five-star-hotel-share', 1000000, 50000, 0, 50000),
+      ('bk_life_rail', 'user_customer', 'five-star-hotel-share', 1000000, 50000, 0, 50000);
+  `);
+  const short = await merchant.createMerchantPaymentRequest(db, "user_customer", "bk_life_short", "user_merchant", {
+    acceptMerchantTerms: true,
+  });
+  await db.query(`update merchants set available = 0 where user_id = 'user_merchant'`);
+  await assert.rejects(
+    () => merchant.approveMerchantPaymentRequest(db, "user_merchant", short.id),
+    (err) => err.code === "insufficient_credit",
+  );
+  assert.equal((await db.query(`select status from bookings where id = 'bk_life_short'`)).rows[0].status, "pending");
+  assert.equal((await db.query(`select status from merchant_payment_requests where id = $1`, [short.id])).rows[0].status, "pending");
+  assert.equal(await count(db, `select count(*)::int as n from offer_inventory_events where booking_id = 'bk_life_short'`), 0);
+  assert.equal(await count(db, `select count(*)::int as n from merchant_credit_ledger where payment_request_id = $1`, [short.id]), 0);
+  await db.query(`update merchants set available = 150000 where user_id = 'user_merchant'`);
+
+  const rail = await merchant.createMerchantPaymentRequest(db, "user_customer", "bk_life_rail", "user_merchant", {
+    acceptMerchantTerms: true,
+  });
+  await db.query(`update payment_method_settings set enabled = false where context = 'growth_booking' and method = 'merchant'`);
+  await assert.rejects(
+    () => merchant.approveMerchantPaymentRequest(db, "user_merchant", rail.id),
+    (err) => err.code === "payment_method_not_allowed",
+  );
+  assert.equal((await db.query(`select status from bookings where id = 'bk_life_rail'`)).rows[0].status, "pending");
+  assert.equal(await count(db, `select count(*)::int as n from merchant_credit_ledger where payment_request_id = $1`, [rail.id]), 0);
+  assert.equal(await count(db, `select count(*)::int as n from offer_inventory_events where booking_id = 'bk_life_rail'`), 0);
+  await db.query(`update payment_method_settings set enabled = true where context = 'growth_booking' and method = 'merchant'`);
+  const balancesAfterGuards = await db.query(`select available, reserved, settled from merchants where user_id = 'user_merchant'`);
+  assert.equal(Number(balancesAfterGuards.rows[0].available), 150000);
+  assert.equal(Number(balancesAfterGuards.rows[0].reserved), 0);
+  assert.equal(Number(balancesAfterGuards.rows[0].settled), 50000);
 
   const declined = await merchant.createMerchantPaymentRequest(db, "user_customer", "bk_life_decline", "user_merchant", {
     acceptMerchantTerms: true,

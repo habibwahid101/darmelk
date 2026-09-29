@@ -4,7 +4,7 @@
 import type { PoolClient } from "pg";
 import { badRequest, conflict, forbidden, notFound } from "../errors.js";
 import { uid } from "../ids.js";
-import { recordConsents, requireCurrentConsents } from "./terms.js";
+import { recordConsents, requireCurrentConsents, hasCurrentConsent } from "./terms.js";
 import { releaseMerchantPaymentForActivation, settleMerchantPaymentForActivation } from "./merchant.js";
 
 const ACTIVATION_FEE = 1000;
@@ -65,9 +65,19 @@ export async function requestActivation(
     throw conflict(`Activation already ${memberRows[0].activation_status}`);
   }
 
-  if (input.acceptGrowthTerms === true) {
+  const missingTerms: Array<(typeof GROWTH_ACTIVATION_DOCUMENTS)[number]> = [];
+  for (const key of GROWTH_ACTIVATION_DOCUMENTS) {
+    if (!(await hasCurrentConsent(client, userId, key))) missingTerms.push(key);
+  }
+  if (missingTerms.length > 0) {
+    if (input.acceptGrowthTerms !== true) {
+      throw forbidden(
+        "Growth Program Terms and Growth Activation Terms must be accepted",
+        "terms_required",
+      );
+    }
     await recordConsents(client, userId, {
-      keys: [...GROWTH_ACTIVATION_DOCUMENTS],
+      keys: missingTerms,
       context: "growth_activation",
     });
   }
