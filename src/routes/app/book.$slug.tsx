@@ -74,7 +74,7 @@ function BookOfferPage() {
           }
           description={
             merchantRequest
-              ? "The selected Merchant can approve or decline this request. The booking stays pending until Darmelk confirms it."
+              ? "The selected Merchant can approve or decline this request. Merchant approval confirms the booking. It does not wait for Darmelk."
               : "Your booking payment is under review. It is confirmed and activated only after admin approval."
           }
         />
@@ -163,7 +163,7 @@ function BookOfferPage() {
             <li>{offerBookingCopy(offer)}</li>
             <li>This booking freezes the commercial figures shown above. Later offer edits do not rewrite it.</li>
             <li>After creating the request, pay via Darmelk Bank or Pay by Merchant.</li>
-            <li>Payment submission and Merchant approval do not confirm the booking. Darmelk confirms it after review.</li>
+            <li>Bank payment submission does not confirm the booking. Darmelk confirms bank payments after review. Merchant approval confirms the booking and does not wait for Darmelk.</li>
             <li>Inventory is consumed once at confirmation. Reversal does not restore stock.</li>
             <li>Qualification benefit stays attached to this offer, not a global figure.</li>
             <li>

@@ -79,11 +79,15 @@ export function MerchantRequestStatus({ request }: { request: MerchantPaymentReq
             ? activation
               ? "This Merchant declined the request. Growth Program Activation was not completed and no Merchant Credit was used."
               : "This Merchant declined the request. No booking confirmation, commission, or inventory change was made."
-            : request.status === "approved" || (request.status === "settled" && activation)
+            : request.status === "settled"
               ? activation
                 ? "Merchant approval completed this Growth Program Activation. No separate Darmelk approval is required."
-                : "Merchant approval reserves credit only. Darmelk still confirms the booking."
-              : "This request is kept for history."}
+                : "Merchant approval confirmed this booking. No separate Darmelk payment approval is required."
+              : request.status === "approved"
+                ? activation
+                  ? "Merchant approval completed this Growth Program Activation. No separate Darmelk approval is required."
+                  : "This Merchant-approved booking was not completed automatically. It remains pending review and was not changed."
+                : "This request is kept for history."}
       </p>
     </Surface>
   );
@@ -100,6 +104,17 @@ export function describePaymentOptions(options?: PaymentOptions | null, targetTy
     return "Pay by Merchant";
   });
   if (!parts.length) return "No payment methods are currently available for this transaction.";
+  const merchantOnly = available.length === 1 && available[0]?.method === "merchant";
+  if (merchantOnly) {
+    return targetType === "activation"
+      ? "Pay by Merchant. Merchant approval completes Growth Program Activation. No separate Darmelk approval is required."
+      : "Pay by Merchant. Merchant approval confirms the booking. No separate Darmelk payment approval is required.";
+  }
+  if (available.some((method) => method.method === "merchant")) {
+    const manual = parts.filter((part) => part !== "Pay by Merchant");
+    const manualText = manual.length === 1 ? manual[0] : `${manual.slice(0, -1).join(", ")} or ${manual[manual.length - 1]}`;
+    return `${manualText}. Darmelk confirms those payments after review. Pay by Merchant is confirmed by the Merchant.`;
+  }
   if (parts.length === 1) return `${parts[0]}. Darmelk confirms after review.`;
   return `${parts.slice(0, -1).join(", ")} or ${parts[parts.length - 1]}. Darmelk confirms after review.`;
 }
@@ -237,7 +252,7 @@ export function PaymentForm({
           {merchantMode
             ? targetType === "activation"
               ? "Request payment from an active Merchant. If the Merchant approves, Growth Program Activation completes. No separate Darmelk approval is required."
-              : "Request payment from an active Merchant. The booking stays pending until Darmelk confirms it."
+              : "Request payment from an active Merchant. Merchant approval confirms the booking. It does not wait for Darmelk."
             : allowMerchant
               ? "Pay via Darmelk Bank, then submit the reference and proof. Payment is not approved automatically."
               : "Pay manually, then submit the reference and proof. Payment is not approved automatically."}
@@ -289,7 +304,7 @@ export function PaymentForm({
           <p className="text-sm text-muted">
             {targetType === "activation"
               ? `This creates a payment request for ${formatBdt(amount)}. If the Merchant approves, Merchant Credit is settled once and Growth Program Activation completes. No separate Darmelk approval is required. Merchant Credit is separate from the Commission Wallet.`
-              : `This creates a payment request for ${formatBdt(amount)}. Merchant Credit is reserved only if the Merchant approves. Merchant approval does not confirm the booking, consume inventory, create commission, or qualify a promotion. Merchant Credit is separate from the Commission Wallet.`}
+              : `This creates a payment request for ${formatBdt(amount)}. If the Merchant approves, Merchant Credit is settled once and the booking is confirmed. Inventory is consumed once at that confirmation. Commission is not posted until the booking is activated. Merchant Credit is separate from the Commission Wallet.`}
           </p>
           <TermsAccept
             statement="Read the Merchant Payment Terms, then confirm. The box starts unchecked."

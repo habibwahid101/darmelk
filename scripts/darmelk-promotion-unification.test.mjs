@@ -119,9 +119,9 @@ test("Batch 05 and 06 rails stay untouched and no new migration is added", () =>
   assert.match(smoke, /Growth Bank booking pending does not qualify/);
   assert.match(smoke, /Growth Bank payment submission does not qualify/);
   assert.match(smoke, /Growth Bank payment approval qualifies through existing confirmation/);
-  assert.match(smoke, /Merchant approval alone does not qualify for a promotion/);
-  assert.match(smoke, /Merchant-funded booking qualifies only after existing confirmation/);
-  assert.match(smoke, /Merchant approval does not consume inventory/);
+  assert.match(smoke, /Merchant approval confirms the booking and qualifies through existing confirmation/);
+  assert.match(smoke, /Merchant-funded booking qualifies only through existing confirmation/);
+  assert.match(smoke, /Merchant approval consumes inventory once/);
   assert.match(smoke, /Contact and Request to Book do not qualify for a promotion/);
   assert.match(smoke, /Promotion Terms are readable without consent/);
   const files = readdirSync(join(root, "migrations")).filter((name) => name.endsWith(".sql") && name.startsWith("001"));

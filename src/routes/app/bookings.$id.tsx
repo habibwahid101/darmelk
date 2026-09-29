@@ -88,8 +88,9 @@ function BookingDetailPage() {
           {booking.activated_at ? <li>Activated {formatWhen(booking.activated_at)}</li> : null}
         </ul>
         <p className="mt-4 text-sm text-muted">
-          Pending means operations has not confirmed this request yet. Cancelled and reversed
-          history is kept.
+          {booking.status === "pending"
+            ? "Pending means operations has not confirmed this request yet. Cancelled and reversed history is kept."
+            : "Cancelled and reversed history is kept."}
         </p>
         <Button asChild variant="secondary" className="mt-5">
           <Link to="/properties/$slug" params={{ slug: booking.offer_slug }}>

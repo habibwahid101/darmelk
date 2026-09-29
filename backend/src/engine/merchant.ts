@@ -815,6 +815,23 @@ async function completeMerchantFundedActivation(
   await approveActivation(client, activationId, actorUserId);
 }
 
+async function completeMerchantFundedBooking(
+  client: PoolClient,
+  bookingId: string,
+  actorUserId: string,
+): Promise<void> {
+  const { rows } = await client.query<{ status: string }>(
+    `select status from bookings where id = $1 for update`,
+    [bookingId],
+  );
+  const booking = rows[0];
+  if (!booking) throw conflict("Booking is no longer awaiting payment");
+  if (booking.status === "confirmed" || booking.status === "activated") return;
+  if (booking.status !== "pending") throw conflict(`Booking is ${booking.status}`);
+  const { confirmBooking } = await import("./bookings.js");
+  await confirmBooking(client, bookingId, actorUserId);
+}
+
 export async function approveMerchantPaymentRequest(
   client: PoolClient,
   merchantUserId: string,
@@ -830,6 +847,10 @@ export async function approveMerchantPaymentRequest(
   if (request.status === "approved" || request.status === "settled") {
     if ((request.purpose === "growth_activation" || request.activation_id) && request.activation_id) {
       await completeMerchantFundedActivation(client, request.activation_id, merchantUserId);
+      return presentMerchantRequest(client, request);
+    }
+    if (request.booking_id) {
+      await completeMerchantFundedBooking(client, request.booking_id, merchantUserId);
       return presentMerchantRequest(client, request);
     }
     return request;
@@ -885,6 +906,7 @@ export async function approveMerchantPaymentRequest(
   );
   const booking = bookingRows[0];
   if (!booking || booking.status !== "pending") throw conflict("Booking is no longer awaiting payment");
+  await assertRailAvailable(client, "booking", "merchant");
 
   const { rows: merchantRows } = await client.query<MerchantAccount>(
     `select * from merchants where user_id = $1 for update`,
@@ -917,7 +939,8 @@ export async function approveMerchantPaymentRequest(
     idempotencyKey: `reserve:${request.id}`,
     requireActive: true,
   });
-  return updated[0];
+  await completeMerchantFundedBooking(client, request.booking_id!, merchantUserId);
+  return presentMerchantRequest(client, updated[0]);
 }
 
 export async function declineMerchantPaymentRequest(

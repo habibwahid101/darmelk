@@ -13,6 +13,10 @@ import { PaymentForm, MerchantRequestStatus, MERCHANT_REQUEST_ALREADY_SUBMITTED,
 import { isGrowthParticipant } from "@/lib/growth";
 
 const ACTIVATION_FEE = 1000;
+const GROWTH_TERM_ITEMS = [
+  { key: "GROWTH_PROGRAM_TERMS", label: "Growth Program Terms", href: "/terms?key=growth-program" },
+  { key: "GROWTH_ACTIVATION_TERMS", label: "Growth Activation Terms", href: "/terms?key=growth-activation" },
+] as const;
 
 export const Route = createFileRoute("/app/activation")({
   component: ActivationPage,
@@ -30,19 +34,36 @@ function ActivationPage() {
   const { data: paymentData, reload: reloadPayments } = useAsync(() => api.myPayments(), [member?.user_id], { enabled: Boolean(member) });
   const { data: merchantData, reload: reloadMerchant } = useAsync(() => api.myMerchant(), [member?.user_id], { enabled: Boolean(member) });
   const { data: optionData } = useAsync(() => api.paymentOptions("activation"), []);
+  const { data: consentData, loading: consentsLoading } = useAsync(() => api.myConsents(), [member?.user_id], { enabled: Boolean(member) });
+  const { data: termsData, loading: termsLoading } = useAsync(
+    () => api.terms(["GROWTH_PROGRAM_TERMS", "GROWTH_ACTIVATION_TERMS"]),
+    [member?.user_id],
+    { enabled: Boolean(member) },
+  );
 
   if (!member) return null;
   if (!isGrowthParticipant(member)) return <Navigate to="/growth-program" />;
 
   const canRequest =
     member.activation_status === "inactive" || member.activation_status === "expired";
-  const termsReady = Boolean(accepted.GROWTH_PROGRAM_TERMS && accepted.GROWTH_ACTIVATION_TERMS);
+  const termsLoaded = Boolean(consentData && termsData) && !consentsLoading && !termsLoading;
+  const outstanding = termsLoaded
+    ? GROWTH_TERM_ITEMS.filter((item) => {
+        const current = termsData?.documents.find((doc) => doc.key === item.key);
+        if (!current) return true;
+        return !consentData?.consents.some(
+          (consent) => consent.document_key === item.key && consent.document_version === current.version,
+        );
+      })
+    : [...GROWTH_TERM_ITEMS];
+  const termsReady = termsLoaded && outstanding.every((item) => accepted[item.key]);
 
   async function requestActivation() {
+    if (!termsLoaded || !termsReady) return;
     setPending(true);
     setError(null);
     try {
-      const { activation } = await api.requestActivation(crypto.randomUUID(), true);
+      const { activation } = await api.requestActivation(crypto.randomUUID(), outstanding.length > 0);
       setCreatedId(activation.id);
       reloadActivations();
       reload();
@@ -93,15 +114,20 @@ function ActivationPage() {
         {error ? <p className="mt-4 text-sm text-clay" role="alert">{error}</p> : null}
         {canRequest ? (
           <div className="mt-6 space-y-5">
-            <TermsAccept
-              items={[
-                { key: "GROWTH_PROGRAM_TERMS", label: "Growth Program Terms", href: "/terms?key=growth-program" },
-                { key: "GROWTH_ACTIVATION_TERMS", label: "Growth Activation Terms", href: "/terms?key=growth-activation" },
-              ]}
-              accepted={accepted}
-              onChange={(key, value) => setAccepted((current) => ({ ...current, [key]: value }))}
-              statement="I have read and agree to the Growth Program Terms and Growth Activation Terms."
-            />
+            {outstanding.length > 0 ? (
+              <TermsAccept
+                items={[...outstanding]}
+                accepted={accepted}
+                onChange={(key, value) => setAccepted((current) => ({ ...current, [key]: value }))}
+                statement={
+                  outstanding.length === 1
+                    ? "I have read and agree to the remaining Growth terms."
+                    : "I have read and agree to the Growth Program Terms and Growth Activation Terms."
+                }
+              />
+            ) : (
+              <p className="text-sm text-muted">Current Growth Program Terms and Growth Activation Terms are already accepted.</p>
+            )}
             <Button className="w-full min-h-11" onClick={() => void requestActivation()} disabled={pending || !termsReady}>
               {pending ? "Submitting…" : member.activation_status === "expired" ? "Request Growth Program renewal" : "Request Growth Program Activation"}
             </Button>

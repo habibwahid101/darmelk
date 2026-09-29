@@ -2187,25 +2187,31 @@ async function main() {
   }));
   const merchantQualBefore = await query(`select id from promotion_qualifications where booking_id=$1`, [merchantBook.booking.id]);
   const merchantInvBefore = await query(`select id from offer_inventory_events where booking_id=$1 and event_type='consume'`, [merchantBook.booking.id]);
+  const merchantBookingRow = await queryOne<{ status: string }>(`select status from bookings where id=$1`, [merchantBook.booking.id]);
   record(
-    "Merchant approval alone does not qualify for a promotion",
-    merchantAppr.request?.status === "approved" && merchantQualBefore.length === 0,
-    { request: merchantAppr.request?.status, quals: merchantQualBefore.length },
+    "Merchant approval confirms the booking and qualifies through existing confirmation",
+    merchantAppr.request?.status === "settled" && merchantBookingRow?.status === "confirmed" && merchantQualBefore.length > 0,
+    { request: merchantAppr.request?.status, status: merchantBookingRow?.status, quals: merchantQualBefore.length },
   );
   record(
-    "Merchant approval does not consume inventory",
-    merchantInvBefore.length === 0,
+    "Merchant approval consumes inventory once",
+    merchantInvBefore.length === 1,
     merchantInvBefore.length,
   );
-  const merchantConfirm = await json(await app.request(`/api/admin/bookings/${merchantBook.booking.id}/confirm`, {
+  const merchantConfirm = await app.request(`/api/admin/bookings/${merchantBook.booking.id}/confirm`, {
     method: "POST", headers: { cookie: adminCookie },
-  }));
+  });
+  record(
+    "Merchant-funded booking does not accept a second admin confirmation",
+    merchantConfirm.status === 409,
+    merchantConfirm.status,
+  );
   const merchantQualAfter = await query(`select id from promotion_qualifications where booking_id=$1 and user_id=$2`, [merchantBook.booking.id, pu6.member.user_id]);
   const merchantInvAfter = await query(`select id from offer_inventory_events where booking_id=$1 and event_type='consume'`, [merchantBook.booking.id]);
   record(
-    "Merchant-funded booking qualifies only after existing confirmation",
-    merchantConfirm.booking?.status === "confirmed" && merchantQualAfter.length > 0,
-    { status: merchantConfirm.booking?.status, quals: merchantQualAfter.length },
+    "Merchant-funded booking qualifies only through existing confirmation",
+    merchantQualAfter.length === merchantQualBefore.length && merchantQualAfter.length > 0,
+    { status: merchantBookingRow?.status, quals: merchantQualAfter.length },
   );
   record("Merchant-funded confirmation consumes inventory once", merchantInvAfter.length === 1, merchantInvAfter.length);
   const merchantComm = await query(`select id from commission_ledger where source_booking_id=$1`, [merchantBook.booking.id]);

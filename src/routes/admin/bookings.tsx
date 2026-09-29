@@ -33,7 +33,7 @@ function AdminBookings() {
       <PageHeader
         kicker="Operations"
         title="Bookings"
-        description="Confirming a booking uses that offer’s actual booking amount for any upline commission. Reversed rows stay in history."
+        description="Merchant approval confirms a Pay by Merchant booking. Bank payments are still confirmed in Payment review. Activating a confirmed booking posts commission. Reversed rows stay in history."
       />
 
       {loading && !data ? (
@@ -61,23 +61,13 @@ function AdminBookings() {
                 {b.status === "pending" ? (
                   <p className="text-sm text-muted">
                     {b.merchant_request_status === "approved"
-                      ? "Merchant Credit is reserved. Confirming settles it and does not post commission until activation."
+                      ? "This Merchant-approved booking was not auto-completed. It still needs owner review and was not changed by this release."
                       : b.merchant_request_status === "pending"
                         ? "Awaiting Merchant approval."
                         : "Awaiting payment review."}
                   </p>
                 ) : null}
                 <div className="flex flex-wrap items-center gap-2">
-                  {b.status === "pending" && b.merchant_request_status === "approved" ? (
-                    <Button
-                      size="sm"
-                      className="shrink-0"
-                      disabled={busyId === b.id}
-                      onClick={() => void run(b.id, () => api.admin.confirmBooking(b.id))}
-                    >
-                      Confirm Merchant payment
-                    </Button>
-                  ) : null}
                   {b.status === "confirmed" ? (
                     <Button
                       size="sm"

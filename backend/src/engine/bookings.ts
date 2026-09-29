@@ -169,8 +169,8 @@ export async function confirmBooking(client: PoolClient, bookingId: string, admi
   );
   await settleMerchantPaymentForBooking(client, bookingId);
   // Single qualification entry for every payment rail. Bank approval and
-  // Merchant-funded confirmation both reach this function; Merchant approval
-  // itself never does.
+  // Merchant-funded confirmation both reach this function. Merchant booking
+  // approval calls it once; it does not post commissions or write the snapshot.
   await evaluatePromotionsForConfirmedBooking(client, bookingId, adminUserId);
   return updated[0]!;
 }

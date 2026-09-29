@@ -308,13 +308,14 @@ function MerchantDashboard({
       {confirming ? (
         <Surface>
           <p className="text-xs font-medium uppercase tracking-wide text-subtle">Confirm approval</p>
-          <h2 className="mt-2 font-display text-2xl font-semibold">Reserve {formatBdt(confirming.amount)}?</h2>
+          <h2 className="mt-2 font-display text-2xl font-semibold">Approve {formatBdt(confirming.amount)}?</h2>
           <p className="mt-2 text-sm text-muted">
             {confirming.customer_name ?? "Customer"} · {confirming.offer_title} · {confirming.purpose === "growth_activation" ? "Growth Program Activation" : confirming.booking_id}
           </p>
           <p className="mt-3 text-sm text-muted">
-            Approving reserves this amount from available Merchant Credit. It does not confirm the booking, consume
-            inventory, or activate Growth Program privileges.
+            {confirming.purpose === "growth_activation"
+              ? "Approving settles this amount once and completes Growth Program Activation. No separate Darmelk approval is required."
+              : "Approving settles this amount once and confirms the booking. Inventory is consumed once. Commission is not posted until activation. No separate Darmelk payment approval is required."}
           </p>
           <div className="mt-5 flex flex-col gap-3 sm:flex-row">
             <Button disabled={busyId === confirming.id} onClick={() => void decide(confirming.id, "approve")}>
