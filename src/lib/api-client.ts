@@ -76,6 +76,7 @@ export type Booking = {
   qualification_benefit: number;
   full_payment_price?: number | null;
   full_payment_deadline_days?: number | null;
+  payment_completion_deadline?: string | null;
   installment_enabled?: boolean | null;
   installment_count?: number | null;
   installment_frequency?: string | null;

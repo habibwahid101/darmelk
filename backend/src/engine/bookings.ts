@@ -15,6 +15,13 @@ import {
 } from "./promotions.js";
 import { recordConsents, requireCurrentConsentFor } from "./terms.js";
 
+function frozenCalendarDate(value: unknown): string | null {
+  if (value == null || value === "") return null;
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value.toISOString().slice(0, 10);
+  const match = /^(\d{4}-\d{2}-\d{2})/.exec(String(value).trim());
+  return match ? match[1] : null;
+}
+
 export type Booking = {
   id: string;
   user_id: string;
@@ -26,6 +33,7 @@ export type Booking = {
   offer_version?: number;
   full_payment_price?: number | null;
   full_payment_deadline_days?: number | null;
+  payment_completion_deadline?: string | null;
   installment_enabled?: boolean;
   installment_count?: number | null;
   installment_frequency?: string | null;
@@ -51,6 +59,7 @@ type OfferFreeze = {
   total_quantity: number | null;
   full_payment_price: number | null;
   full_payment_deadline_days: number | null;
+  payment_completion_deadline: string | null;
   installment_enabled: boolean;
   installment_count: number | null;
   installment_frequency: string | null;
@@ -78,7 +87,8 @@ export async function createBooking(
             full_payment_price, full_payment_deadline_days,
             coalesce(installment_enabled, false) as installment_enabled,
             installment_count, installment_frequency, installment_amount,
-            installment_duration_months, first_installment_due_rule, grace_period_days
+            installment_duration_months, first_installment_due_rule, grace_period_days,
+            payment_completion_deadline
        from offers where slug = $1`,
     [offerSlug],
   );
@@ -104,9 +114,10 @@ export async function createBooking(
         commission_eligible_amount, offer_version, status,
         full_payment_price, full_payment_deadline_days, installment_enabled,
         installment_count, installment_frequency, installment_amount,
-        installment_duration_months, first_installment_due_rule, grace_period_days
+        installment_duration_months, first_installment_due_rule, grace_period_days,
+        payment_completion_deadline
       )
-     values ($1,$2,$3,$4,$5,$6,$7,$8,'pending',$9,$10,$11,$12,$13,$14,$15,$16,$17)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,'pending',$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
      returning *`,
     [
       id,
@@ -126,6 +137,7 @@ export async function createBooking(
       offer.installment_duration_months,
       offer.first_installment_due_rule,
       offer.grace_period_days,
+      frozenCalendarDate(offer.payment_completion_deadline),
     ],
   );
   const booking = rows[0]!;
@@ -197,8 +209,8 @@ export async function activateBooking(client: PoolClient, bookingId: string): Pr
         commission_eligible_amount, offer_version, activated_at,
         full_payment_price, full_payment_deadline_days, installment_enabled, installment_count,
         installment_frequency, installment_amount, installment_duration_months,
-        first_installment_due_rule, grace_period_days)
-     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,now(),$11,$12,$13,$14,$15,$16,$17,$18,$19)
+        first_installment_due_rule, grace_period_days, payment_completion_deadline)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,now(),$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
      on conflict (booking_id) do nothing`,
     [
       uid("snap"),
@@ -220,6 +232,7 @@ export async function activateBooking(client: PoolClient, bookingId: string): Pr
       booking.installment_duration_months ?? null,
       booking.first_installment_due_rule ?? null,
       booking.grace_period_days ?? null,
+      frozenCalendarDate(booking.payment_completion_deadline),
     ],
   );
   await postCommissionsForBooking(client, {

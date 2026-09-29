@@ -82,15 +82,15 @@ export function FeaturedOffer({ offer }: { offer: PropertyOffer }) {
         </div>
       </div>
       <div className="flex min-w-0 flex-col justify-center p-5 sm:p-6 lg:p-8">
+        <h2 className="font-display text-2xl font-semibold tracking-tight md:text-[1.75rem] lg:text-3xl">
+          {offer.title}
+        </h2>
         {offer.location ? (
-          <p className="flex items-center gap-1.5 text-sm text-muted">
+          <p className="mt-2 flex items-center gap-1.5 text-sm text-muted">
             <MapPin className="size-3.5" aria-hidden="true" />
             {offer.location}
           </p>
         ) : null}
-        <h2 className="mt-2 font-display text-2xl font-semibold tracking-tight md:text-[1.75rem] lg:text-3xl">
-          {offer.title}
-        </h2>
         <p className="mt-3 text-sm leading-relaxed text-muted">{offer.summary}</p>
         <p className="mt-2 text-xs text-subtle">Figures below belong to this offer only.</p>
         <div className="mt-5">

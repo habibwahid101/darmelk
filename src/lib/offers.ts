@@ -24,6 +24,7 @@ export type PropertyOffer = {
   commissionEligibleAmount?: number;
   fullPaymentPrice?: number | null;
   fullPaymentDeadlineDays?: number | null;
+  paymentCompletionDeadline?: string | null;
   installmentEnabled?: boolean;
   installmentCount?: number | null;
   installmentFrequency?: string | null;
@@ -118,6 +119,35 @@ export function formatBdt(amount: number) {
   return `BDT\u00A0${amount.toLocaleString("en-US")}`;
 }
 
+const CALENDAR_MONTHS = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+] as const;
+
+/** Fixed calendar date, never a count of days after booking. */
+export function formatCalendarDate(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+  const utc = new Date(Date.UTC(year, month - 1, day));
+  if (utc.getUTCFullYear() !== year || utc.getUTCMonth() !== month - 1 || utc.getUTCDate() !== day) return null;
+  return `${day} ${CALENDAR_MONTHS[month - 1]} ${year}`;
+}
+
 export function exampleCommission(bookingAmount: number, rate: number, positions: number) {
   return Math.round(bookingAmount * rate * positions);
 }
@@ -182,6 +212,7 @@ export type ApiOffer = {
   commission_eligible_amount?: number | null;
   full_payment_price?: number | null;
   full_payment_deadline_days?: number | null;
+  payment_completion_deadline?: string | null;
   installment_enabled?: boolean | null;
   installment_count?: number | null;
   installment_frequency?: string | null;
@@ -237,6 +268,7 @@ export function fromApiOffer(row: ApiOffer): PropertyOffer {
     commissionEligibleAmount: row.commission_eligible_amount ?? row.booking_amount,
     fullPaymentPrice: row.full_payment_price ?? null,
     fullPaymentDeadlineDays: row.full_payment_deadline_days ?? null,
+    paymentCompletionDeadline: row.payment_completion_deadline ?? null,
     installmentEnabled: Boolean(row.installment_enabled),
     installmentCount: row.installment_count ?? null,
     installmentFrequency: row.installment_frequency ?? null,

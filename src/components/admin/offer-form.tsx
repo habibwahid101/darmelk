@@ -18,7 +18,7 @@ export type OfferFormValue = {
   qualificationBenefit: string;
   commissionEligibleAmount: string;
   fullPaymentPrice: string;
-  fullPaymentDeadlineDays: string;
+  paymentCompletionDeadline: string;
   installmentEnabled: boolean;
   installmentCount: string;
   installmentFrequency: string;
@@ -44,6 +44,12 @@ function optionalNumber(value: string): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+function dateInputValue(value: string | null | undefined): string {
+  if (!value) return "";
+  const match = /^(\d{4}-\d{2}-\d{2})/.exec(value);
+  return match ? match[1] : "";
+}
+
 export function emptyOfferForm(): OfferFormValue {
   return {
     title: "",
@@ -59,7 +65,7 @@ export function emptyOfferForm(): OfferFormValue {
     qualificationBenefit: "",
     commissionEligibleAmount: "",
     fullPaymentPrice: "",
-    fullPaymentDeadlineDays: "",
+    paymentCompletionDeadline: "",
     installmentEnabled: false,
     installmentCount: "",
     installmentFrequency: "monthly",
@@ -94,7 +100,7 @@ export function formFromOffer(offer: PropertyOffer): OfferFormValue {
     qualificationBenefit: String(offer.qualificationBenefit),
     commissionEligibleAmount: String(offer.commissionEligibleAmount ?? offer.bookingAmount),
     fullPaymentPrice: offer.fullPaymentPrice != null ? String(offer.fullPaymentPrice) : "",
-    fullPaymentDeadlineDays: offer.fullPaymentDeadlineDays != null ? String(offer.fullPaymentDeadlineDays) : "",
+    paymentCompletionDeadline: dateInputValue(offer.paymentCompletionDeadline),
     installmentEnabled: Boolean(offer.installmentEnabled),
     installmentCount: offer.installmentCount != null ? String(offer.installmentCount) : "",
     installmentFrequency: offer.installmentFrequency || "monthly",
@@ -130,7 +136,7 @@ export function payloadFromForm(form: OfferFormValue, opts?: { includeSlug?: boo
     qualificationBenefit: Number(form.qualificationBenefit),
     commissionEligibleAmount: Number(form.commissionEligibleAmount || form.bookingAmount),
     fullPaymentPrice: optionalNumber(form.fullPaymentPrice),
-    fullPaymentDeadlineDays: optionalNumber(form.fullPaymentDeadlineDays),
+    paymentCompletionDeadline: form.paymentCompletionDeadline.trim() || null,
     installmentEnabled: form.installmentEnabled,
     installmentCount: optionalNumber(form.installmentCount),
     installmentFrequency: form.installmentEnabled ? form.installmentFrequency || null : null,
@@ -218,7 +224,7 @@ export function OfferForm({
             ))}
           </select>
         </Field>
-        <Field label="Location" htmlFor="offer-location">
+        <Field label="Project Location" hint="Shown under the property title. Not part of the commercial table." htmlFor="offer-location">
           <Input id="offer-location" value={value.location} onChange={(e) => set({ location: e.target.value })} />
         </Field>
       </Section>
@@ -282,8 +288,8 @@ export function OfferForm({
               required
             />
           </Field>
-          <Field label="Full payment deadline (days)" hint="Days after booking. Leave blank if unused." htmlFor="offer-full-deadline">
-            <Input id="offer-full-deadline" inputMode="numeric" value={value.fullPaymentDeadlineDays} onChange={(e) => set({ fullPaymentDeadlineDays: e.target.value })} />
+          <Field label="Payment Completion Deadline" hint="Fixed calendar date for this offer. Not calculated from the booking date." htmlFor="offer-completion-deadline">
+            <Input id="offer-completion-deadline" type="date" value={value.paymentCompletionDeadline} onChange={(e) => set({ paymentCompletionDeadline: e.target.value })} />
           </Field>
         </div>
       </Section>
@@ -337,10 +343,10 @@ export function OfferForm({
                 <option value="yearly">Yearly</option>
               </select>
             </Field>
-            <Field label="Installment amount (BDT)" hint="Leave blank to divide full payment price by count." htmlFor="offer-inst-amount">
+            <Field label="Installment Amount (BDT)" hint="Leave blank to divide full payment price by count." htmlFor="offer-inst-amount">
               <Input id="offer-inst-amount" inputMode="numeric" value={value.installmentAmount} onChange={(e) => set({ installmentAmount: e.target.value })} />
             </Field>
-            <Field label="Duration (months)" htmlFor="offer-inst-duration">
+            <Field label="Installment Duration (months)" htmlFor="offer-inst-duration">
               <Input id="offer-inst-duration" inputMode="numeric" value={value.installmentDurationMonths} onChange={(e) => set({ installmentDurationMonths: e.target.value })} />
             </Field>
             <Field label="First installment due" htmlFor="offer-inst-first">
