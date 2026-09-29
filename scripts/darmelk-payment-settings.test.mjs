@@ -90,7 +90,10 @@ test("merchant remains a rail: booking reserve-only, activation uses approveActi
   const activation = read("backend/src/engine/activation.ts");
   const router = read("backend/src/router.ts");
   const approve = merchant.slice(merchant.indexOf("export async function approveMerchantPaymentRequest"));
-  assert.doesNotMatch(approve, /confirmBooking|activateBooking|consumeInventoryForConfirmation|postCommissionsForBooking|evaluatePromotions|approveActivation/);
+  const bookingApprove = approve.slice(approve.indexOf("select status from bookings"));
+  assert.match(approve.slice(0, approve.indexOf("select status from bookings")), /completeMerchantFundedActivation/);
+  assert.match(merchant, /const \{ approveActivation \} = await import\("\.\/activation\.js"\)/);
+  assert.doesNotMatch(bookingApprove, /confirmBooking|activateBooking|consumeInventoryForConfirmation|postCommissionsForBooking|evaluatePromotions|approveActivation|completeMerchantFundedActivation/);
   assert.match(merchant, /activation_payment_reserved/);
   assert.match(merchant, /activation_payment_settled/);
   assert.match(merchant, /createMerchantActivationPaymentRequest/);

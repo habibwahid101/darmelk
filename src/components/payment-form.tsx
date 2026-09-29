@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { Check, Copy } from "lucide-react";
-import { api, ApiError, type PaymentOptions } from "@/lib/api-client";
+import { api, ApiError, type MerchantPaymentRequest, type PaymentOptions } from "@/lib/api-client";
 import { useAsync } from "@/lib/use-async";
 import { formatBdt } from "@/lib/offers";
+import { formatWhen } from "@/lib/platform";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -23,6 +24,69 @@ function railLabel(rail: Rail, targetType: ManualTarget) {
   if (rail === "bank") return targetType === "booking" ? "Pay via Darmelk Bank" : "Darmelk Bank";
   if (rail === "mfs") return "Pay by MFS";
   return "Pay by Merchant";
+}
+
+export const MERCHANT_REQUEST_SUBMITTED = "Payment request has been submitted successfully.";
+export const MERCHANT_REQUEST_ALREADY_SUBMITTED = "Your payment request has already been submitted.";
+
+export function merchantRequestStatusLabel(status: string) {
+  if (status === "pending") return "Pending Merchant Approval";
+  if (status === "approved") return "Approved";
+  if (status === "declined") return "Declined";
+  if (status === "cancelled") return "Cancelled";
+  if (status === "settled") return "Completed";
+  if (status === "reversed") return "Reversed";
+  return status;
+}
+
+export function MerchantRequestStatus({ request }: { request: MerchantPaymentRequest }) {
+  const activation = request.purpose === "growth_activation";
+  const merchant = request.merchant_name || request.merchant_user_id;
+  const reference = activation ? "Growth Program Activation" : request.offer_title || request.booking_id || "Booking";
+  return (
+    <Surface>
+      <p className="text-xs font-medium uppercase tracking-wide text-subtle">Merchant Payment Request</p>
+      <dl className="mt-4 space-y-3 text-sm">
+        <div className="flex items-start justify-between gap-4">
+          <dt className="text-muted">Merchant</dt>
+          <dd className="break-all text-right font-medium">{merchant}</dd>
+        </div>
+        <div className="flex items-start justify-between gap-4">
+          <dt className="text-muted">Amount</dt>
+          <dd className="font-medium">{formatBdt(request.amount)}</dd>
+        </div>
+        <div className="flex items-start justify-between gap-4">
+          <dt className="text-muted">Context</dt>
+          <dd className="text-right font-medium">{activation ? "Growth Program Activation" : "Growth Booking"}</dd>
+        </div>
+        <div className="flex items-start justify-between gap-4">
+          <dt className="text-muted">{activation ? "Reference" : "Property"}</dt>
+          <dd className="break-all text-right font-medium">{reference}</dd>
+        </div>
+        <div className="flex items-start justify-between gap-4">
+          <dt className="text-muted">Status</dt>
+          <dd className="text-right font-medium">{merchantRequestStatusLabel(request.status)}</dd>
+        </div>
+        <div className="flex items-start justify-between gap-4">
+          <dt className="text-muted">Requested</dt>
+          <dd className="text-right font-medium">{formatWhen(request.created_at)}</dd>
+        </div>
+      </dl>
+      <p className="mt-4 text-sm text-muted">
+        {request.status === "pending"
+          ? "The request is waiting for this Merchant to approve or decline it."
+          : request.status === "declined"
+            ? activation
+              ? "This Merchant declined the request. Growth Program Activation was not completed and no Merchant Credit was used."
+              : "This Merchant declined the request. No booking confirmation, commission, or inventory change was made."
+            : request.status === "approved" || (request.status === "settled" && activation)
+              ? activation
+                ? "Merchant approval completed this Growth Program Activation. No separate Darmelk approval is required."
+                : "Merchant approval reserves credit only. Darmelk still confirms the booking."
+              : "This request is kept for history."}
+      </p>
+    </Surface>
+  );
 }
 
 export function describePaymentOptions(options?: PaymentOptions | null, targetType?: ManualTarget) {
@@ -49,7 +113,7 @@ export function PaymentForm({
   targetType: ManualTarget;
   targetId: string;
   amount: number;
-  onSubmitted: () => void;
+  onSubmitted: (result?: { merchantRequest?: MerchantPaymentRequest; alreadyOpen?: boolean }) => void;
 }) {
   const { data } = useAsync(() => api.paymentOptions(targetType), [targetType]);
   const options = data?.options;
@@ -116,11 +180,12 @@ export function PaymentForm({
           return;
         }
         if (targetType === "activation") {
-          await api.requestActivationMerchantPay(targetId, merchantUserId.trim(), crypto.randomUUID(), true);
+          const created = await api.requestActivationMerchantPay(targetId, merchantUserId.trim(), crypto.randomUUID(), true);
+          onSubmitted({ merchantRequest: created.request, alreadyOpen: created.alreadyOpen === true });
         } else {
-          await api.requestMerchantPay(targetId, merchantUserId.trim(), crypto.randomUUID(), true);
+          const created = await api.requestMerchantPay(targetId, merchantUserId.trim(), crypto.randomUUID(), true);
+          onSubmitted({ merchantRequest: created.request, alreadyOpen: created.alreadyOpen === true });
         }
-        onSubmitted();
         return;
       }
       if (!selected) {
@@ -171,7 +236,7 @@ export function PaymentForm({
         <p className="max-w-sm text-sm text-muted">
           {merchantMode
             ? targetType === "activation"
-              ? "Request payment from an active Merchant. Growth Program Activation stays pending until Darmelk confirms it."
+              ? "Request payment from an active Merchant. If the Merchant approves, Growth Program Activation completes. No separate Darmelk approval is required."
               : "Request payment from an active Merchant. The booking stays pending until Darmelk confirms it."
             : allowMerchant
               ? "Pay via Darmelk Bank, then submit the reference and proof. Payment is not approved automatically."
@@ -222,9 +287,9 @@ export function PaymentForm({
             />
           </Field>
           <p className="text-sm text-muted">
-            This creates a payment request for {formatBdt(amount)}. Merchant Credit is reserved only if the Merchant
-            approves. Merchant approval does not confirm the booking, consume inventory, create commission, or qualify
-            a promotion. Merchant Credit is separate from the Commission Wallet.
+            {targetType === "activation"
+              ? `This creates a payment request for ${formatBdt(amount)}. If the Merchant approves, Merchant Credit is settled once and Growth Program Activation completes. No separate Darmelk approval is required. Merchant Credit is separate from the Commission Wallet.`
+              : `This creates a payment request for ${formatBdt(amount)}. Merchant Credit is reserved only if the Merchant approves. Merchant approval does not confirm the booking, consume inventory, create commission, or qualify a promotion. Merchant Credit is separate from the Commission Wallet.`}
           </p>
           <TermsAccept
             statement="Read the Merchant Payment Terms, then confirm. The box starts unchecked."

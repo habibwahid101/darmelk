@@ -1,11 +1,11 @@
 import { useState } from "react";
-import { Check, Copy, Link2, Share2 } from "lucide-react";
+import { Check, Copy, Link2 } from "lucide-react";
 import { Surface } from "@/components/states";
-import { referralLinkFor, referralShareText } from "@/lib/referral";
+import { REFERRAL_ORIGIN, referralLinkFor } from "@/lib/referral";
 
 export function ReferralShareCard({ code }: { code: string }) {
   const [copied, setCopied] = useState<"code" | "link" | null>(null);
-  const link = referralLinkFor(code);
+  const link = referralLinkFor(code, REFERRAL_ORIGIN);
 
   async function copy(kind: "code" | "link") {
     try {
@@ -15,19 +15,6 @@ export function ReferralShareCard({ code }: { code: string }) {
     } catch {
       setCopied(null);
     }
-  }
-
-  async function share() {
-    const text = referralShareText(link);
-    if (typeof navigator.share === "function") {
-      try {
-        await navigator.share({ title: "Darmelk", text, url: link });
-        return;
-      } catch {
-        // fall through to copy
-      }
-    }
-    await copy("link");
   }
 
   return (
@@ -53,15 +40,6 @@ export function ReferralShareCard({ code }: { code: string }) {
         >
           {copied === "link" ? <Check className="size-4" /> : <Link2 className="size-4" />}
           {copied === "link" ? "Copied" : "Copy link"}
-        </button>
-        <button
-          type="button"
-          onClick={() => void share()}
-          className="inline-flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm font-medium text-pine hover:bg-pine/8"
-          aria-label="Share referral link"
-        >
-          <Share2 className="size-4" />
-          Share
         </button>
       </div>
     </Surface>
