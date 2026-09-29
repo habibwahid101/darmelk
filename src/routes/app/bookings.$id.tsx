@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { useMemberSession } from "@/components/layout/use-member";
 import { formatWhen } from "@/lib/platform";
+import { formatCalendarDate } from "@/lib/offers";
 import { api, ApiError } from "@/lib/api-client";
 import { useAsync } from "@/lib/use-async";
 import { MerchantRequestStatus } from "@/components/payment-form";
@@ -65,15 +66,26 @@ function BookingDetailPage() {
           {booking.full_payment_price ? <AmountRow label="Full payment price" value={booking.full_payment_price} /> : null}
           <AmountRow label="Booking amount" value={booking.booking_amount} />
           <AmountRow label="Qualification benefit" value={booking.qualification_benefit} />
+          {booking.installment_amount ? <AmountRow label="Installment Amount" value={booking.installment_amount} /> : null}
+          {booking.installment_duration_months ? (
+            <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-3 border-b border-line py-2.5 last:border-0">
+              <dt className="min-w-0 text-sm text-muted">Installment Duration</dt>
+              <dd className="text-right text-sm font-medium text-ink">
+                {booking.installment_duration_months} month{booking.installment_duration_months === 1 ? "" : "s"}
+              </dd>
+            </div>
+          ) : null}
+          {formatCalendarDate(booking.payment_completion_deadline) ? (
+            <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-3 border-b border-line py-2.5 last:border-0">
+              <dt className="min-w-0 text-sm text-muted">Payment Completion Deadline</dt>
+              <dd className="text-right text-sm font-medium text-ink">{formatCalendarDate(booking.payment_completion_deadline)}</dd>
+            </div>
+          ) : null}
         </dl>
-        {booking.installment_enabled && booking.installment_count && booking.installment_amount ? (
+        {!formatCalendarDate(booking.payment_completion_deadline) && booking.full_payment_deadline_days ? (
           <p className="mt-3 text-sm text-muted">
-            Frozen installment plan: {booking.installment_count} {booking.installment_frequency ?? ""} payments of{" "}
-            {booking.installment_amount.toLocaleString("en-US")} BDT
-            {booking.full_payment_deadline_days ? ` · full payment within ${booking.full_payment_deadline_days} days` : ""}.
+            Frozen full-payment deadline: {booking.full_payment_deadline_days} days after booking.
           </p>
-        ) : booking.full_payment_deadline_days ? (
-          <p className="mt-3 text-sm text-muted">Frozen full-payment deadline: {booking.full_payment_deadline_days} days after booking.</p>
         ) : null}
         <p className="mt-3 text-xs text-subtle">Figures belong to this offer only. They do not change if the live offer is edited later.</p>
       </Surface>

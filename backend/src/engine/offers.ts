@@ -36,6 +36,7 @@ export type OfferRow = {
   commission_eligible_amount: number;
   full_payment_price: number | null;
   full_payment_deadline_days: number | null;
+  payment_completion_deadline: string | null;
   installment_enabled: boolean;
   installment_count: number | null;
   installment_frequency: string | null;
@@ -84,6 +85,8 @@ export type OfferInput = {
   full_payment_price?: number | null;
   fullPaymentDeadlineDays?: number | null;
   full_payment_deadline_days?: number | null;
+  paymentCompletionDeadline?: string | null;
+  payment_completion_deadline?: string | null;
   installmentEnabled?: boolean;
   installment_enabled?: boolean;
   installmentCount?: number | null;
@@ -142,6 +145,31 @@ function optionalPositiveInt(value: unknown, label: string): number | null {
     throw badRequest(`${label} must be a positive whole number`);
   }
   return n;
+}
+
+function optionalCalendarDate(value: unknown, label: string): string | null {
+  if (value == null || value === "") return null;
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) throw badRequest(`${label} must be a calendar date`);
+    return value.toISOString().slice(0, 10);
+  }
+  if (typeof value !== "string") throw badRequest(`${label} must be a calendar date`);
+  const text = value.trim().slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) throw badRequest(`${label} must be a calendar date`);
+  const [year, month, day] = text.split("-").map(Number);
+  const utc = new Date(Date.UTC(year!, month! - 1, day));
+  if (utc.getUTCFullYear() !== year || utc.getUTCMonth() !== month! - 1 || utc.getUTCDate() !== day) {
+    throw badRequest(`${label} must be a calendar date`);
+  }
+  return text;
+}
+
+export function calendarDate(value: unknown): string | null {
+  if (value == null || value === "") return null;
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value.toISOString().slice(0, 10);
+  if (typeof value !== "string") return null;
+  const match = /^(\d{4}-\d{2}-\d{2})/.exec(value.trim());
+  return match ? match[1] : null;
 }
 
 function optionalNonNegInt(value: unknown, label: string): number | null {
@@ -213,6 +241,7 @@ function normalize(row: OfferRow): OfferRow {
     installment_enabled: Boolean(row.installment_enabled),
     full_payment_price: row.full_payment_price ?? null,
     full_payment_deadline_days: row.full_payment_deadline_days ?? null,
+    payment_completion_deadline: calendarDate(row.payment_completion_deadline),
     installment_count: row.installment_count ?? null,
     installment_frequency: row.installment_frequency ?? null,
     installment_amount: row.installment_amount ?? null,
@@ -286,6 +315,10 @@ function parsedInput(body: OfferInput) {
     body.fullPaymentDeadlineDays ?? body.full_payment_deadline_days,
     "Full payment deadline",
   );
+  const paymentCompletionDeadline = optionalCalendarDate(
+    body.paymentCompletionDeadline ?? body.payment_completion_deadline,
+    "Payment Completion Deadline",
+  );
   const installmentEnabled = Boolean(body.installmentEnabled ?? body.installment_enabled);
   let installmentCount = optionalPositiveInt(body.installmentCount ?? body.installment_count, "Installment count");
   let installmentFrequency = cleanText(body.installmentFrequency ?? body.installment_frequency ?? "", "Installment frequency", 20) || null;
@@ -348,6 +381,7 @@ function parsedInput(body: OfferInput) {
     commissionEligible,
     fullPaymentPrice,
     fullPaymentDeadlineDays,
+    paymentCompletionDeadline,
     installmentEnabled,
     installmentCount,
     installmentFrequency,
@@ -372,7 +406,7 @@ function assertPublishable(parsed: ReturnType<typeof parsedInput>) {
 const OFFER_WRITE_COLS = `
        slug, title, category, category_slug, location, image, hero_image, image_alt, hero_image_alt,
        retail_value, booking_amount, qualification_benefit, commission_eligible_amount,
-       full_payment_price, full_payment_deadline_days, installment_enabled, installment_count,
+       full_payment_price, full_payment_deadline_days, payment_completion_deadline, installment_enabled, installment_count,
        installment_frequency, installment_amount, installment_duration_months,
        first_installment_due_rule, grace_period_days, total_quantity,
        status, flagship, summary, details, features, notes, display_order, gallery, version
@@ -395,6 +429,7 @@ function writeParams(slug: string, parsed: ReturnType<typeof parsedInput>, versi
     parsed.commissionEligible,
     parsed.fullPaymentPrice,
     parsed.fullPaymentDeadlineDays,
+    parsed.paymentCompletionDeadline,
     parsed.installmentEnabled,
     parsed.installmentCount,
     parsed.installmentFrequency,
@@ -427,7 +462,7 @@ export async function createOffer(client: PoolClient, body: OfferInput): Promise
   const { rows } = await client.query<OfferRow>(
     `insert into offers (${OFFER_WRITE_COLS})
      values (
-       $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28::jsonb,$29,$30,$31::jsonb,$32
+       $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29::jsonb,$30,$31,$32::jsonb,$33
      ) returning *`,
     writeParams(slug, parsed, 1),
   );
@@ -454,6 +489,7 @@ export async function updateOffer(client: PoolClient, slug: string, body: OfferI
     displayOrder: existing.display_order,
     fullPaymentPrice: existing.full_payment_price,
     fullPaymentDeadlineDays: existing.full_payment_deadline_days,
+    paymentCompletionDeadline: calendarDate(existing.payment_completion_deadline),
     installmentEnabled: existing.installment_enabled,
     installmentCount: existing.installment_count,
     installmentFrequency: existing.installment_frequency,
@@ -476,6 +512,7 @@ export async function updateOffer(client: PoolClient, slug: string, body: OfferI
     parsed.commissionEligible !== existing.commission_eligible_amount ||
     parsed.fullPaymentPrice !== (existing.full_payment_price ?? null) ||
     parsed.fullPaymentDeadlineDays !== (existing.full_payment_deadline_days ?? null) ||
+    parsed.paymentCompletionDeadline !== calendarDate(existing.payment_completion_deadline) ||
     parsed.installmentEnabled !== Boolean(existing.installment_enabled) ||
     parsed.installmentCount !== (existing.installment_count ?? null) ||
     parsed.installmentFrequency !== (existing.installment_frequency ?? null) ||
@@ -491,11 +528,12 @@ export async function updateOffer(client: PoolClient, slug: string, body: OfferI
        image = $6, hero_image = $7, image_alt = $8, hero_image_alt = $9,
        retail_value = $10, booking_amount = $11, qualification_benefit = $12,
        commission_eligible_amount = $13, full_payment_price = $14, full_payment_deadline_days = $15,
-       installment_enabled = $16, installment_count = $17, installment_frequency = $18,
-       installment_amount = $19, installment_duration_months = $20, first_installment_due_rule = $21,
-       grace_period_days = $22, total_quantity = $23, status = $24, flagship = $25,
-       summary = $26, details = $27, features = $28::jsonb, notes = $29,
-       display_order = $30, gallery = $31::jsonb, version = $32, updated_at = now()
+       payment_completion_deadline = $16,
+       installment_enabled = $17, installment_count = $18, installment_frequency = $19,
+       installment_amount = $20, installment_duration_months = $21, first_installment_due_rule = $22,
+       grace_period_days = $23, total_quantity = $24, status = $25, flagship = $26,
+       summary = $27, details = $28, features = $29::jsonb, notes = $30,
+       display_order = $31, gallery = $32::jsonb, version = $33, updated_at = now()
      where slug = $1
      returning *`,
     writeParams(slug, parsed, nextVersion),

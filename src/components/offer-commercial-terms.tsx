@@ -1,7 +1,7 @@
 import { AmountRow } from "@/components/states";
 import {
   formatBdt,
-  installmentSummary,
+  formatCalendarDate,
   isSoldOut,
   type PropertyOffer,
 } from "@/lib/offers";
@@ -24,7 +24,7 @@ export function OfferCommercialTerms({
   variant?: "public" | "growth";
   compact?: boolean;
 }) {
-  const plan = installmentSummary(offer);
+  const deadline = formatCalendarDate(offer.paymentCompletionDeadline);
   const soldOut = isSoldOut(offer);
   const available = offer.inventory?.available;
   const tracked = offer.inventory?.total != null;
@@ -39,18 +39,13 @@ export function OfferCommercialTerms({
       {variant === "growth" ? (
         <AmountRow compact={compact} label="Qualification benefit (this offer)" value={offer.qualificationBenefit} />
       ) : null}
-      {offer.fullPaymentDeadlineDays ? (
+      {deadline ? <FactRow label="Payment Completion Deadline" value={deadline} /> : null}
+      {offer.installmentAmount ? <FactRow label="Installment Amount" value={formatBdt(offer.installmentAmount)} /> : null}
+      {offer.installmentDurationMonths ? (
         <FactRow
-          label="Full payment deadline"
-          value={`${offer.fullPaymentDeadlineDays} day${offer.fullPaymentDeadlineDays === 1 ? "" : "s"} after booking`}
+          label="Installment Duration"
+          value={`${offer.installmentDurationMonths} month${offer.installmentDurationMonths === 1 ? "" : "s"}`}
         />
-      ) : null}
-      {plan ? <FactRow label="Installment plan" value={plan} /> : null}
-      {offer.installmentEnabled && offer.installmentDurationMonths ? (
-        <FactRow label="Installment duration" value={`${offer.installmentDurationMonths} month${offer.installmentDurationMonths === 1 ? "" : "s"}`} />
-      ) : null}
-      {offer.installmentEnabled && offer.firstInstallmentDueRule ? (
-        <FactRow label="First installment" value={offer.firstInstallmentDueRule} />
       ) : null}
       {tracked ? (
         <FactRow

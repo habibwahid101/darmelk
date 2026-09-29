@@ -116,7 +116,10 @@ test("Batch 05 payment routes and historical engines remain", () => {
   const files = readdirSync(join(root, "migrations")).filter((name) => name.endsWith(".sql") && name.startsWith("001"));
   assert.ok(files.includes("0019_darmelk_consents.sql"));
   const two = readdirSync(join(root, "migrations")).filter((name) => name.endsWith(".sql") && name.startsWith("002"));
-  assert.deepEqual(two, ["0020_darmelk_payment_settings.sql"]);
+  assert.deepEqual(two, [
+    "0020_darmelk_payment_settings.sql",
+    "0021_darmelk_payment_completion_deadline.sql",
+  ]);
 });
 
 test("Terms copy stays Darmelk-only and does not invent earnings", () => {
