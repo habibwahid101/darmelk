@@ -119,6 +119,7 @@ test("Batch 05 payment routes and historical engines remain", () => {
   assert.deepEqual(two, [
     "0020_darmelk_payment_settings.sql",
     "0021_darmelk_payment_completion_deadline.sql",
+    "0022_darmelk_booking_terms_admin.sql",
   ]);
 });
 

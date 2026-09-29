@@ -40,6 +40,7 @@ import { Route as AdminPaymentSettingsRouteImport } from './routes/admin/payment
 import { Route as AdminPaymentsRouteImport } from './routes/admin/payments'
 import { Route as AdminPromotionsRouteImport } from './routes/admin/promotions'
 import { Route as AdminSettingsRouteImport } from './routes/admin/settings'
+import { Route as AdminTermsRouteImport } from './routes/admin/terms'
 import { Route as AdminUsersRouteImport } from './routes/admin/users'
 import { Route as AdminWithdrawalsRouteImport } from './routes/admin/withdrawals'
 import { Route as AppIndexRouteImport } from './routes/app/index'
@@ -251,6 +252,11 @@ const AdminPromotionsRoute = AdminPromotionsRouteImport.update({
 const AdminSettingsRoute = AdminSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminTermsRoute = AdminTermsRouteImport.update({
+  id: '/terms',
+  path: '/terms',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminUsersRoute = AdminUsersRouteImport.update({
@@ -582,6 +588,7 @@ export interface FileRoutesByFullPath {
   '/admin/payments': typeof AdminPaymentsRoute
   '/admin/promotions': typeof AdminPromotionsRouteWithChildren
   '/admin/settings': typeof AdminSettingsRoute
+  '/admin/terms': typeof AdminTermsRoute
   '/admin/users': typeof AdminUsersRoute
   '/admin/withdrawals': typeof AdminWithdrawalsRoute
   '/app/activation': typeof AppActivationRoute
@@ -663,6 +670,7 @@ export interface FileRoutesByTo {
   '/admin/payment-settings': typeof AdminPaymentSettingsRoute
   '/admin/payments': typeof AdminPaymentsRoute
   '/admin/settings': typeof AdminSettingsRoute
+  '/admin/terms': typeof AdminTermsRoute
   '/admin/users': typeof AdminUsersRoute
   '/admin/withdrawals': typeof AdminWithdrawalsRoute
   '/app/activation': typeof AppActivationRoute
@@ -747,6 +755,7 @@ export interface FileRoutesById {
   '/admin/payments': typeof AdminPaymentsRoute
   '/admin/promotions': typeof AdminPromotionsRouteWithChildren
   '/admin/settings': typeof AdminSettingsRoute
+  '/admin/terms': typeof AdminTermsRoute
   '/admin/users': typeof AdminUsersRoute
   '/admin/withdrawals': typeof AdminWithdrawalsRoute
   '/app/activation': typeof AppActivationRoute
@@ -839,6 +848,7 @@ export interface FileRouteTypes {
     | '/admin/payments'
     | '/admin/promotions'
     | '/admin/settings'
+    | '/admin/terms'
     | '/admin/users'
     | '/admin/withdrawals'
     | '/app/activation'
@@ -920,6 +930,7 @@ export interface FileRouteTypes {
     | '/admin/payment-settings'
     | '/admin/payments'
     | '/admin/settings'
+    | '/admin/terms'
     | '/admin/users'
     | '/admin/withdrawals'
     | '/app/activation'
@@ -1003,6 +1014,7 @@ export interface FileRouteTypes {
     | '/admin/payments'
     | '/admin/promotions'
     | '/admin/settings'
+    | '/admin/terms'
     | '/admin/users'
     | '/admin/withdrawals'
     | '/app/activation'
@@ -1300,6 +1312,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/admin/settings'
       preLoaderRoute: typeof AdminSettingsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/terms': {
+      id: '/admin/terms'
+      path: '/terms'
+      fullPath: '/admin/terms'
+      preLoaderRoute: typeof AdminTermsRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/users': {
@@ -1902,6 +1921,7 @@ interface AdminRouteChildren {
   AdminPaymentsRoute: typeof AdminPaymentsRoute
   AdminPromotionsRoute: typeof AdminPromotionsRouteWithChildren
   AdminSettingsRoute: typeof AdminSettingsRoute
+  AdminTermsRoute: typeof AdminTermsRoute
   AdminUsersRoute: typeof AdminUsersRoute
   AdminWithdrawalsRoute: typeof AdminWithdrawalsRoute
   AdminIndexRoute: typeof AdminIndexRoute
@@ -1923,6 +1943,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminPaymentsRoute: AdminPaymentsRoute,
   AdminPromotionsRoute: AdminPromotionsRouteWithChildren,
   AdminSettingsRoute: AdminSettingsRoute,
+  AdminTermsRoute: AdminTermsRoute,
   AdminUsersRoute: AdminUsersRoute,
   AdminWithdrawalsRoute: AdminWithdrawalsRoute,
   AdminIndexRoute: AdminIndexRoute,

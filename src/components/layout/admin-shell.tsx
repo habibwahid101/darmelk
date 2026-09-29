@@ -14,6 +14,7 @@ import {
   Megaphone,
   Settings,
   Store,
+  ScrollText,
   Users,
   Wallet,
   CreditCard,
@@ -38,6 +39,7 @@ type AdminPath =
   | "/admin/commission"
   | "/admin/activation"
   | "/admin/documents"
+  | "/admin/terms"
   | "/admin/settings"
   | "/admin/payments"
   | "/admin/payment-settings"
@@ -72,6 +74,7 @@ const NAV: NavItem[] = [
   { to: "/admin/leadership-rewards", label: "Leadership Rewards", icon: Award },
   { to: "/admin/activation", label: "Activation", icon: BadgeCheck },
   { to: "/admin/documents", label: "Documents", icon: FileText },
+  { to: "/admin/terms", label: "Booking Terms", icon: ScrollText },
   { to: "/admin/settings", label: "Settings", icon: Settings },
 ];
 

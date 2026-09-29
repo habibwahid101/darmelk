@@ -1,5 +1,5 @@
 import type { PoolClient } from "pg";
-import { badRequest, forbidden, notFound } from "../errors.js";
+import { badRequest, conflict, forbidden, notFound } from "../errors.js";
 import { uid } from "../ids.js";
 
 export const DOCUMENT_KEYS = [
@@ -218,7 +218,7 @@ export async function recordConsents(
   const referenceId = input.referenceId ?? null;
   const referenceKey = referenceId ?? "";
   for (const key of input.keys) {
-    const doc = POLICY_DOCUMENTS[key];
+    const doc = await resolveCurrentPolicy(client, key);
     const { rows } = await client.query<UserConsent>(
       `insert into user_consents
          (id, user_id, document_key, document_version, context, reference_id, reference_key, metadata)
@@ -257,7 +257,7 @@ export async function hasCurrentConsent(
   userId: string,
   key: DocumentKey,
 ): Promise<boolean> {
-  const doc = POLICY_DOCUMENTS[key];
+  const doc = await resolveCurrentPolicy(client, key);
   const { rows } = await client.query(
     `select 1 from user_consents
       where user_id = $1 and document_key = $2 and document_version = $3
@@ -274,7 +274,7 @@ export async function hasCurrentConsentFor(
   context: ConsentContext,
   referenceId?: string | null,
 ): Promise<boolean> {
-  const doc = POLICY_DOCUMENTS[key];
+  const doc = await resolveCurrentPolicy(client, key);
   const referenceKey = referenceId ?? "";
   const { rows } = await client.query(
     `select 1 from user_consents
@@ -318,4 +318,255 @@ export async function listUserConsents(client: PoolClient, userId: string): Prom
     [userId],
   );
   return rows;
+}
+
+export const MANAGED_BOOKING_TERMS_KEY = "PROPERTY_BOOKING_TERMS" as const;
+
+export type PolicyRevision = {
+  id: string;
+  document_key: DocumentKey;
+  version: string;
+  title: string;
+  effective_date: string;
+  summary: string;
+  body: string;
+  status: "draft" | "published";
+  created_at: string;
+  updated_at: string;
+  published_at: string | null;
+  created_by_admin_id: string | null;
+  published_by_admin_id: string | null;
+};
+
+type RevisionInput = {
+  version?: unknown;
+  title?: unknown;
+  effectiveDate?: unknown;
+  effective_date?: unknown;
+  summary?: unknown;
+  body?: unknown;
+};
+
+function asDateText(value: unknown): string {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) return value.toISOString().slice(0, 10);
+  const match = /^(\d{4}-\d{2}-\d{2})/.exec(String(value ?? "").trim());
+  return match ? match[1] : "";
+}
+
+export function paragraphsFromBody(body: string): string[] {
+  return body
+    .split(/\n{2,}/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function cleanRevisionText(value: unknown, label: string, max: number, required = false): string {
+  if (value == null || value === "") {
+    if (required) throw badRequest(`${label} is required`);
+    return "";
+  }
+  if (typeof value !== "string") throw badRequest(`${label} is required`);
+  const text = value.trim();
+  if (required && !text) throw badRequest(`${label} is required`);
+  if (text.length > max) throw badRequest(`${label} is too long`);
+  return text;
+}
+
+function parseEffectiveDate(value: unknown): string {
+  const text = cleanRevisionText(value, "Effective date", 10, true);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) throw badRequest("Effective date must be a calendar date");
+  const [year, month, day] = text.split("-").map(Number);
+  const utc = new Date(Date.UTC(year!, month! - 1, day));
+  if (utc.getUTCFullYear() !== year || utc.getUTCMonth() !== month! - 1 || utc.getUTCDate() !== day) {
+    throw badRequest("Effective date must be a calendar date");
+  }
+  return text;
+}
+
+function revisionToPolicy(row: PolicyRevision): PolicyDocument {
+  const code = POLICY_DOCUMENTS.PROPERTY_BOOKING_TERMS;
+  return {
+    key: "PROPERTY_BOOKING_TERMS",
+    version: row.version,
+    slug: code.slug,
+    title: row.title,
+    effectiveDate: asDateText(row.effective_date),
+    summary: row.summary,
+    paragraphs: paragraphsFromBody(row.body),
+  };
+}
+
+function serializeRevision(row: PolicyRevision): PolicyRevision {
+  const asIso = (value: string | Date | null | undefined) => {
+    if (value == null || value === "") return null;
+    if (value instanceof Date) return value.toISOString();
+    return String(value);
+  };
+  return {
+    ...row,
+    effective_date: asDateText(row.effective_date),
+    created_at: asIso(row.created_at) ?? "",
+    updated_at: asIso(row.updated_at) ?? "",
+    published_at: asIso(row.published_at),
+  };
+}
+
+export async function resolveCurrentPolicy(client: PoolClient, key: DocumentKey): Promise<PolicyDocument> {
+  if (!isDocumentKey(key)) throw notFound("Terms document not found");
+  const code = POLICY_DOCUMENTS[key];
+  if (key !== MANAGED_BOOKING_TERMS_KEY) return code;
+  const { rows } = await client.query<PolicyRevision>(
+    `select * from policy_revisions
+      where document_key = $1 and status = 'published'
+      order by published_at desc nulls last, created_at desc
+      limit 1`,
+    [key],
+  );
+  const row = rows[0];
+  if (!row) return code;
+  return revisionToPolicy(row);
+}
+
+export async function listResolvedPolicies(client: PoolClient, keys?: string[]): Promise<PolicyDocument[]> {
+  const selected = keys?.length ? keys : [...DOCUMENT_KEYS];
+  const documents: PolicyDocument[] = [];
+  for (const key of selected) {
+    if (!isDocumentKey(key)) throw notFound("Terms document not found");
+    documents.push(await resolveCurrentPolicy(client, key));
+  }
+  return documents;
+}
+
+export async function resolvePolicyRequest(client: PoolClient, raw: string): Promise<PolicyDocument> {
+  const code = policyBySlug(raw) ?? (isDocumentKey(raw) ? POLICY_DOCUMENTS[raw] : undefined);
+  if (!code) throw notFound("Terms document not found");
+  return resolveCurrentPolicy(client, code.key);
+}
+
+export async function getBookingTermsAdmin(client: PoolClient) {
+  const current = await resolveCurrentPolicy(client, MANAGED_BOOKING_TERMS_KEY);
+  const { rows } = await client.query<PolicyRevision>(
+    `select * from policy_revisions
+      where document_key = $1
+      order by coalesce(published_at, created_at) desc, created_at desc`,
+    [MANAGED_BOOKING_TERMS_KEY],
+  );
+  const published = rows.find((row) => row.status === "published" && row.version === current.version);
+  return {
+    key: MANAGED_BOOKING_TERMS_KEY,
+    slug: POLICY_DOCUMENTS.PROPERTY_BOOKING_TERMS.slug,
+    publicPath: "/terms?key=booking",
+    current: {
+      ...current,
+      source: published ? "database" : "code",
+      revisionId: published?.id ?? null,
+      status: "published" as const,
+      body: published?.body ?? current.paragraphs.join("\n\n"),
+    },
+    revisions: rows.map((row) => {
+      const serialized = serializeRevision(row);
+      return {
+        ...serialized,
+        current: row.status === "published" && row.version === current.version && row.id === published?.id,
+      };
+    }),
+  };
+}
+
+async function assertNotCurrentPublishedVersion(client: PoolClient, version: string, opts?: { lock?: boolean }) {
+  if (opts?.lock) {
+    await client.query(
+      `select id from policy_revisions
+        where document_key = $1 and status = 'published'
+        order by published_at desc nulls last, created_at desc
+        limit 1
+        for update`,
+      [MANAGED_BOOKING_TERMS_KEY],
+    );
+  }
+  // Authoritative current terms: the latest published revision, or the code
+  // document when nothing has been published. A draft must not reuse that
+  // version, or existing consents would match different text.
+  const current = await resolveCurrentPolicy(client, MANAGED_BOOKING_TERMS_KEY);
+  if (version === current.version) {
+    throw conflict("A new Terms revision must use a new version.", "terms_version_reused");
+  }
+}
+
+async function assertVersionAvailable(client: PoolClient, version: string, exceptId?: string) {
+  const { rows } = await client.query<{ id: string }>(
+    `select id from policy_revisions where document_key = $1 and version = $2`,
+    [MANAGED_BOOKING_TERMS_KEY, version],
+  );
+  const existing = rows[0];
+  if (existing && existing.id !== exceptId) throw conflict("That terms version already exists", "terms_version_exists");
+}
+
+export async function createBookingTermsDraft(client: PoolClient, adminId: string, input: RevisionInput) {
+  const version = cleanRevisionText(input.version, "Version", 40, true);
+  const title = cleanRevisionText(input.title, "Title", 160, true);
+  const effectiveDate = parseEffectiveDate(input.effectiveDate ?? input.effective_date);
+  const summary = cleanRevisionText(input.summary, "Summary", 600);
+  const body = cleanRevisionText(input.body, "Terms content", 20000, true);
+  await assertNotCurrentPublishedVersion(client, version);
+  await assertVersionAvailable(client, version);
+  const id = uid("term");
+  const { rows } = await client.query<PolicyRevision>(
+    `insert into policy_revisions
+       (id, document_key, version, title, effective_date, summary, body, status, created_by_admin_id)
+     values ($1, $2, $3, $4, $5, $6, $7, 'draft', $8)
+     returning *`,
+    [id, MANAGED_BOOKING_TERMS_KEY, version, title, effectiveDate, summary, body, adminId],
+  );
+  return serializeRevision(rows[0]!);
+}
+
+export async function updateBookingTermsDraft(client: PoolClient, id: string, input: RevisionInput) {
+  const { rows: existingRows } = await client.query<PolicyRevision>(
+    `select * from policy_revisions where id = $1 and document_key = $2`,
+    [id, MANAGED_BOOKING_TERMS_KEY],
+  );
+  const existing = existingRows[0];
+  if (!existing) throw notFound("Terms draft not found");
+  if (existing.status !== "draft") throw conflict("Published terms cannot be edited", "terms_published_locked");
+  const version = input.version == null ? existing.version : cleanRevisionText(input.version, "Version", 40, true);
+  const title = input.title == null ? existing.title : cleanRevisionText(input.title, "Title", 160, true);
+  const effectiveDate =
+    input.effectiveDate == null && input.effective_date == null
+      ? asDateText(existing.effective_date)
+      : parseEffectiveDate(input.effectiveDate ?? input.effective_date);
+  const summary = input.summary == null ? existing.summary : cleanRevisionText(input.summary, "Summary", 600);
+  const body = input.body == null ? existing.body : cleanRevisionText(input.body, "Terms content", 20000, true);
+  await assertNotCurrentPublishedVersion(client, version);
+  await assertVersionAvailable(client, version, id);
+  const { rows } = await client.query<PolicyRevision>(
+    `update policy_revisions
+        set version = $2, title = $3, effective_date = $4, summary = $5, body = $6, updated_at = now()
+      where id = $1 and status = 'draft'
+      returning *`,
+    [id, version, title, effectiveDate, summary, body],
+  );
+  if (!rows[0]) throw conflict("Published terms cannot be edited", "terms_published_locked");
+  return serializeRevision(rows[0]);
+}
+
+export async function publishBookingTermsDraft(client: PoolClient, id: string, adminId: string) {
+  const { rows: locked } = await client.query<PolicyRevision>(
+    `select * from policy_revisions where id = $1 and document_key = $2 for update`,
+    [id, MANAGED_BOOKING_TERMS_KEY],
+  );
+  const draft = locked[0];
+  if (!draft) throw notFound("Terms draft not found");
+  if (draft.status !== "draft") throw conflict("Published terms cannot be edited", "terms_published_locked");
+  await assertNotCurrentPublishedVersion(client, draft.version, { lock: true });
+  const { rows } = await client.query<PolicyRevision>(
+    `update policy_revisions
+        set status = 'published', published_at = now(), published_by_admin_id = $2, updated_at = now()
+      where id = $1 and document_key = $3 and status = 'draft'
+      returning *`,
+    [id, adminId, MANAGED_BOOKING_TERMS_KEY],
+  );
+  const published = rows[0];
+  if (!published) throw conflict("Published terms cannot be edited", "terms_published_locked");
+  return serializeRevision(published);
 }

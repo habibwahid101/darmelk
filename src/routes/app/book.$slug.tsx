@@ -3,15 +3,13 @@ import { useState } from "react";
 import { MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PageHeader, SuccessBanner, Surface } from "@/components/states";
-import { OfferAvailabilityNote, OfferCommercialTerms, offerBookingCopy } from "@/components/offer-commercial-terms";
+import { OfferAvailabilityNote, OfferCommercialTerms } from "@/components/offer-commercial-terms";
 import { useMemberSession } from "@/components/layout/use-member";
 import { formatBdt, fromApiOffer, getOffer, isBookable, isSoldOut } from "@/lib/offers";
 import { api, ApiError, type MerchantPaymentRequest } from "@/lib/api-client";
 import { PaymentForm, MerchantRequestStatus, MERCHANT_REQUEST_ALREADY_SUBMITTED, MERCHANT_REQUEST_SUBMITTED, describePaymentOptions } from "@/components/payment-form";
 import { TermsAccept } from "@/components/terms-accept";
 import { useAsync } from "@/lib/use-async";
-
-const ACTIVATION_FEE = 1000;
 
 export const Route = createFileRoute("/app/book/$slug")({
   loader: async ({ params }) => {
@@ -39,13 +37,32 @@ function BookOfferPage() {
   const [merchantAlreadyOpen, setMerchantAlreadyOpen] = useState(false);
   const [accepted, setAccepted] = useState<Record<string, boolean>>({});
   const { data: optionData } = useAsync(() => api.paymentOptions("booking"), []);
+  const { data: consentData, loading: consentsLoading, error: consentError } = useAsync(
+    () => api.myConsents(),
+    [member?.user_id],
+    { enabled: Boolean(member) },
+  );
+  const { data: termsData, loading: termsLoading, error: termsLoadError } = useAsync(
+    () => api.terms(["PROPERTY_BOOKING_TERMS"]),
+    [member?.user_id],
+    { enabled: Boolean(member) },
+  );
   const soldOut = isSoldOut(offer);
-  const termsReady = Boolean(accepted.PROPERTY_BOOKING_TERMS);
+  const termsLoaded = Boolean(consentData && termsData) && !consentsLoading && !termsLoading;
+  const currentTerms = termsData?.documents.find((doc) => doc.key === "PROPERTY_BOOKING_TERMS");
+  const alreadyAccepted = Boolean(
+    termsLoaded &&
+      currentTerms &&
+      consentData?.consents.some(
+        (consent) => consent.document_key === "PROPERTY_BOOKING_TERMS" && consent.document_version === currentTerms.version,
+      ),
+  );
+  const termsReady = termsLoaded && (alreadyAccepted || Boolean(accepted.PROPERTY_BOOKING_TERMS));
 
   if (!member) return null;
 
   async function submit() {
-    if (!termsReady) {
+    if (!termsLoaded || !termsReady) {
       setError("Property Booking Terms must be accepted.");
       return;
     }
@@ -144,32 +161,34 @@ function BookOfferPage() {
         </Surface>
       ) : (
         <Surface>
-          <p className="text-sm font-medium">What happens next</p>
-          <ul className="mt-3 space-y-2 text-sm text-muted">
-            <li>{offerBookingCopy(offer)}</li>
-            <li>This booking freezes the commercial figures shown above. Later offer edits do not rewrite it.</li>
-            <li>After creating the request, pay via Darmelk Bank or Pay by Merchant.</li>
-            <li>Bank payment submission does not confirm the booking. Darmelk confirms bank payments after review. Merchant approval confirms the booking and does not wait for Darmelk.</li>
-            <li>Inventory is consumed once at confirmation. Reversal does not restore stock.</li>
-            <li>Qualification benefit stays attached to this offer, not a global figure.</li>
-            <li>
-              Growth Program Activation is a separate {formatBdt(ACTIVATION_FEE)} fee and is not part of this
-              booking.
-            </li>
-          </ul>
+          <h2 className="text-sm font-medium">Before you confirm</h2>
+          <p className="mt-3 text-sm text-muted">
+            Your booking will be created using the commercial terms shown above. These terms will remain attached to this booking even if the live offer is updated later.
+          </p>
+          <p className="mt-3 text-sm text-muted">
+            After confirming, you will proceed to payment using the available payment methods.
+          </p>
           <div className="mt-5">
-            <TermsAccept
-              statement="Read the Property Booking Terms, then confirm. The box starts unchecked."
-              items={[
-                {
-                  key: "PROPERTY_BOOKING_TERMS",
-                  label: "Property Booking Terms for this booking",
-                  href: "/terms?key=booking",
-                },
-              ]}
-              accepted={accepted}
-              onChange={(key, value) => setAccepted((current) => ({ ...current, [key]: value }))}
-            />
+            {termsLoadError || consentError ? (
+              <p className="text-sm text-clay" role="alert">Booking terms could not be loaded.</p>
+            ) : !termsLoaded ? (
+              <p className="text-sm text-muted" role="status">Loading booking terms…</p>
+            ) : alreadyAccepted ? (
+              <p className="text-sm text-muted">Property Booking Terms for this booking are already accepted.</p>
+            ) : (
+              <TermsAccept
+                hideLegend
+                items={[
+                  {
+                    key: "PROPERTY_BOOKING_TERMS",
+                    label: "Property Booking Terms for this booking",
+                    href: "/terms?key=booking",
+                  },
+                ]}
+                accepted={accepted}
+                onChange={(key, value) => setAccepted((current) => ({ ...current, [key]: value }))}
+              />
+            )}
           </div>
           {error ? <p className="mt-3 text-sm text-clay" role="alert">{error}</p> : null}
         </Surface>

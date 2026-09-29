@@ -9,17 +9,21 @@ export function TermsAccept({
   accepted,
   onChange,
   statement,
+  hideLegend,
 }: {
   items: TermsAcceptItem[];
   accepted: Record<string, boolean>;
   onChange: (key: string, value: boolean) => void;
   statement?: string;
+  hideLegend?: boolean;
 }) {
   return (
     <fieldset className="space-y-3">
-      <legend className="text-sm font-medium">
-        {statement ?? "Read each document, then confirm. Boxes start unchecked."}
-      </legend>
+      {hideLegend ? null : (
+        <legend className="text-sm font-medium">
+          {statement ?? "Read each document, then confirm. Boxes start unchecked."}
+        </legend>
+      )}
       {items.map((item) => (
         <label key={item.key} className="flex min-h-11 items-start gap-3 rounded-xl bg-paper px-3 py-3 text-sm leading-relaxed">
           <input
