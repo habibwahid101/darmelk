@@ -25,9 +25,6 @@ export function OfferCommercialTerms({
   compact?: boolean;
 }) {
   const deadline = formatCalendarDate(offer.paymentCompletionDeadline);
-  const soldOut = isSoldOut(offer);
-  const available = offer.inventory?.available;
-  const tracked = offer.inventory?.total != null;
 
   return (
     <dl>
@@ -47,27 +44,13 @@ export function OfferCommercialTerms({
           value={`${offer.installmentDurationMonths} month${offer.installmentDurationMonths === 1 ? "" : "s"}`}
         />
       ) : null}
-      {tracked ? (
-        <FactRow
-          label="Available quantity"
-          value={soldOut ? "Sold out" : String(available ?? 0)}
-        />
-      ) : null}
     </dl>
   );
 }
 
 export function OfferAvailabilityNote({ offer }: { offer: PropertyOffer }) {
-  if (offer.inventory?.total == null) return null;
-  if (isSoldOut(offer)) {
-    return <p className="mt-3 text-sm font-medium text-clay">This property is currently sold out.</p>;
-  }
-  return (
-    <p className="mt-3 text-sm text-muted">
-      {offer.inventory.available} of {offer.inventory.total} remaining. A Request to Book is an enquiry and does not
-      reserve a unit.
-    </p>
-  );
+  if (!isSoldOut(offer)) return null;
+  return <p className="mt-3 text-sm font-medium text-clay">This property is currently sold out.</p>;
 }
 
 export function offerBookingCopy(offer: PropertyOffer): string {
