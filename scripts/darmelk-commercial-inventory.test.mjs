@@ -82,11 +82,53 @@ test("public marketplace shows commercial terms without Growth-only mechanics", 
   assert.doesNotMatch(detail, /Qualification benefit/);
   assert.doesNotMatch(detail, /Commission-eligible/);
   assert.match(terms, /Full payment price/);
-  assert.match(terms, /Available quantity/);
+  assert.match(terms, /Installment Duration/);
+  assert.doesNotMatch(terms, /Available quantity/);
+  assert.doesNotMatch(terms, /remaining/);
+  assert.doesNotMatch(terms, /does not reserve a unit/);
   assert.match(terms, /variant === "growth"/);
   assert.match(card, /Sold out/);
   assert.match(book, /variant="growth"/);
   assert.match(book, /This property is sold out/);
+  assert.doesNotMatch(book, /Available quantity/);
+  assert.doesNotMatch(book, /remaining/);
+  assert.doesNotMatch(book, /does not reserve a unit/);
+  assert.doesNotMatch(detail, /Available quantity/);
+  assert.doesNotMatch(detail, /of \{offer\.inventory/);
+  assert.doesNotMatch(card, /Available quantity/);
+  assert.match(read("src/components/admin/offer-form.tsx"), /Available quantity/);
+  assert.match(read("src/routes/admin/offers.index.tsx"), /inventory\.available/);
+  assert.match(read("src/routes/admin/offers.$slug.preview.tsx"), /available of/);
+});
+
+test("customer UI hides inventory counts while sold-out booking and Request to Book stay intact", () => {
+  const terms = read("src/components/offer-commercial-terms.tsx");
+  const detail = read("src/routes/properties.$slug.tsx");
+  const book = read("src/routes/app/book.$slug.tsx");
+  const card = read("src/components/property-card.tsx");
+  const bookings = read("backend/src/engine/bookings.ts");
+  const inventory = read("backend/src/engine/inventory.ts");
+  const offers = read("src/lib/offers.ts");
+  const duration = terms.indexOf("Installment Duration");
+  assert.ok(duration > terms.indexOf("Installment Amount"));
+  assert.equal(terms.indexOf("Available quantity"), -1);
+  assert.doesNotMatch(terms, /of \{offer\.inventory/);
+  assert.doesNotMatch(terms, /inventory\.total/);
+  assert.doesNotMatch(terms, /inventory\.available/);
+  assert.match(terms, /isSoldOut\(offer\)/);
+  assert.match(terms, /This property is currently sold out/);
+  assert.doesNotMatch(book, /inventory\.available|inventory\.total|Available quantity|of 2000 remaining/);
+  assert.match(book, /Confirm Booking/);
+  assert.match(book, /isSoldOut\(offer\)/);
+  assert.match(detail, /Request to Book/);
+  assert.match(detail, /reserve the property/);
+  assert.doesNotMatch(detail, /Available quantity|inventory\.available|inventory\.total/);
+  assert.doesNotMatch(card, /Available quantity|inventory\.available|inventory\.total/);
+  assert.match(offers, /export function isSoldOut/);
+  assert.match(bookings, /No remaining quantity for this property/);
+  assert.match(bookings, /offer_sold_out|consumeInventoryForConfirmation/);
+  assert.match(inventory, /consumeInventoryForConfirmation/);
+  assert.match(inventory, /offer_sold_out/);
 });
 
 test("shared inventory is used by both General and Growth booking of the same offer", () => {

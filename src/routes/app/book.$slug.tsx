@@ -157,7 +157,6 @@ function BookOfferPage() {
       {soldOut ? (
         <Surface>
           <p className="text-sm font-medium">This property is sold out</p>
-          <p className="mt-2 text-sm text-muted">A Request to Book remains an enquiry and does not reserve a unit.</p>
         </Surface>
       ) : (
         <Surface>
