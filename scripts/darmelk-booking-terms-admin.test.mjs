@@ -279,3 +279,171 @@ test("PGlite: drafts stay private, publish preserves history, and a new version 
   assert.equal(code.version, "1");
   assert.match(code.paragraphs[3], /Payment submission and Merchant approval do not confirm the booking/);
 });
+
+test("current booking terms version cannot be reused by a draft", () => {
+  const terms = read("backend/src/engine/terms.ts");
+  const book = read("src/routes/app/book.$slug.tsx");
+  const migration = read("migrations/0022_darmelk_booking_terms_admin.sql");
+  const booking = terms.slice(terms.indexOf("PROPERTY_BOOKING_TERMS:"), terms.indexOf("DARMELK_PAYMENT_TERMS:"));
+  const guard = terms.slice(
+    terms.indexOf("async function assertNotCurrentPublishedVersion"),
+    terms.indexOf("async function assertVersionAvailable"),
+  );
+  const publish = terms.slice(terms.indexOf("export async function publishBookingTermsDraft"));
+  assert.match(booking, /version: "1"/);
+  assert.doesNotMatch(terms, /version: "2"/);
+  assert.match(guard, /resolveCurrentPolicy/);
+  assert.match(guard, /A new Terms revision must use a new version\./);
+  assert.match(terms, /if \(!row\) return code/);
+  assert.match(publish, /for update/);
+  assert.match(publish, /assertNotCurrentPublishedVersion\(client, draft\.version, \{ lock: true \}\)/);
+  assert.ok(publish.indexOf("assertNotCurrentPublishedVersion") < publish.indexOf("status = 'published'"));
+  assert.match(terms.slice(terms.indexOf("export async function createBookingTermsDraft"), terms.indexOf("export async function updateBookingTermsDraft")), /assertNotCurrentPublishedVersion/);
+  assert.match(terms.slice(terms.indexOf("export async function updateBookingTermsDraft"), terms.indexOf("export async function publishBookingTermsDraft")), /assertNotCurrentPublishedVersion/);
+  assert.doesNotMatch(migration, /insert into/i);
+  assert.match(book, /document_version === currentTerms\.version/);
+  assert.match(book, /alreadyAccepted/);
+  assert.doesNotMatch(terms, /delete from user_consents/i);
+  assert.doesNotMatch(terms, /update user_consents/i);
+});
+
+test("PGlite: code-backed current version is blocked on create, update, and publish", async () => {
+  const { terms } = await loadEngines();
+  const db = new PGlite();
+  await applyMigrations(db);
+  const code = terms.POLICY_DOCUMENTS.PROPERTY_BOOKING_TERMS;
+  const reused = (err) => err.code === "terms_version_reused" && err.message === "A new Terms revision must use a new version.";
+
+  const admin = await terms.getBookingTermsAdmin(db);
+  assert.equal(admin.current.source, "code");
+  assert.equal(admin.current.version, "1");
+  assert.equal(admin.current.version, code.version);
+  assert.equal(admin.current.body, code.paragraphs.join("\n\n"));
+  assert.equal(await count(db, `select count(*)::int as n from policy_revisions`), 0);
+
+  await db.exec(`
+    insert into "user" (id, name, email, "emailVerified", "createdAt", "updatedAt") values
+      ('user_guard', 'Guard', 'booking-terms-guard@example.com', true, now(), now());
+    insert into members (user_id, referral_code, role, onboarding_complete, activation_status, activation_expires_at) values
+      ('user_guard', 'DM-GUARD1', 'admin', true, 'active', '2099-01-01');
+  `);
+
+  await assert.rejects(
+    () =>
+      terms.createBookingTermsDraft(db, "user_guard", {
+        version: code.version,
+        title: "Property Booking Terms",
+        effectiveDate: "2026-09-15",
+        body: "Different legal text that must not reuse version 1.",
+      }),
+    reused,
+  );
+  assert.equal(await count(db, `select count(*)::int as n from policy_revisions`), 0);
+
+  const draft = await terms.createBookingTermsDraft(db, "user_guard", {
+    version: "qa-new",
+    title: "Property Booking Terms",
+    effectiveDate: "2026-10-01",
+    summary: "Unpublished draft",
+    body: "A future booking terms draft that is not current.",
+  });
+  assert.equal(draft.status, "draft");
+  assert.equal(draft.version, "qa-new");
+  const whileDraft = await terms.resolveCurrentPolicy(db, "PROPERTY_BOOKING_TERMS");
+  assert.equal(whileDraft.version, "1");
+  assert.equal(whileDraft.paragraphs[0], code.paragraphs[0]);
+
+  await assert.rejects(
+    () => terms.updateBookingTermsDraft(db, draft.id, { version: code.version, body: "Edited onto the current version." }),
+    reused,
+  );
+  const kept = (await db.query(`select version, status, body from policy_revisions where id = $1`, [draft.id])).rows[0];
+  assert.equal(kept.version, "qa-new");
+  assert.equal(kept.status, "draft");
+  assert.match(kept.body, /A future booking terms draft/);
+
+  await terms.recordConsents(db, "user_guard", {
+    keys: ["PROPERTY_BOOKING_TERMS"],
+    context: "booking",
+    referenceId: "bk_guard_prior",
+  });
+  assert.equal(await terms.hasCurrentConsent(db, "user_guard", "PROPERTY_BOOKING_TERMS"), true);
+  await terms.recordConsents(db, "user_guard", {
+    keys: ["PROPERTY_BOOKING_TERMS"],
+    context: "booking",
+    referenceId: "bk_guard_prior",
+  });
+  assert.equal(
+    await count(db, `select count(*)::int as n from user_consents where user_id = 'user_guard' and document_version = '1'`),
+    1,
+  );
+  assert.equal(await terms.hasCurrentConsent(db, "user_guard", "PROPERTY_BOOKING_TERMS"), true);
+
+  await db.query(
+    `insert into policy_revisions
+       (id, document_key, version, title, effective_date, summary, body, status, created_by_admin_id)
+     values ('term_code_reuse', 'PROPERTY_BOOKING_TERMS', '1', 'Property Booking Terms', '2026-09-15', '', $1, 'draft', 'user_guard')`,
+    ["Changed legal text that must not publish as version 1."],
+  );
+  await assert.rejects(() => terms.publishBookingTermsDraft(db, "term_code_reuse", "user_guard"), reused);
+  const blocked = (await db.query(`select status, body from policy_revisions where id = 'term_code_reuse'`)).rows[0];
+  assert.equal(blocked.status, "draft");
+  assert.match(blocked.body, /Changed legal text/);
+  const stillCode = await terms.resolvePolicyRequest(db, "booking");
+  assert.equal(stillCode.version, "1");
+  assert.equal(stillCode.paragraphs[0], code.paragraphs[0]);
+  assert.doesNotMatch(stillCode.paragraphs.join("\n"), /Changed legal text/);
+
+  const early = await terms.createBookingTermsDraft(db, "user_guard", {
+    version: "qa-early",
+    title: "Property Booking Terms",
+    effectiveDate: "2026-10-02",
+    body: "Early draft that must not publish after its version becomes current.",
+  });
+  const live = await terms.createBookingTermsDraft(db, "user_guard", {
+    version: "qa-live",
+    title: "Property Booking Terms",
+    effectiveDate: "2026-10-03",
+    body: "Later revision that becomes current first.",
+  });
+  await terms.publishBookingTermsDraft(db, live.id, "user_guard");
+  assert.equal((await terms.resolveCurrentPolicy(db, "PROPERTY_BOOKING_TERMS")).version, "qa-live");
+  await assert.rejects(() => terms.updateBookingTermsDraft(db, early.id, { version: "qa-live" }), reused);
+
+  await db.exec(`alter table policy_revisions drop constraint policy_revisions_key_version_unique`);
+  await db.query(`update policy_revisions set version = 'qa-live' where id = $1`, [early.id]);
+  await assert.rejects(() => terms.publishBookingTermsDraft(db, early.id, "user_guard"), reused);
+  const earlyRow = (await db.query(`select status, version from policy_revisions where id = $1`, [early.id])).rows[0];
+  assert.equal(earlyRow.status, "draft");
+  assert.equal(earlyRow.version, "qa-live");
+  const current = await terms.resolveCurrentPolicy(db, "PROPERTY_BOOKING_TERMS");
+  assert.equal(current.version, "qa-live");
+  assert.match(current.paragraphs[0], /Later revision that becomes current first/);
+  assert.doesNotMatch(current.paragraphs.join("\n"), /Early draft/);
+  assert.equal(await terms.hasCurrentConsent(db, "user_guard", "PROPERTY_BOOKING_TERMS"), false);
+  assert.equal(
+    await count(
+      db,
+      `select count(*)::int as n from user_consents where user_id = 'user_guard' and document_version = '1' and reference_id = 'bk_guard_prior'`,
+    ),
+    1,
+  );
+  await terms.recordConsents(db, "user_guard", {
+    keys: ["PROPERTY_BOOKING_TERMS"],
+    context: "booking",
+    referenceId: "bk_guard_next",
+  });
+  assert.equal(await terms.hasCurrentConsent(db, "user_guard", "PROPERTY_BOOKING_TERMS"), true);
+  assert.equal(
+    await count(db, `select count(*)::int as n from user_consents where user_id = 'user_guard' and document_version = 'qa-live'`),
+    1,
+  );
+  assert.equal(
+    await count(db, `select count(*)::int as n from user_consents where user_id = 'user_guard' and document_version = '1'`),
+    1,
+  );
+  assert.equal(await count(db, `select count(*)::int as n from policy_revisions where version = '2' and status = 'published'`), 0);
+  assert.equal(code.version, "1");
+  assert.match(code.paragraphs[0], /^A binding Growth property booking freezes the selected offer/);
+  assert.match(code.paragraphs[3], /Payment submission and Merchant approval do not confirm the booking/);
+});
