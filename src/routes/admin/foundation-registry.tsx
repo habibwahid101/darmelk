@@ -79,6 +79,24 @@ function AdminFoundationRegistry() {
               Download JSON
             </Button>
           </div>
+          <p className="text-sm text-muted">
+            Foundation bookings {data?.validation.foundationBookings ?? 0}. Historical BDT 1000 activation rows{" "}
+            {data?.validation.foundationStandardActivationRows ?? 0}. These do not fail foundation integrity.
+          </p>
+          {(data?.validation.warnings?.length ?? 0) > 0 ? (
+            <ul className="space-y-1 text-sm text-muted">
+              {data?.validation.warnings?.map((warning) => (
+                <li key={warning}>{warning}</li>
+              ))}
+            </ul>
+          ) : null}
+          {(data?.validation.errors?.length ?? 0) > 0 ? (
+            <ul className="space-y-1 text-sm">
+              {data?.validation.errors?.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          ) : null}
           <Surface className="p-0 sm:p-0">
             <div className="overflow-x-auto">
               <table className="min-w-[960px] w-full text-left text-sm">

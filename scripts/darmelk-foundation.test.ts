@@ -55,6 +55,27 @@ test("foundation activation sentinel remains 9999-12-31 and ordinary fee stays B
   assert.match(read("backend/src/engine/activation.ts"), /const ACTIVATION_FEE = 1000/);
 });
 
+test("permanent foundation health does not fail on later business activity", () => {
+  const foundation = read("backend/src/engine/foundation.ts");
+  const validate = foundation.slice(foundation.indexOf("export async function validateFoundation"));
+  assert.doesNotMatch(validate, /fake foundation bookings exist/);
+  assert.doesNotMatch(validate, /fake BDT 1000 activation payments exist for foundation accounts/);
+  assert.match(validate, /foundationBookings/);
+  assert.match(validate, /foundationStandardActivationRows/);
+  assert.match(validate, /warnings/);
+  assert.match(validate, /foundation count/);
+  assert.match(validate, /expiry is not the foundation sentinel/);
+  assert.match(validate, /credential accounts/);
+  assert.match(validate, /sponsor\/matrix parent mismatch/);
+  assert.match(validate, /duplicate referral code/);
+  assert.match(validate, /HW-2\.3\.1\.2 ancestry/);
+  assert.doesNotMatch(foundation, /insert into bookings/);
+  assert.doesNotMatch(foundation, /insert into annual_activations/);
+  assert.match(read("backend/src/router.ts"), /SET TRANSACTION READ ONLY/);
+  assert.match(read("backend/src/router.ts"), /foundationBookings: result\.validation\.foundationBookings/);
+  assert.doesNotMatch(read("backend/src/router.ts"), /createFoundationNetwork|foundation repair/);
+});
+
 test("referral link UX and join route feed the existing login ref search", () => {
   const join = read("src/routes/join.$code.tsx");
   const login = read("src/routes/login.tsx");

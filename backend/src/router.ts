@@ -1040,6 +1040,9 @@ app.get("/api/admin/foundation-registry", async (c) => {
     validation: {
       ok: result.validation.ok,
       errors: result.validation.errors,
+      warnings: result.validation.warnings,
+      foundationBookings: result.validation.foundationBookings,
+      foundationStandardActivationRows: result.validation.foundationStandardActivationRows,
       byLevel: result.validation.byLevel,
       active: result.validation.active,
       commissionEligible: result.validation.commissionEligible,

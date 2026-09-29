@@ -57,6 +57,9 @@ async function main() {
             validation: {
               ok: validation.ok,
               errors: validation.errors,
+              warnings: validation.warnings,
+              foundationBookings: validation.foundationBookings,
+              foundationStandardActivationRows: validation.foundationStandardActivationRows,
               byLevel: validation.byLevel,
               active: validation.active,
               commissionEligible: validation.commissionEligible,
