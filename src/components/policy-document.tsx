@@ -34,14 +34,30 @@ export function PolicyArticle({ document }: { document: PolicyDocument }) {
       <article className="mx-auto max-w-3xl">
         <p className="text-xs font-medium uppercase tracking-[.18em] text-pine">{kicker}</p>
         <h1 className="mt-3 font-display text-4xl font-semibold text-pretty">{document.title}</h1>
-        <p className="mt-3 text-sm text-muted">
-          Version {document.version} · Effective {document.effectiveDate}
-        </p>
+        <p className="mt-3 text-sm text-muted">Version: {document.version}</p>
+        <p className="text-sm text-muted">Effective: {document.effectiveDate}</p>
         <p className="mt-4 text-sm leading-relaxed text-muted text-pretty">{document.summary}</p>
         <div className="mt-8 space-y-5 text-sm leading-relaxed text-muted">
-          {document.paragraphs.map((paragraph) => (
-            <p key={paragraph.slice(0, 48)}>{paragraph}</p>
-          ))}
+          {document.paragraphs.map((paragraph, index) => {
+            const heading = /^(#{1,3})\s+(\S.*)$/.exec(paragraph);
+            if (heading) {
+              const text = heading[2] ?? "";
+              return heading[1] === "#" ? (
+                <h2 key={`${index}-${text}`} className="font-display text-2xl font-semibold text-ink">
+                  {text}
+                </h2>
+              ) : (
+                <h3 key={`${index}-${text}`} className="font-display text-xl font-semibold text-ink">
+                  {text}
+                </h3>
+              );
+            }
+            return (
+              <p key={`${index}-${paragraph.slice(0, 48)}`} className="whitespace-pre-line">
+                {paragraph}
+              </p>
+            );
+          })}
         </div>
         <p className="mt-8 text-sm text-muted">
           Related:{" "}

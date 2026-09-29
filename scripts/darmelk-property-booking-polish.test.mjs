@@ -66,7 +66,8 @@ test("Growth booking is one review page, then confirm, then the existing payment
   const merchant = read("backend/src/engine/merchant.ts");
   const router = read("backend/src/router.ts");
   assert.match(book, /Confirm Booking/);
-  assert.match(book, /What happens next/);
+  assert.match(book, /Before you confirm/);
+  assert.doesNotMatch(book, /What happens next/);
   assert.match(book, /TermsAccept/);
   assert.match(book, /Property Booking Terms for this booking/);
   assert.match(book, /disabled=\{pending \|\| !termsReady\}/);

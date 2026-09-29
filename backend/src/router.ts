@@ -20,7 +20,16 @@ import { getCommissionTotals } from "./engine/commissions.js";
 import { completeOnboarding, ensureMember, logAdminAction, requireAdmin, bindSponsorForGrowth } from "./engine/members.js";
 import { FOUNDATION_TOTAL, foundationRegistryCsv, listFoundationRegistry, validateFoundation } from "./engine/foundation.js";
 import { createContactRequest, listContactRequests, updateContactRequestStatus } from "./engine/contact.js";
-import { getPolicy, listCurrentPolicies, listUserConsents, policyBySlug, recordConsents } from "./engine/terms.js";
+import {
+  createBookingTermsDraft,
+  getBookingTermsAdmin,
+  listResolvedPolicies,
+  listUserConsents,
+  publishBookingTermsDraft,
+  recordConsents,
+  resolvePolicyRequest,
+  updateBookingTermsDraft,
+} from "./engine/terms.js";
 import { getQualificationStatus, PERSONAL_SPONSOR_TARGET, TOTAL_POSITIONS } from "./engine/network.js";
 import { listLeadershipRewardSummaries, syncLeadershipReward } from "./engine/leadership.js";
 import { decideWithdrawal, markWithdrawalPaid, requestWithdrawal } from "./engine/withdrawals.js";
@@ -176,18 +185,17 @@ app.get("/api/payment-options", async (c) => {
   const options = await withTransaction((client) => getEffectivePaymentOptions(client, c.req.query("target")));
   return c.json({ options });
 });
-app.get("/api/terms", (c) => {
+app.get("/api/terms", async (c) => {
   const keys = (c.req.query("keys") ?? "")
     .split(",")
     .map((key) => key.trim())
     .filter(Boolean);
-  return c.json({ documents: listCurrentPolicies(keys.length ? keys : undefined) });
+  const documents = await withTransaction((client) => listResolvedPolicies(client, keys.length ? keys : undefined));
+  return c.json({ documents });
 });
-app.get("/api/terms/:key", (c) => {
-  const raw = c.req.param("key");
-  const bySlug = policyBySlug(raw);
-  if (bySlug) return c.json({ document: bySlug });
-  return c.json({ document: getPolicy(raw) });
+app.get("/api/terms/:key", async (c) => {
+  const document = await withTransaction((client) => resolvePolicyRequest(client, c.req.param("key")));
+  return c.json({ document });
 });
 
 // Better Auth mounts its whole surface (sign-up, sign-in, sign-out,
@@ -877,6 +885,80 @@ app.get("/api/admin/consents", async (c) => {
     return listUserConsents(client, userId);
   });
   return c.json({ consents });
+});
+
+app.get("/api/admin/terms/booking", async (c) => {
+  const adminId = c.get("userId");
+  const view = await withTransaction(async (client) => {
+    await requireAdmin(client, adminId);
+    return getBookingTermsAdmin(client);
+  });
+  return c.json(view);
+});
+
+app.post("/api/admin/terms/booking/drafts", async (c) => {
+  const adminId = c.get("userId");
+  const body = await jsonBody<{
+    version?: string;
+    title?: string;
+    effectiveDate?: string;
+    summary?: string;
+    body?: string;
+  }>(c);
+  const revision = await withTransaction(async (client) => {
+    await requireAdmin(client, adminId);
+    const created = await createBookingTermsDraft(client, adminId, body);
+    await logAdminAction(client, {
+      adminUserId: adminId,
+      actionType: "terms.booking.draft.create",
+      targetType: "policy_revision",
+      targetId: created.id,
+      payload: { version: created.version, status: created.status },
+    });
+    return created;
+  });
+  return c.json({ revision }, 201);
+});
+
+app.post("/api/admin/terms/booking/drafts/:id/publish", async (c) => {
+  const adminId = c.get("userId");
+  const revision = await withTransaction(async (client) => {
+    await requireAdmin(client, adminId);
+    const published = await publishBookingTermsDraft(client, c.req.param("id"), adminId);
+    await logAdminAction(client, {
+      adminUserId: adminId,
+      actionType: "terms.booking.publish",
+      targetType: "policy_revision",
+      targetId: published.id,
+      payload: { version: published.version, status: published.status },
+    });
+    return published;
+  });
+  return c.json({ revision });
+});
+
+app.post("/api/admin/terms/booking/drafts/:id", async (c) => {
+  const adminId = c.get("userId");
+  const body = await jsonBody<{
+    version?: string;
+    title?: string;
+    effectiveDate?: string;
+    summary?: string;
+    body?: string;
+  }>(c);
+  const revision = await withTransaction(async (client) => {
+    await requireAdmin(client, adminId);
+    const updated = await updateBookingTermsDraft(client, c.req.param("id"), body);
+    await logAdminAction(client, {
+      adminUserId: adminId,
+      actionType: "terms.booking.draft.update",
+      targetType: "policy_revision",
+      targetId: updated.id,
+      payload: { version: updated.version, status: updated.status },
+    });
+    return updated;
+  });
+  return c.json({ revision });
 });
 
 app.post("/api/admin/activations/:id/:decision", async (c) => {

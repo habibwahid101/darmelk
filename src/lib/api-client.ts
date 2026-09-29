@@ -200,6 +200,36 @@ export type PolicyDocument = {
   paragraphs: string[];
 };
 
+export type PolicyRevision = {
+  id: string;
+  document_key: string;
+  version: string;
+  title: string;
+  effective_date: string;
+  summary: string;
+  body: string;
+  status: "draft" | "published";
+  created_at: string;
+  updated_at: string;
+  published_at: string | null;
+  created_by_admin_id: string | null;
+  published_by_admin_id: string | null;
+  current?: boolean;
+};
+
+export type BookingTermsAdmin = {
+  key: string;
+  slug: string;
+  publicPath: string;
+  current: PolicyDocument & {
+    source: "code" | "database";
+    revisionId: string | null;
+    status: "published";
+    body: string;
+  };
+  revisions: PolicyRevision[];
+};
+
 export type UserConsent = {
   id: string;
   user_id: string;
@@ -685,6 +715,13 @@ export const api = {
     activations: () => request<{ activations: Array<AnnualActivation & { user_name?: string; user_email?: string; consents?: UserConsent[] }> }>("/api/admin/activations"),
     consents: (userId: string) =>
       request<{ consents: UserConsent[] }>(`/api/admin/consents?userId=${encodeURIComponent(userId)}`),
+    bookingTerms: () => request<BookingTermsAdmin>("/api/admin/terms/booking"),
+    createBookingTermsDraft: (data: { version: string; title: string; effectiveDate: string; summary?: string; body: string }) =>
+      post<{ revision: PolicyRevision }>("/api/admin/terms/booking/drafts", data),
+    updateBookingTermsDraft: (id: string, data: { version: string; title: string; effectiveDate: string; summary?: string; body: string }) =>
+      post<{ revision: PolicyRevision }>(`/api/admin/terms/booking/drafts/${encodeURIComponent(id)}`, data),
+    publishBookingTermsDraft: (id: string) =>
+      post<{ revision: PolicyRevision }>(`/api/admin/terms/booking/drafts/${encodeURIComponent(id)}/publish`, {}),
     decideActivation: (id: string, decision: "approve" | "reject") =>
       post<{ activation: AnnualActivation }>(`/api/admin/activations/${id}/${decision}`),
 
