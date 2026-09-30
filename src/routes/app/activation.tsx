@@ -3,7 +3,6 @@ import { useState } from "react";
 import { AlertBanner, PageHeader, Surface } from "@/components/states";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { TermsAccept } from "@/components/terms-accept";
 import { useMemberSession } from "@/components/layout/use-member";
 import { formatBdt } from "@/lib/offers";
 import { formatWhen } from "@/lib/platform";
@@ -115,16 +114,34 @@ function ActivationPage() {
         {canRequest ? (
           <div className="mt-6 space-y-5">
             {outstanding.length > 0 ? (
-              <TermsAccept
-                items={[...outstanding]}
-                accepted={accepted}
-                onChange={(key, value) => setAccepted((current) => ({ ...current, [key]: value }))}
-                statement={
-                  outstanding.length === 1
-                    ? "I have read and agree to the remaining Growth terms."
-                    : "I have read and agree to the Growth Program Terms and Growth Activation Terms."
-                }
-              />
+              <label className="flex min-h-11 items-start gap-3 rounded-xl bg-paper px-3 py-3 text-sm leading-relaxed">
+                <input
+                  type="checkbox"
+                  className="mt-0.5 size-4 shrink-0 accent-[var(--color-pine)]"
+                  checked={outstanding.every((item) => accepted[item.key])}
+                  onChange={(e) => {
+                    const value = e.target.checked;
+                    setAccepted((current) => {
+                      const next = { ...current };
+                      for (const item of outstanding) next[item.key] = value;
+                      return next;
+                    });
+                  }}
+                  required
+                />
+                <span>
+                  I have read and agree to the{" "}
+                  {outstanding.map((item, index) => (
+                    <span key={item.key}>
+                      {index > 0 ? " and " : null}
+                      <a href={item.href} className="font-medium text-pine underline-offset-2 hover:underline">
+                        {item.label}
+                      </a>
+                    </span>
+                  ))}
+                  .
+                </span>
+              </label>
             ) : (
               <p className="text-sm text-muted">Current Growth Program Terms and Growth Activation Terms are already accepted.</p>
             )}

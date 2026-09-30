@@ -10,7 +10,9 @@
 // browser must be willing to send a cross-site cookie) when no custom API
 // domain is wired up yet.
 import { betterAuth } from "better-auth";
-import { getPool } from "./db.js";
+import { referralSignupHook } from "./auth-referral-hook.js";
+import { getPool, withTransaction } from "./db.js";
+import { assertSignupReferral } from "./engine/members.js";
 
 function env(key: string): string | undefined {
   const v = process.env[key]?.trim();
@@ -54,6 +56,13 @@ export const auth = betterAuth({
   },
   session: {
     cookieCache: { enabled: true, maxAge: 300 },
+  },
+  hooks: {
+    before: referralSignupHook(async (code) => {
+      await withTransaction(async (client) => {
+        await assertSignupReferral(client, code);
+      });
+    }),
   },
   advanced: {
     // Cross-origin either way: the frontend (darmelk.com, on Vercel) and this

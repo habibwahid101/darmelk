@@ -54,6 +54,17 @@ test("activation terms UI asks only for the current versions that are missing", 
   assert.match(page, /api\.terms\(\["GROWTH_PROGRAM_TERMS", "GROWTH_ACTIVATION_TERMS"\]\)/);
   assert.match(page, /api\.requestActivation\(crypto\.randomUUID\(\), outstanding\.length > 0\)/);
   assert.doesNotMatch(page, /requestActivation\(crypto\.randomUUID\(\), true\)/);
+  assert.match(page, /type="checkbox"/);
+  assert.equal((page.match(/type="checkbox"/g) ?? []).length, 1);
+  assert.match(page, /outstanding\.length > 0/);
+  assert.match(page, /\/terms\?key=growth-program/);
+  assert.match(page, /\/terms\?key=growth-activation/);
+  assert.match(page, /Growth Program Terms/);
+  assert.match(page, /Growth Activation Terms/);
+  assert.match(page, /Current Growth Program Terms and Growth Activation Terms are already accepted/);
+  assert.doesNotMatch(page, /TermsAccept/);
+  assert.doesNotMatch(page, /remaining Growth terms/);
+  assert.match(page, /for \(const item of outstanding\) next\[item\.key\] = value/);
   assert.match(page, /PaymentForm targetType="activation"/);
   assert.match(page, /termsLoaded && outstanding\.every/);
   assert.match(engine, /hasCurrentConsent/);

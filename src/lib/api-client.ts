@@ -593,7 +593,7 @@ export const api = {
   termsDocument: (key: string) =>
     request<{ document: PolicyDocument }>(`/api/terms/${encodeURIComponent(key)}`),
   myConsents: () => request<{ consents: UserConsent[] }>("/api/me/consents"),
-  me: () => request<{ member: Member; merchant: MerchantSummary | null }>("/api/me"),
+  me: () => request<{ member: Member | null; merchant: MerchantSummary | null; incompleteRegistration?: boolean }>("/api/me"),
   onboarding: (data: { name?: string; phone?: string; sponsorCode?: string; termsAccepted?: boolean }) =>
     post<{ member: Member }>("/api/me/onboarding", data),
   bindGrowthSponsor: (data: { sponsorCode: string }) =>

@@ -3,14 +3,15 @@ import { api, type Member, type MerchantSummary } from "@/lib/api-client";
 import { useAsync } from "@/lib/use-async";
 
 /**
- * Current member profile, backed by the real Darmelk API (`GET /api/me`),
- * which also auto-provisions the `members` row on first contact. Replaces
- * the old zustand-store `useMemberSession`.
+ * Current member profile from GET /api/me.
+ * A signed-in identity with no members row stays incomplete until registration
+ * finishes with an active Referral ID. Existing members are not rewritten.
  */
 export function useMemberSession(): {
   user: AppUser | null;
   member: Member | undefined;
   merchant: MerchantSummary | null | undefined;
+  incompleteRegistration: boolean;
   isPending: boolean;
   reload: () => void;
 } {
@@ -19,8 +20,9 @@ export function useMemberSession(): {
 
   return {
     user,
-    member: data?.member,
+    member: data?.member ?? undefined,
     merchant: data?.merchant,
+    incompleteRegistration: data?.incompleteRegistration === true && !data.member,
     // When auth resolves on a hard load, useAsync's enabling effect has not
     // started yet during that render. Keep the route gated until /api/me has
     // either returned or failed, otherwise a valid session flashes to /login.

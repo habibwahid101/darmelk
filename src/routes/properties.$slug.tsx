@@ -161,7 +161,7 @@ function PropertyCta({
 }) {
   const { user } = useCurrentUserState();
   const { data: me } = useAsync(() => api.me(), [user?.id], { enabled: Boolean(user) });
-  const active = me?.member.activation_status === "active";
+  const active = me?.member?.activation_status === "active";
 
   if (!bookable) {
     return (

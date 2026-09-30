@@ -7,32 +7,49 @@ import test from "node:test";
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const read = (rel) => readFileSync(join(root, rel), "utf8");
 
-test("general signup presents referral as optional and only looks it up when provided", () => {
+test("general signup requires an active referral before Better Auth sign-up", () => {
   const src = read("src/routes/login.tsx");
-  assert.match(src, /Referral ID \(Optional\)/);
-  assert.match(src, /Have a referral ID\? Enter it here\./);
-  assert.match(src, /A referral ID is optional/);
-  assert.match(src, /const trimmedReferral = sponsorCode\.trim\(\)/);
-  assert.match(src, /if \(trimmedReferral\) \{[\s\S]*lookupSponsor\(trimmedReferral\)/);
+  const auth = read("backend/src/auth.ts");
+  const hook = read("backend/src/auth-referral-hook.ts");
+  assert.match(src, /label="Referral ID"/);
+  assert.doesNotMatch(src, /Referral ID \(Optional\)/);
+  assert.doesNotMatch(src, /A referral ID is optional/);
+  assert.doesNotMatch(src, /Add a referral ID only if you have one/);
+  assert.doesNotMatch(src, /Have a referral ID\? Enter it here/);
+  assert.match(src, /Referral ID is required\./);
+  assert.match(src, /lookupSponsor\(trimmedReferral\)/);
+  assert.match(src, /DARMELK_REFERRAL_HEADER/);
+  assert.match(read("src/lib/referral.ts"), /x-darmelk-referral/);
+  assert.match(src, /required/);
+  assert.match(src, /aria-required="true"/);
   assert.match(src, /sponsorCode: trimmedReferral/);
-  assert.doesNotMatch(src, /Sponsor referral code is required/);
-  const referralStart = src.indexOf('id="sponsor-code"');
-  const referralField = src.slice(referralStart, src.indexOf("</Field>", referralStart));
-  assert.doesNotMatch(referralField, /(?<![A-Za-z-])required(?![A-Za-z-])/);
   assert.doesNotMatch(src, /Growth Program/);
   assert.doesNotMatch(src, /3×5/);
   assert.doesNotMatch(src, /3x5/);
+  assert.match(auth, /referralSignupHook/);
+  assert.match(auth, /assertSignupReferral/);
+  assert.match(hook, /\/sign-up\/email/);
+  assert.match(hook, /DARMELK_REFERRAL_HEADER/);
+  assert.match(read("backend/src/referral-messages.ts"), /x-darmelk-referral/);
+  assert.doesNotMatch(auth, /additionalFields/);
 });
 
-test("backend onboarding allows a null sponsor and skips matrix placement", () => {
+test("backend onboarding requires an active referral and does not auto-provision a sponsorless member", () => {
   const src = read("backend/src/engine/members.ts");
-  assert.match(src, /sponsorCode\?: string/);
-  assert.match(src, /const code = \(data\.sponsorCode \?\? ""\)\.trim\(\)\.toUpperCase\(\)/);
-  assert.match(src, /if \(sponsor\) \{[\s\S]*findOpenMatrixSlot/);
-  assert.match(src, /sponsor\?\.user_id \?\? null/);
-  assert.doesNotMatch(src, /sponsor_required/);
+  const ensure = src.slice(src.indexOf("export async function ensureMember"), src.indexOf("export async function assertSignupReferral"));
+  const register = src.slice(src.indexOf("export async function registerMemberWithActiveReferral"), src.indexOf("export async function completeOnboarding"));
+  assert.match(src, /export async function assertSignupReferral/);
+  assert.match(src, /export async function registerMemberWithActiveReferral/);
+  assert.match(src, /findOpenMatrixSlot/);
+  assert.match(src, /referral_required/);
+  assert.match(src, /sponsor_inactive/);
+  assert.match(src, /if \(existing\?\.onboarding_complete\) return existing/);
+  assert.doesNotMatch(ensure, /insert into members/);
+  assert.match(ensure, /incomplete_registration/);
+  assert.match(register, /findOpenMatrixSlot/);
+  assert.match(register, /sponsor_user_id/);
+  assert.doesNotMatch(register, /sponsor\?\.user_id \?\? null/);
   assert.doesNotMatch(src, /canSkipSponsor/);
-  assert.match(src, /if \(existing\.onboarding_complete\) return existing/);
 });
 
 test("sponsor schema stays nullable and additive", () => {

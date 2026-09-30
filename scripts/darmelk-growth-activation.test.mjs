@@ -13,7 +13,8 @@ test("General account is free and is not forced into Growth activation", () => {
   const activation = read("src/routes/app/activation.tsx");
   const shell = read("src/components/layout/app-shell.tsx");
   assert.match(login, /A Darmelk account is free/);
-  assert.match(login, /Referral ID \(Optional\)/);
+  assert.match(login, /label="Referral ID"/);
+  assert.doesNotMatch(login, /Referral ID \(Optional\)/);
   assert.doesNotMatch(login, /Growth Program/);
   assert.match(overview, /if \(!inGrowth\)/);
   const general = overview.slice(overview.indexOf("if (!inGrowth)"), overview.indexOf("Your property, progress, and financial activity"));
