@@ -85,18 +85,20 @@ test("public chrome does not add a loud Growth Program CTA", () => {
   assert.match(header, /label: "Contact"/);
 });
 
-test("general signup stays optional and Batch 02 contracts remain", () => {
+test("new signup requires an active referral and still uses the matrix engine", () => {
   const login = read("src/routes/login.tsx");
   const engine = read("backend/src/engine/members.ts");
-  const onboarding = engine.slice(
+  const register = engine.slice(
+    engine.indexOf("export async function registerMemberWithActiveReferral"),
     engine.indexOf("export async function completeOnboarding"),
-    engine.indexOf("export async function bindSponsorForGrowth"),
   );
-  assert.match(login, /Referral ID \(Optional\)/);
+  assert.match(login, /label="Referral ID"/);
+  assert.doesNotMatch(login, /Referral ID \(Optional\)/);
   assert.doesNotMatch(login, /Growth Program/);
-  assert.doesNotMatch(onboarding, /sponsor_required|growth_referral_required/);
-  assert.match(onboarding, /if \(sponsor\) \{[\s\S]*findOpenMatrixSlot/);
-  assert.match(onboarding, /sponsor\?\.user_id \?\? null/);
+  assert.match(register, /findOpenMatrixSlot/);
+  assert.match(register, /assertSignupReferral/);
+  assert.match(engine, /if \(existing\?\.onboarding_complete\) return existing/);
+  assert.doesNotMatch(register, /sponsor\?\.user_id \?\? null/);
 });
 
 test("annual activation amount is unchanged", () => {

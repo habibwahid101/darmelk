@@ -17,7 +17,7 @@ import {
   requestActivation,
 } from "./engine/activation.js";
 import { getCommissionTotals } from "./engine/commissions.js";
-import { completeOnboarding, ensureMember, logAdminAction, requireAdmin, bindSponsorForGrowth } from "./engine/members.js";
+import { ensureMember, logAdminAction, requireAdmin, bindSponsorForGrowth, registerMemberWithActiveReferral, assertSignupReferral } from "./engine/members.js";
 import { FOUNDATION_TOTAL, foundationRegistryCsv, listFoundationRegistry, validateFoundation } from "./engine/foundation.js";
 import { createContactRequest, listContactRequests, updateContactRequestStatus } from "./engine/contact.js";
 import {
@@ -34,6 +34,7 @@ import { getQualificationStatus, PERSONAL_SPONSOR_TARGET, TOTAL_POSITIONS } from
 import { listLeadershipRewardSummaries, syncLeadershipReward } from "./engine/leadership.js";
 import { decideWithdrawal, markWithdrawalPaid, requestWithdrawal } from "./engine/withdrawals.js";
 import { createPaymentSubmission, finalizePayment, getPaymentProof, markPaymentUnderReview, type PaymentMethod, type PaymentTarget } from "./engine/payments.js";
+import { REFERRAL_REQUIRED } from "./referral-messages.js";
 import { uid } from "./ids.js";
 import {
   addOfferMedia,
@@ -163,7 +164,7 @@ app.use(
   cors({
     origin: trustedOrigins,
     credentials: true,
-    allowHeaders: ["Content-Type", "Authorization", "Idempotency-Key"],
+    allowHeaders: ["Content-Type", "Authorization", "Idempotency-Key", "x-darmelk-referral"],
     allowMethods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
   }),
 );
@@ -290,14 +291,10 @@ app.get("/api/jobs/:slug", async (c) => {
 });
 
 app.get("/api/referral/:code", async (c) => {
-  const code = c.req.param("code").trim().toUpperCase();
-  if (!code) throw badRequest("Sponsor referral code is required", "sponsor_required");
-  const row = await queryOne<{ referral_code: string }>(
-    `select referral_code from members where referral_code = $1`,
-    [code],
-  );
-  if (!row) throw notFound("Sponsor code not found");
-  return c.json({ ok: true, referralCode: row.referral_code });
+  const code = c.req.param("code").trim();
+  if (!code) throw badRequest(REFERRAL_REQUIRED, "referral_required");
+  const sponsor = await withTransaction((client) => assertSignupReferral(client, code));
+  return c.json({ ok: true, referralCode: sponsor.referral_code });
 });
 
 app.post("/api/contact", async (c) => {
@@ -350,11 +347,12 @@ app.get("/api/promotions/:id", async (c) => {
 
 app.get("/api/me", async (c) => {
   const userId = c.get("userId");
-  const email = c.get("userEmail");
   const result = await withTransaction(async (client) => {
-    const member = await ensureMember(client, { id: userId, email });
+    const existing = await client.query(`select * from members where user_id = $1`, [userId]);
+    const member = existing.rows[0] ?? null;
+    if (!member) return { member: null, merchant: null, incompleteRegistration: true };
     const merchant = await getMerchantSummary(client, userId);
-    return { member, merchant };
+    return { member, merchant, incompleteRegistration: false };
   });
   return c.json(result);
 });
@@ -364,11 +362,14 @@ app.post("/api/me/onboarding", async (c) => {
   const body = await jsonBody<{ name?: string; phone?: string; sponsorCode?: string; termsAccepted?: boolean }>(c);
   if (body.termsAccepted !== true) throw badRequest("Terms & Conditions must be accepted", "terms_required");
   const member = await withTransaction(async (client) => {
-    await ensureMember(client, { id: userId, email: c.get("userEmail") });
     if (body.name?.trim()) {
       await client.query(`update "user" set name = $2, "updatedAt" = now() where id = $1`, [userId, body.name.trim()]);
     }
-    const result = await completeOnboarding(client, userId, { phone: body.phone ?? "", sponsorCode: body.sponsorCode ?? "" });
+    const result = await registerMemberWithActiveReferral(
+      client,
+      { id: userId, email: c.get("userEmail") },
+      { phone: body.phone ?? "", sponsorCode: body.sponsorCode ?? "" },
+    );
     await recordConsents(client, userId, {
       keys: ["GENERAL_TERMS", "PRIVACY_POLICY"],
       context: "signup",

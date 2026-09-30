@@ -15,7 +15,7 @@ async function main() {
   const { consumeInventoryForConfirmation } = await import("./engine/inventory.js");
   const { evaluatePromotionsForConfirmedBooking } = await import("./engine/promotions.js");
   const { postCommissionsForBooking } = await import("./engine/commissions.js");
-  const { completeOnboarding, ensureMember } = await import("./engine/members.js");
+  const { completeOnboarding } = await import("./engine/members.js");
   const { getQualificationStatus } = await import("./engine/network.js");
   const {
     addMonths,
@@ -73,226 +73,323 @@ async function main() {
     return approved;
   };
 
-  // --- sign up explicitly configured admin ---
-  const adminEmail = "admin@example.com";
-  const signUpAdmin = await app.request("/api/auth/sign-up/email", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ email: adminEmail, password: "password123", name: "Admin User" }),
+  // TEST-ONLY fixtures. Inserted directly into the CI database — never through
+  // signup, never via a migration, and never as production seed data.
+  const REFERRAL_HEADER = "x-darmelk-referral";
+  const CI_ROOT_ID = "darmelk_ci_bootstrap_sponsor";
+  const CI_ROOT_CODE = "DM-CIROOT";
+  let sessionCookieName = "better-auth.session_token";
+
+  const identityCounts = async (email: string) => {
+    const row = await queryOne<{ users: number; accounts: number; members: number }>(
+      `select
+         (select count(*)::int from "user" where lower(email) = lower($1)) as users,
+         (select count(*)::int from account a join "user" u on u.id = a."userId" where lower(u.email) = lower($1)) as accounts,
+         (select count(*)::int from members m join "user" u on u.id = m.user_id where lower(u.email) = lower($1)) as members`,
+      [email],
+    );
+    return { users: row?.users ?? 0, accounts: row?.accounts ?? 0, members: row?.members ?? 0 };
+  };
+  const signUpEmail = (email: string, name: string, referral?: string) =>
+    app.request("/api/auth/sign-up/email", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        ...(referral !== undefined ? { [REFERRAL_HEADER]: referral } : {}),
+      },
+      body: JSON.stringify({ email, password: "password123", name }),
+    });
+  const seedFixtureMember = async (opts: {
+    id: string;
+    email: string;
+    name: string;
+    code: string;
+    activationStatus: "inactive" | "active" | "expired";
+    expires: "future" | "past" | "none";
+    onboardingComplete?: boolean;
+  }) => {
+    await withTransaction(async (client) => {
+      await client.query(
+        `insert into "user" (id, name, email, "emailVerified", "createdAt", "updatedAt")
+         values ($1, $2, $3, true, now(), now())`,
+        [opts.id, opts.name, opts.email],
+      );
+      await client.query(
+        `insert into members (
+           user_id, referral_code, phone, role, onboarding_complete,
+           activation_status, activation_expires_at
+         ) values (
+           $1, $2, '', 'member', $3, $4,
+           case $5
+             when 'future' then now() + interval '365 days'
+             when 'past' then now() - interval '1 day'
+             else null
+           end
+         )`,
+        [opts.id, opts.code, opts.onboardingComplete ?? true, opts.activationStatus, opts.expires],
+      );
+    });
+    return (await query<any>(`select * from members where user_id = $1`, [opts.id]))[0];
+  };
+  const signedSessionCookie = async (userId: string) => {
+    const token = `${crypto.randomUUID().replace(/-/g, "")}${crypto.randomUUID().replace(/-/g, "")}`;
+    await query(
+      `insert into session (id, "expiresAt", token, "createdAt", "updatedAt", "userId")
+       values ($1, now() + interval '7 days', $2, now(), now(), $3)`,
+      [`ci_sess_${token.slice(0, 20)}`, token, userId],
+    );
+    const key = await crypto.subtle.importKey(
+      "raw",
+      new TextEncoder().encode(process.env.BETTER_AUTH_SECRET ?? ""),
+      { name: "HMAC", hash: "SHA-256" },
+      false,
+      ["sign"],
+    );
+    const sigBuf = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(token));
+    const signature = btoa(String.fromCharCode(...new Uint8Array(sigBuf)));
+    return `${sessionCookieName}=${encodeURIComponent(`${token}.${signature}`)}`;
+  };
+  const rejectSignup = async (label: string, email: string, name: string, referral: string | undefined, code: string) => {
+    const res = await signUpEmail(email, name, referral);
+    const body = await res.clone().json().catch(() => undefined);
+    const counts = await identityCounts(email);
+    record(
+      label,
+      res.status === 400 &&
+        body?.code === code &&
+        counts.users === 0 &&
+        counts.accounts === 0 &&
+        counts.members === 0,
+      { status: res.status, body, counts },
+    );
+  };
+
+  await seedFixtureMember({
+    id: CI_ROOT_ID,
+    email: "ci-bootstrap-sponsor@example.com",
+    name: "CI Bootstrap Sponsor",
+    code: CI_ROOT_CODE,
+    activationStatus: "active",
+    expires: "future",
   });
-  record("admin sign-up", signUpAdmin.status === 200, await signUpAdmin.clone().json().catch(() => undefined) as any);
-  const adminCookie = extractCookie(signUpAdmin);
+  await seedFixtureMember({
+    id: "darmelk_ci_inactive_sponsor",
+    email: "ci-inactive-sponsor@example.com",
+    name: "CI Inactive Sponsor",
+    code: "DM-CIINACTIVE",
+    activationStatus: "inactive",
+    expires: "none",
+  });
+  await seedFixtureMember({
+    id: "darmelk_ci_expired_sponsor",
+    email: "ci-expired-sponsor@example.com",
+    name: "CI Expired Sponsor",
+    code: "DM-CIEXPIRED",
+    activationStatus: "active",
+    expires: "past",
+  });
 
-  const adminMeRes = await app.request("/api/me", { headers: { cookie: adminCookie } });
-  const adminMe = await json(adminMeRes);
-  record("admin /api/me provisions member with role=admin", adminMe.member?.role === "admin", adminMe);
-
-  const lookupOk = await json(await app.request(`/api/referral/${adminMe.member.referral_code}`));
-  record("public sponsor lookup accepts valid code", lookupOk.ok === true && lookupOk.referralCode === adminMe.member.referral_code, lookupOk);
+  const lookupOk = await json(await app.request(`/api/referral/${CI_ROOT_CODE}`));
+  record(
+    "public sponsor lookup accepts valid code",
+    lookupOk.ok === true && lookupOk.referralCode === CI_ROOT_CODE,
+    lookupOk,
+  );
   const lookupBad = await app.request("/api/referral/DM-NOTREAL");
-  record("public sponsor lookup rejects invalid code", lookupBad.status === 404, lookupBad.status);
+  record("public sponsor lookup rejects invalid code", lookupBad.status === 400, lookupBad.status);
+  const lookupInactive = await app.request("/api/referral/DM-CIINACTIVE");
+  record("public sponsor lookup rejects inactive code", lookupInactive.status === 400, lookupInactive.status);
 
-  const rootSignUp = await app.request("/api/auth/sign-up/email", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ email: "root-no-sponsor@example.com", password: "password123", name: "Root Member" }),
-  });
-  const rootCookie = extractCookie(rootSignUp);
-  await app.request("/api/me", { headers: { cookie: rootCookie } });
-  const rootOnboarding = await json(await app.request("/api/me/onboarding", {
-    method: "POST",
-    headers: { cookie: rootCookie, "content-type": "application/json" },
-    body: JSON.stringify({ name: "Root Member", phone: "", sponsorCode: "", termsAccepted: true }),
-  }));
-  record(
-    "root member completes onboarding with optional phone and no sponsor",
-    rootOnboarding.member?.onboarding_complete === true && rootOnboarding.member?.sponsor_user_id === null &&
-      rootOnboarding.member?.network_parent_user_id === null && Boolean(rootOnboarding.member?.referral_code),
-    rootOnboarding.member,
+  await rejectSignup(
+    "missing referral signup is rejected before any auth user, credential, or member",
+    "missing-ref@example.com",
+    "Missing Referral",
+    undefined,
+    "referral_required",
   );
-
-  const missingSponsor = await app.request("/api/auth/sign-up/email", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ email: "nosponsor@example.com", password: "password123", name: "No Sponsor" }),
-  });
-  const noSponsorCookie = extractCookie(missingSponsor);
-  await app.request("/api/me", { headers: { cookie: noSponsorCookie } });
-  const noSponsorOnboard = await json(
-    await app.request("/api/me/onboarding", {
-      method: "POST",
-      headers: { cookie: noSponsorCookie, "content-type": "application/json" },
-      body: JSON.stringify({ name: "No Sponsor", sponsorCode: "", termsAccepted: true }),
-    }),
+  await rejectSignup(
+    "whitespace-only referral signup is rejected before any identity is created",
+    "whitespace-ref@example.com",
+    "Whitespace Ref",
+    "   ",
+    "referral_required",
   );
-  record(
-    "general member without referral completes onboarding with no sponsor",
-    noSponsorOnboard.member?.onboarding_complete === true &&
-      noSponsorOnboard.member?.sponsor_user_id === null &&
-      noSponsorOnboard.member?.network_parent_user_id === null &&
-      noSponsorOnboard.member?.network_slot === null,
-    noSponsorOnboard.member,
+  await rejectSignup(
+    "invalid referral signup is rejected before any identity is created",
+    "badref@example.com",
+    "Bad Referral",
+    "DM-NOTREAL",
+    "referral_not_found",
   );
-  const generalId = noSponsorOnboard.member?.user_id as string | undefined;
-  const generalPlacement = await queryOne<{
-    sponsor_user_id: string | null;
-    network_parent_user_id: string | null;
-    network_slot: number | null;
-  }>(
-    `select sponsor_user_id, network_parent_user_id, network_slot from members where user_id = $1`,
-    [generalId],
+  await rejectSignup(
+    "inactive referral signup is rejected before any identity is created",
+    "inactive-ref@example.com",
+    "Inactive Referral",
+    "DM-CIINACTIVE",
+    "sponsor_inactive",
   );
-  record(
-    "sponsorless account is not placed into the 3x5 matrix",
-    generalPlacement?.sponsor_user_id == null &&
-      generalPlacement?.network_parent_user_id == null &&
-      generalPlacement?.network_slot == null,
-    generalPlacement,
-  );
-  const generalCommissions = await queryOne<{ n: number }>(
-    `select count(*)::int as n from commission_ledger where source_user_id = $1 or beneficiary_user_id = $1`,
-    [generalId],
-  );
-  record("sponsorless signup creates no commission", generalCommissions?.n === 0, generalCommissions);
-  const generalQual = await withTransaction((client) => getQualificationStatus(client, generalId!));
-  record(
-    "sponsorless signup creates no qualification progress",
-    generalQual.sponsorCount === 0 && generalQual.qualified === false && generalQual.levelCounts[1] === 0,
-    generalQual,
-  );
-  const generalLeadership = await queryOne<{ n: number }>(
-    `select count(*)::int as n from leadership_reward_cycles where user_id = $1`,
-    [generalId],
-  );
-  record("sponsorless signup creates no Leadership entitlement", generalLeadership?.n === 0, generalLeadership);
-  const laterBind = await json(
-    await app.request("/api/me/onboarding", {
-      method: "POST",
-      headers: { cookie: noSponsorCookie, "content-type": "application/json" },
-      body: JSON.stringify({ sponsorCode: adminMe.member.referral_code, termsAccepted: true }),
-    }),
-  );
-  record(
-    "completed general onboarding cannot later bind a sponsor",
-    laterBind.member?.sponsor_user_id === null && laterBind.member?.network_parent_user_id === null,
-    laterBind.member,
-  );
-  const generalSignIn = await app.request("/api/auth/sign-in/email", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ email: "nosponsor@example.com", password: "password123" }),
-  });
-  record("login works for sponsorless account", generalSignIn.status === 200, generalSignIn.status);
-  const generalConsents = await json(await app.request("/api/me/consents", { headers: { cookie: noSponsorCookie } }));
-  record(
-    "general signup stores auditable General Terms and Privacy acceptance",
-    Array.isArray(generalConsents.consents) &&
-      generalConsents.consents.some((c: { document_key: string; document_version: string }) => c.document_key === "GENERAL_TERMS" && c.document_version === "1") &&
-      generalConsents.consents.some((c: { document_key: string }) => c.document_key === "PRIVACY_POLICY") &&
-      !generalConsents.consents.some((c: { document_key: string }) => c.document_key === "GROWTH_PROGRAM_TERMS"),
-    generalConsents.consents,
-  );
-  const generalActivation = await json(await app.request("/api/activation/request", {
-    method: "POST",
-    headers: { cookie: noSponsorCookie, "content-type": "application/json" },
-    body: JSON.stringify({ acceptGrowthTerms: true }),
-  }));
-  record(
-    "sponsorless general account cannot request Growth Program Activation",
-    generalActivation.error?.code === "growth_referral_required",
-    generalActivation,
+  await rejectSignup(
+    "expired referral signup is rejected before any identity is created",
+    "expired-ref@example.com",
+    "Expired Referral",
+    "DM-CIEXPIRED",
+    "sponsor_inactive",
   );
 
-  const whitespaceSignUp = await app.request("/api/auth/sign-up/email", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ email: "whitespace-ref@example.com", password: "password123", name: "Whitespace Ref" }),
-  });
-  const whitespaceCookie = extractCookie(whitespaceSignUp);
-  await app.request("/api/me", { headers: { cookie: whitespaceCookie } });
-  const whitespaceOnboard = await json(
-    await app.request("/api/me/onboarding", {
-      method: "POST",
-      headers: { cookie: whitespaceCookie, "content-type": "application/json" },
-      body: JSON.stringify({ name: "Whitespace Ref", sponsorCode: "   ", termsAccepted: true }),
-    }),
-  );
+  // --- admin signs up with the active CI bootstrap referral, then onboards ---
+  const adminEmail = "admin@example.com";
+  const signUpAdmin = await signUpEmail(adminEmail, "Admin User", CI_ROOT_CODE);
+  const adminSignUpBody = await signUpAdmin.clone().json().catch(() => undefined);
+  record("admin sign-up", signUpAdmin.status === 200, adminSignUpBody);
+  const adminCookie = extractCookie(signUpAdmin);
+  sessionCookieName = adminCookie.split("=")[0] || sessionCookieName;
+  const adminIdentityBefore = await identityCounts(adminEmail);
   record(
-    "whitespace-only referral is treated as omitted",
-    whitespaceOnboard.member?.onboarding_complete === true && whitespaceOnboard.member?.sponsor_user_id === null,
-    whitespaceOnboard.member,
+    "active referral signup creates an auth identity and no member",
+    signUpAdmin.status === 200 && adminIdentityBefore.users === 1 && adminIdentityBefore.accounts === 1 && adminIdentityBefore.members === 0,
+    adminIdentityBefore,
   );
 
+  const adminMeBefore = await json(await app.request("/api/me", { headers: { cookie: adminCookie } }));
+  record(
+    "admin /api/me before onboarding is incomplete and does not auto-provision a member",
+    adminMeBefore.member == null && adminMeBefore.incompleteRegistration === true && adminMeBefore.merchant == null,
+    adminMeBefore,
+  );
+
+  const termsSignUp = await signUpEmail("terms-missing@example.com", "Terms Missing", CI_ROOT_CODE);
+  const termsCookie = extractCookie(termsSignUp);
   const noTerms = await json(
     await app.request("/api/me/onboarding", {
       method: "POST",
-      headers: { cookie: noSponsorCookie, "content-type": "application/json" },
-      body: JSON.stringify({ sponsorCode: adminMe.member.referral_code }),
+      headers: { cookie: termsCookie, "content-type": "application/json" },
+      body: JSON.stringify({ sponsorCode: CI_ROOT_CODE }),
     }),
   );
-  record("onboarding without terms accepted is rejected", noTerms.error?.code === "terms_required", noTerms);
-
-  const invalidSignUp = await app.request("/api/auth/sign-up/email", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ email: "badref@example.com", password: "password123", name: "Bad Referral" }),
-  });
-  const invalidCookie = extractCookie(invalidSignUp);
-  const invalidMe = await json(await app.request("/api/me", { headers: { cookie: invalidCookie } }));
-  const badCode = await json(
-    await app.request("/api/me/onboarding", {
-      method: "POST",
-      headers: { cookie: invalidCookie, "content-type": "application/json" },
-      body: JSON.stringify({ sponsorCode: "DM-NOTREAL", termsAccepted: true }),
-    }),
-  );
-  record("invalid sponsor code is rejected", badCode.error?.code === "sponsor_not_found", badCode);
-  const invalidAfter = await queryOne<{
-    onboarding_complete: boolean;
-    sponsor_user_id: string | null;
-    network_parent_user_id: string | null;
-    network_slot: number | null;
-  }>(
-    `select onboarding_complete, sponsor_user_id, network_parent_user_id, network_slot from members where user_id = $1`,
-    [invalidMe.member?.user_id],
-  );
+  const termsMe = await json(await app.request("/api/me", { headers: { cookie: termsCookie } }));
   record(
-    "failed referral validation leaves no network side effect",
-    invalidAfter?.onboarding_complete === false &&
-      invalidAfter?.sponsor_user_id == null &&
-      invalidAfter?.network_parent_user_id == null &&
-      invalidAfter?.network_slot == null,
-    invalidAfter,
+    "onboarding without terms accepted is rejected",
+    noTerms.error?.code === "terms_required" && termsMe.member == null && termsMe.incompleteRegistration === true,
+    { noTerms, termsMe },
   );
 
-  const selfSignUp = await app.request("/api/auth/sign-up/email", {
+  const adminOnboardingRes = await app.request("/api/me/onboarding", {
     method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ email: "selfref@example.com", password: "password123", name: "Self Referral" }),
+    headers: { cookie: adminCookie, "content-type": "application/json" },
+    body: JSON.stringify({ name: "Admin User", phone: "", sponsorCode: CI_ROOT_CODE, termsAccepted: true }),
   });
-  const selfCookie = extractCookie(selfSignUp);
-  const selfMe = await json(await app.request("/api/me", { headers: { cookie: selfCookie } }));
-  const selfOnboard = await json(
-    await app.request("/api/me/onboarding", {
-      method: "POST",
-      headers: { cookie: selfCookie, "content-type": "application/json" },
-      body: JSON.stringify({ sponsorCode: selfMe.member?.referral_code, termsAccepted: true }),
-    }),
+  const adminOnboarding = await json(adminOnboardingRes);
+  record(
+    "admin onboarding creates exactly one member under the bootstrap sponsor",
+    adminOnboarding.member?.role === "admin" &&
+      adminOnboarding.member?.onboarding_complete === true &&
+      adminOnboarding.member?.sponsor_user_id === CI_ROOT_ID &&
+      adminOnboarding.member?.network_parent_user_id === CI_ROOT_ID &&
+      adminOnboarding.member?.network_slot === 1,
+    adminOnboarding.member,
   );
-  record("self-referral is rejected", selfOnboard.error?.code === "self_sponsor", selfOnboard);
+  const adminMemberCount = await queryOne<{ n: number }>(
+    `select count(*)::int as n from members m join "user" u on u.id = m.user_id where lower(u.email) = lower($1)`,
+    [adminEmail],
+  );
+  record("admin onboarding does not create a second member", adminMemberCount?.n === 1, adminMemberCount);
+
+  const adminMe = await json(await app.request("/api/me", { headers: { cookie: adminCookie } }));
+  record(
+    "admin /api/me after onboarding returns the completed admin member",
+    adminMe.member?.role === "admin" &&
+      adminMe.member?.onboarding_complete === true &&
+      adminMe.member?.user_id === adminOnboarding.member?.user_id &&
+      adminMe.incompleteRegistration === false,
+    adminMe.member,
+  );
+  const adminConsents = await json(await app.request("/api/me/consents", { headers: { cookie: adminCookie } }));
+  record(
+    "general signup stores auditable General Terms and Privacy acceptance",
+    Array.isArray(adminConsents.consents) &&
+      adminConsents.consents.some((c: { document_key: string; document_version: string }) => c.document_key === "GENERAL_TERMS" && c.document_version === "1") &&
+      adminConsents.consents.some((c: { document_key: string }) => c.document_key === "PRIVACY_POLICY") &&
+      !adminConsents.consents.some((c: { document_key: string }) => c.document_key === "GROWTH_PROGRAM_TERMS"),
+    adminConsents.consents,
+  );
+
+  const legacy = await seedFixtureMember({
+    id: "darmelk_ci_legacy_sponsorless",
+    email: "ci-legacy-sponsorless@example.com",
+    name: "CI Legacy Sponsorless",
+    code: "DM-CILEGACY",
+    activationStatus: "inactive",
+    expires: "none",
+  });
+  const legacyBefore = await queryOne<any>(`select * from members where user_id = $1`, [legacy.user_id]);
+  const legacyReturned = await withTransaction((client) =>
+    completeOnboarding(client, legacy.user_id, { phone: "should-not-apply", sponsorCode: CI_ROOT_CODE }),
+  );
+  const legacyAfter = await queryOne<any>(`select * from members where user_id = $1`, [legacy.user_id]);
+  record(
+    "historical completed sponsorless member remains unchanged",
+    legacyReturned?.sponsor_user_id == null &&
+      legacyReturned?.onboarding_complete === true &&
+      legacyAfter?.sponsor_user_id == null &&
+      legacyAfter?.network_parent_user_id == null &&
+      legacyAfter?.network_slot == null &&
+      legacyAfter?.referral_code === legacyBefore?.referral_code &&
+      legacyAfter?.activation_status === "inactive" &&
+      legacyAfter?.onboarding_complete === true,
+    { before: legacyBefore, after: legacyAfter },
+  );
+  const legacyActivation = await withTransaction(async (client) => {
+    try {
+      await requestActivation(client, legacy.user_id, { acceptGrowthTerms: true });
+      return { error: null as { code?: string } | null };
+    } catch (err: any) {
+      return { error: { code: err?.code as string | undefined, message: err?.message as string | undefined } };
+    }
+  });
+  record(
+    "sponsorless general account cannot request Growth Program Activation",
+    legacyActivation.error?.code === "growth_referral_required",
+    legacyActivation,
+  );
+
+  const selfMember = await seedFixtureMember({
+    id: "darmelk_ci_self_referral",
+    email: "ci-self-referral@example.com",
+    name: "CI Self Referral",
+    code: "DM-CISELF",
+    activationStatus: "inactive",
+    expires: "none",
+    onboardingComplete: false,
+  });
+  const selfResult = await withTransaction(async (client) => {
+    try {
+      await completeOnboarding(client, selfMember.user_id, { phone: "+8801700000001", sponsorCode: "DM-CISELF" });
+      return { code: "accepted" };
+    } catch (err: any) {
+      return { code: err?.code as string | undefined };
+    }
+  });
+  const selfAfter = await queryOne<any>(`select sponsor_user_id, onboarding_complete, network_slot from members where user_id = $1`, [selfMember.user_id]);
+  record(
+    "self-referral is rejected",
+    selfResult.code === "self_sponsor" && selfAfter?.sponsor_user_id == null && selfAfter?.onboarding_complete === false && selfAfter?.network_slot == null,
+    { selfResult, selfAfter },
+  );
 
   const adminActivationRequest = await requestGrowthActivation(adminCookie);
   await submitAndApprovePayment(adminCookie, "activation", adminActivationRequest.activation.id, "admin-activation-payment");
   const adminAfterActivation = await json(await app.request("/api/me", { headers: { cookie: adminCookie } }));
   record("admin QA identity is annually active before earning or sponsoring", adminAfterActivation.member?.activation_status === "active");
+  const adminLookup = await json(await app.request(`/api/referral/${adminMe.member.referral_code}`));
+  record(
+    "active admin referral is publicly valid after activation",
+    adminLookup.ok === true && adminLookup.referralCode === adminMe.member.referral_code,
+    adminLookup,
+  );
 
   // --- sign up member, onboard with admin's referral code ---
   const memberEmail = "member1@example.com";
-  const signUpMember = await app.request("/api/auth/sign-up/email", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ email: memberEmail, password: "password123", name: "Member One" }),
-  });
+  const signUpMember = await signUpEmail(memberEmail, "Member One", adminMe.member.referral_code);
   const memberCookie = extractCookie(signUpMember);
   record("member sign-up", signUpMember.status === 200);
 
@@ -486,7 +583,11 @@ async function main() {
     body: JSON.stringify({ reason: "smoke test reversal" }),
   });
   const reversed = await json(reverseRes);
-  record("booking reversed, 1 commission reversed", reversed.booking?.status === "reversed" && reversed.commissionsReversed === 1, reversed);
+  record(
+    "booking reversal reverses admin L1 and the CI bootstrap L2",
+    reversed.booking?.status === "reversed" && reversed.commissionsReversed === 2,
+    reversed,
+  );
 
   const adminCommissionsAfter = await json(await app.request("/api/me/commissions", { headers: { cookie: adminCookie } }));
   record(
@@ -504,11 +605,7 @@ async function main() {
   // admin's slots 2, 3, and then a 4th must SPILL to under member1) ---
   const cookies: string[] = [];
   for (const n of [2, 3, 4]) {
-    const res = await app.request("/api/auth/sign-up/email", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ email: `member${n}@example.com`, password: "password123", name: `Member ${n}` }),
-    });
+    const res = await signUpEmail(`member${n}@example.com`, `Member ${n}`, adminMe.member.referral_code);
     const cookie = extractCookie(res);
     cookies.push(cookie);
     await app.request("/api/me/onboarding", {
@@ -652,9 +749,13 @@ async function main() {
        values ($1,'Darmelk QA Matrix Root',$2,true,now(),now())`,
       [matrixRootId, matrixRootEmail],
     );
-    await ensureMember(client, { id: matrixRootId, email: matrixRootEmail });
+    // onboarding_complete stays false so the later count of completed
+    // darmelk_qa_matrix_% rows remains the 363 placed children, not the root.
     await client.query(
-      `update members set activation_status='active', activation_expires_at=now()+interval '365 days' where user_id=$1`,
+      `insert into members (
+         user_id, referral_code, phone, role, onboarding_complete,
+         activation_status, activation_expires_at
+       ) values ($1, 'DM-MATRIXROOT', '', 'member', false, 'active', now()+interval '365 days')`,
       [matrixRootId],
     );
   });
@@ -672,7 +773,6 @@ async function main() {
          values ($1,$2,$3,true,now(),now())`,
         [userId, `Darmelk QA Matrix ${suffix}`, email],
       );
-      await ensureMember(client, { id: userId, email });
       await completeOnboarding(client, userId, { phone: `+88017${suffix.padStart(8, "0")}`, sponsorCode: matrixRoot.referral_code });
       await client.query(
         `update members set activation_status='active', activation_expires_at=now()+interval '365 days' where user_id=$1`,
@@ -720,7 +820,6 @@ async function main() {
       `insert into "user" (id,name,email,"emailVerified","createdAt","updatedAt") values ($1,'Darmelk QA Matrix 364',$2,true,now(),now())`,
       [userId, email],
     );
-    await ensureMember(client, { id: userId, email });
     try {
       await completeOnboarding(client, userId, { phone: "+8801700000364", sponsorCode: matrixRoot.referral_code });
       return false;
@@ -815,7 +914,6 @@ async function main() {
       `insert into "user" (id,name,email,"emailVerified","createdAt","updatedAt") values ($1,'Darmelk QA Expired Sponsor Probe',$2,true,now(),now())`,
       [id, email],
     );
-    await ensureMember(client, { id, email });
     try {
       await completeOnboarding(client, id, { phone: "+8801700000999", sponsorCode: matrixRoot.referral_code });
       return false;
@@ -1361,11 +1459,7 @@ async function main() {
     adminDetailLr.leadership?.evidence?.tier50?.length >= 3 && adminDetailLr.leadership?.entitlements?.length === 12, adminDetailLr.leadership?.evidence);
 
   const signupOnboardActivate = async (email: string, name: string, sponsorCode: string) => {
-    const signUp = await app.request("/api/auth/sign-up/email", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ email, password: "password123", name }),
-    });
+    const signUp = await signUpEmail(email, name, sponsorCode);
     const cookie = extractCookie(signUp);
     await app.request("/api/me", { headers: { cookie } });
     await app.request("/api/me/onboarding", {
@@ -2343,24 +2437,8 @@ async function main() {
     { key: promoTerms.document?.key, version: promoTerms.document?.version },
   );
 
-  // --- Growth Program: bind sponsor later on an isolated sponsorless tree ---
-  const signupGeneralLater = async (email: string, name: string) => {
-    const signUp = await app.request("/api/auth/sign-up/email", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ email, password: "password123", name }),
-    });
-    const cookie = extractCookie(signUp);
-    await app.request("/api/me", { headers: { cookie } });
-    const onboard = await json(
-      await app.request("/api/me/onboarding", {
-        method: "POST",
-        headers: { cookie, "content-type": "application/json" },
-        body: JSON.stringify({ name, sponsorCode: "", termsAccepted: true }),
-      }),
-    );
-    return { cookie, member: onboard.member };
-  };
+  // --- Growth Program: bind a sponsor later on historical sponsorless members.
+  // These rows are seeded directly. New signup cannot create them.
   const bindGrowth = (cookie: string, sponsorCode: string) =>
     app.request("/api/me/growth/sponsor", {
       method: "POST",
@@ -2375,17 +2453,26 @@ async function main() {
   });
   record("unauthenticated growth bind is rejected", unauthBind.status === 401, unauthBind.status);
 
-  const growthSponsor = await signupGeneralLater("growth-sponsor@example.com", "Growth Sponsor");
-  await withTransaction(async (client) => {
-    await client.query(
-      `update members set activation_status='active', activation_expires_at=now()+interval '365 days' where user_id=$1`,
-      [growthSponsor.member.user_id],
-    );
+  const growthSponsorMember = await seedFixtureMember({
+    id: "darmelk_ci_growth_sponsor",
+    email: "growth-sponsor@example.com",
+    name: "Growth Sponsor",
+    code: "DM-CIGROWTH",
+    activationStatus: "active",
+    expires: "future",
   });
-  const growthSponsorMe = await json(await app.request("/api/me", { headers: { cookie: growthSponsor.cookie } }));
-  const growthSponsorCode = growthSponsorMe.member.referral_code as string;
+  const growthSponsor = { member: growthSponsorMember };
+  const growthSponsorCode = growthSponsorMember.referral_code as string;
 
-  const joiner = await signupGeneralLater("growth-joiner@example.com", "Growth Joiner");
+  const joinerMember = await seedFixtureMember({
+    id: "darmelk_ci_growth_joiner",
+    email: "growth-joiner@example.com",
+    name: "Growth Joiner",
+    code: "DM-CIJOINER",
+    activationStatus: "inactive",
+    expires: "none",
+  });
+  const joiner = { cookie: await signedSessionCookie(joinerMember.user_id), member: joinerMember };
   const emptyBind = await json(await bindGrowth(joiner.cookie, ""));
   record("empty growth referral is rejected", emptyBind.error?.code === "growth_referral_required", emptyBind);
   const whitespaceBind = await json(await bindGrowth(joiner.cookie, "   "));
@@ -2395,8 +2482,7 @@ async function main() {
   const selfBind = await json(await bindGrowth(joiner.cookie, joiner.member.referral_code));
   record("self-referral growth bind is rejected", selfBind.error?.code === "self_sponsor", selfBind);
 
-  const inactiveSponsor = await signupGeneralLater("growth-inactive-sponsor@example.com", "Inactive Growth Sponsor");
-  const inactiveBind = await json(await bindGrowth(joiner.cookie, inactiveSponsor.member.referral_code));
+  const inactiveBind = await json(await bindGrowth(joiner.cookie, "DM-CIINACTIVE"));
   record(
     "inactive sponsor cannot be bound for Growth",
     inactiveBind.error?.code === "forbidden",
@@ -2468,13 +2554,15 @@ async function main() {
     already,
   );
 
-  const altSponsor = await signupGeneralLater("growth-alt-sponsor@example.com", "Alt Growth Sponsor");
-  await withTransaction(async (client) => {
-    await client.query(
-      `update members set activation_status='active', activation_expires_at=now()+interval '365 days' where user_id=$1`,
-      [altSponsor.member.user_id],
-    );
+  const altSponsorMember = await seedFixtureMember({
+    id: "darmelk_ci_growth_alt",
+    email: "growth-alt-sponsor@example.com",
+    name: "Alt Growth Sponsor",
+    code: "DM-CIALT",
+    activationStatus: "active",
+    expires: "future",
   });
+  const altSponsor = { member: altSponsorMember };
   const replaceAttempt = await json(await bindGrowth(joiner.cookie, altSponsor.member.referral_code));
   record(
     "existing sponsor is never replaced",
@@ -2517,11 +2605,12 @@ async function main() {
     sponsorQual,
   );
 
-  const stillOptional = await signupGeneralLater("growth-optional-signup@example.com", "Still Optional");
-  record(
-    "general signup remains optional after Growth bind API exists",
-    stillOptional.member?.sponsor_user_id === null && stillOptional.member?.network_parent_user_id === null,
-    stillOptional.member,
+  await rejectSignup(
+    "new signup stays referral-mandatory after the Growth bind API exists",
+    "growth-optional-signup@example.com",
+    "Still Optional",
+    undefined,
+    "referral_required",
   );
 
   const soldOf = async (slug: string) =>

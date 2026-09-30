@@ -13,7 +13,7 @@ export const Route = createFileRoute("/growth-program")({
 });
 
 function GrowthProgramGateway() {
-  const { user, member, isPending } = useMemberSession();
+  const { user, member, incompleteRegistration, isPending } = useMemberSession();
   const [sponsorCode, setSponsorCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -30,7 +30,10 @@ function GrowthProgramGateway() {
     return <Navigate to="/login" search={{ next: GROWTH_PROGRAM_PATH }} />;
   }
 
-  if (!member) return <RedirectToSignIn />;
+  if (incompleteRegistration || !member) {
+    if (incompleteRegistration) return <Navigate to="/app" />;
+    return <RedirectToSignIn />;
+  }
 
   if (isGrowthParticipant(member)) {
     if (member.activation_status === "active") {

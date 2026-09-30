@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { useEffect, useState, type ComponentType } from "react";
 import { BrandMark } from "@/components/brand-mark";
+import { CompleteRegistration } from "@/components/complete-registration";
 import { Button } from "@/components/ui/button";
 import { RedirectToSignIn } from "@/lib/auth/gates";
 import { signOut } from "@/lib/auth/client";
@@ -91,7 +92,7 @@ function isActive(pathname: string, to: string) {
 }
 
 export function AppShell() {
-  const { user, member, merchant, isPending } = useMemberSession();
+  const { user, member, merchant, incompleteRegistration, isPending, reload } = useMemberSession();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [menuOpen, setMenuOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
@@ -118,7 +119,9 @@ export function AppShell() {
     );
   }
 
-  if (!user || !member) return <RedirectToSignIn />;
+  if (!user) return <RedirectToSignIn />;
+  if (!member && incompleteRegistration) return <CompleteRegistration name={user.displayName} onDone={reload} />;
+  if (!member) return <RedirectToSignIn />;
 
   async function onSignOut() {
     setSigningOut(true);

@@ -7,6 +7,7 @@ import { PasswordField } from "@/components/ui/password-field";
 import { authClient, authEnabled } from "@/lib/auth/client";
 import { api, ApiError } from "@/lib/api-client";
 import { FLAGSHIP, formatBdt, getOffer } from "@/lib/offers";
+import { DARMELK_REFERRAL_HEADER } from "@/lib/referral";
 import { cn } from "@/lib/utils";
 import { GROWTH_PROGRAM_PATH, safeGrowthReturn } from "@/lib/growth";
 
@@ -59,20 +60,30 @@ function Login() {
         setError("Please accept the Terms & Conditions to continue.");
         return;
       }
+      if (!sponsorCode.trim()) {
+        setError("Referral ID is required.");
+        return;
+      }
     }
     setPending(true);
     try {
       if (create) {
         const trimmedReferral = sponsorCode.trim();
-        if (trimmedReferral) {
-          const lookup = await api.lookupSponsor(trimmedReferral);
-          if (!lookup.ok) throw new Error("Referral ID not found.");
+        try {
+          await api.lookupSponsor(trimmedReferral);
+        } catch (lookupErr) {
+          throw lookupErr instanceof ApiError
+            ? lookupErr
+            : new Error("Referral ID not found. Please check the code and try again.");
         }
-        const { error: err } = await authClient.signUp.email({
-          email,
-          password,
-          name: name.trim(),
-        });
+        const { error: err } = await authClient.signUp.email(
+          {
+            email,
+            password,
+            name: name.trim(),
+          },
+          { headers: { [DARMELK_REFERRAL_HEADER]: trimmedReferral } },
+        );
         if (err) throw new Error(err.message || "Could not create account");
         try {
           await api.onboarding({
@@ -115,7 +126,7 @@ function Login() {
             <p className="mt-2 font-display text-3xl font-semibold">{create ? "Create your account" : "Welcome back"}</p>
             <p className="mt-3 max-w-sm text-sm text-cream/75 text-pretty">
               {create
-                ? "A Darmelk account is free. Add a referral ID only if you have one."
+                ? "A Darmelk account is free. An active Referral ID is required."
                 : "Review offer terms before you book. Progress, commission, and benefit stay separate."}
             </p>
           </div>
@@ -125,7 +136,7 @@ function Login() {
           <h1 className="font-display text-2xl font-semibold tracking-tight">{create ? "Create account" : "Sign in"}</h1>
           <p className="mt-2 text-sm text-muted">
             {create
-              ? "Create a Darmelk account to follow property opportunities. A referral ID is optional."
+              ? "Create a Darmelk account to follow property opportunities. A Referral ID is required."
               : next
                 ? "Sign in to continue."
                 : "Continue to your member area."}
@@ -176,8 +187,8 @@ function Login() {
             {create ? (
               <>
                 <Field
-                  label="Referral ID (Optional)"
-                  hint={ref ? "Filled from your referral link. Final assignment is validated on the server." : "Have a referral ID? Enter it here."}
+                  label="Referral ID"
+                  hint={ref ? "Filled from your referral link. Final assignment is validated on the server." : "Required. Enter an active Referral ID."}
                   htmlFor="sponsor-code"
                 >
                   <Input
@@ -189,7 +200,8 @@ function Login() {
                     autoComplete="off"
                     spellCheck={false}
                     inputMode="text"
-                    aria-required="false"
+                    required
+                    aria-required="true"
                   />
                 </Field>
                 <label className="flex min-h-11 items-start gap-3 rounded-xl bg-paper px-3 py-3 text-sm leading-relaxed text-ink">
