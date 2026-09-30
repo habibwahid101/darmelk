@@ -583,7 +583,11 @@ async function main() {
     body: JSON.stringify({ reason: "smoke test reversal" }),
   });
   const reversed = await json(reverseRes);
-  record("booking reversed, 1 commission reversed", reversed.booking?.status === "reversed" && reversed.commissionsReversed === 1, reversed);
+  record(
+    "booking reversal reverses admin L1 and the CI bootstrap L2",
+    reversed.booking?.status === "reversed" && reversed.commissionsReversed === 2,
+    reversed,
+  );
 
   const adminCommissionsAfter = await json(await app.request("/api/me/commissions", { headers: { cookie: adminCookie } }));
   record(
