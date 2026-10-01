@@ -18,6 +18,7 @@ import {
 } from "./engine/activation.js";
 import { getCommissionTotals } from "./engine/commissions.js";
 import { ensureMember, logAdminAction, requireAdmin, bindSponsorForGrowth, registerMemberWithActiveReferral, assertSignupReferral } from "./engine/members.js";
+import { updateOwnMemberPhone } from "./engine/profile.js";
 import { FOUNDATION_TOTAL, foundationRegistryCsv, listFoundationRegistry, validateFoundation } from "./engine/foundation.js";
 import { createContactRequest, listContactRequests, updateContactRequestStatus } from "./engine/contact.js";
 import {
@@ -355,6 +356,14 @@ app.get("/api/me", async (c) => {
     return { member, merchant, incompleteRegistration: false };
   });
   return c.json(result);
+});
+
+app.patch("/api/me/profile", async (c) => {
+  const userId = c.get("userId");
+  if (!userId) throw unauthorized();
+  const body = await jsonBody<{ phone?: unknown }>(c);
+  const member = await withTransaction((client) => updateOwnMemberPhone(client, userId, body.phone));
+  return c.json({ member });
 });
 
 app.post("/api/me/onboarding", async (c) => {
