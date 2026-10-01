@@ -47,6 +47,9 @@ async function request<T>(path: string, init?: RequestInit & { idempotencyKey?: 
 const post = <T>(path: string, body?: unknown, idempotencyKey?: string) =>
   request<T>(path, { method: "POST", body: body !== undefined ? JSON.stringify(body) : undefined, idempotencyKey });
 
+const patch = <T>(path: string, body?: unknown) =>
+  request<T>(path, { method: "PATCH", body: body !== undefined ? JSON.stringify(body) : undefined });
+
 // ---- types mirroring the backend's response shapes -----------------------
 export type Offer = ApiOffer;
 
@@ -594,6 +597,7 @@ export const api = {
     request<{ document: PolicyDocument }>(`/api/terms/${encodeURIComponent(key)}`),
   myConsents: () => request<{ consents: UserConsent[] }>("/api/me/consents"),
   me: () => request<{ member: Member | null; merchant: MerchantSummary | null; incompleteRegistration?: boolean }>("/api/me"),
+  updateProfile: (data: { phone: string }) => patch<{ member: Member }>("/api/me/profile", { phone: data.phone }),
   onboarding: (data: { name?: string; phone?: string; sponsorCode?: string; termsAccepted?: boolean }) =>
     post<{ member: Member }>("/api/me/onboarding", data),
   bindGrowthSponsor: (data: { sponsorCode: string }) =>

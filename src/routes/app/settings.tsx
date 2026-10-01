@@ -1,21 +1,46 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { PageHeader, Surface } from "@/components/states";
 import { ReferralShareCard } from "@/components/referral-share";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { PasswordField } from "@/components/ui/password-field";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { useMemberSession } from "@/components/layout/use-member";
-import { signOut } from "@/lib/auth/client";
+import { authClient, signOut } from "@/lib/auth/client";
 import { formatWhen } from "@/lib/platform";
-import { api, ApiError, type PayoutMethod } from "@/lib/api-client";
+import { api, ApiError, type Member, type PayoutMethod } from "@/lib/api-client";
+import type { AppUser } from "@/lib/auth/use-current-user";
 import { useAsync } from "@/lib/use-async";
+
+const NAME_MAX = 80;
+const INVALID_PHONE = "Enter a valid Bangladesh mobile number, like 01712345678 or +8801712345678.";
+
+type SessionRefetch = (queryParams?: { query?: { disableCookieCache?: boolean } }) => Promise<void>;
+
+function normalizeBdMobile(raw: string): string | null {
+  const compact = raw.replace(/[\s-]/g, "");
+  if (/^01\d{9}$/.test(compact)) return `+880${compact.slice(1)}`;
+  if (/^\+8801\d{9}$/.test(compact)) return compact;
+  return null;
+}
+
+function passwordFailureCopy(err: unknown): string {
+  const record = err && typeof err === "object" ? (err as Record<string, unknown>) : {};
+  const nested = record.error && typeof record.error === "object" ? (record.error as Record<string, unknown>) : {};
+  const code = String(record.code ?? nested.code ?? "");
+  const message = String(record.message ?? nested.message ?? "");
+  if (code === "INVALID_PASSWORD" || message === "Invalid password") return "Current password is incorrect.";
+  if (code === "PASSWORD_TOO_SHORT" || message === "Password too short") return "Use at least 8 characters.";
+  return "Could not update password. Please try again.";
+}
 
 export const Route = createFileRoute("/app/settings")({ component: SettingsPage });
 
 function SettingsPage() {
-  const { user, member } = useMemberSession();
+  const { user, member, reload } = useMemberSession();
+  const { refetch } = authClient.useSession();
   const navigate = useNavigate();
   const [confirmOut, setConfirmOut] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
@@ -41,19 +66,8 @@ function SettingsPage() {
         description="Keep this record accurate. Sponsor assignment is not edited here."
       />
 
-      <Surface>
-        <div className="space-y-4">
-          <Field label="Full name">
-            <Input value={user?.displayName ?? ""} disabled readOnly />
-          </Field>
-          <Field label="Email" hint="Managed by sign-in. Not editable here.">
-            <Input value={user?.primaryEmail ?? ""} disabled readOnly />
-          </Field>
-          <Field label="Phone" hint="Set during onboarding.">
-            <Input value={member.phone} disabled readOnly />
-          </Field>
-        </div>
-      </Surface>
+      <PersonalInformation user={user} member={member} reload={reload} refetchSession={refetch} />
+      <ChangePassword refetchSession={refetch} />
 
       <PayoutCredentials methods={payoutData?.methods ?? []} onSaved={reloadPayouts} />
 
@@ -99,6 +113,233 @@ function SettingsPage() {
         )}
       </Surface>
     </div>
+  );
+}
+
+function PersonalInformation({
+  user,
+  member,
+  reload,
+  refetchSession,
+}: {
+  user: AppUser | null;
+  member: Member;
+  reload: () => void;
+  refetchSession: SessionRefetch;
+}) {
+  const [name, setName] = useState(user?.displayName ?? "");
+  const [phone, setPhone] = useState(member.phone ?? "");
+  const [pending, setPending] = useState(false);
+  const [nameError, setNameError] = useState<string | null>(null);
+  const [phoneError, setPhoneError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+
+  async function save(e: React.FormEvent) {
+    e.preventDefault();
+    setNameError(null);
+    setPhoneError(null);
+    setError(null);
+    setMessage(null);
+
+    const nextName = name.trim();
+    if (!nextName) {
+      setNameError("Full name is required.");
+      return;
+    }
+    if (nextName.length > NAME_MAX) {
+      setNameError("Full name is too long.");
+      return;
+    }
+
+    const stored = (member.phone ?? "").trim();
+    const rawPhone = phone.trim();
+    let nextPhone: string | null = null;
+    if (rawPhone !== stored) {
+      const normalized = normalizeBdMobile(rawPhone);
+      if (!normalized) {
+        setPhoneError(INVALID_PHONE);
+        return;
+      }
+      if (normalized !== stored) nextPhone = rawPhone;
+      else setPhone(normalized);
+    }
+
+    const nameChanged = nextName !== (user?.displayName ?? "");
+    setName(nextName);
+    if (!nameChanged && nextPhone === null) {
+      setMessage("Profile updated successfully.");
+      return;
+    }
+
+    setPending(true);
+    try {
+      if (nameChanged) {
+        const { error: err } = await authClient.updateUser({ name: nextName });
+        if (err) throw new Error("name");
+        try {
+          await refetchSession({ query: { disableCookieCache: true } });
+        } catch {
+          // Name is already saved. The next session read shows it.
+        }
+      }
+      if (nextPhone !== null) {
+        const result = await api.updateProfile({ phone: nextPhone });
+        setPhone(result.member.phone);
+        reload();
+      }
+      setMessage("Profile updated successfully.");
+    } catch (err) {
+      if (err instanceof ApiError && err.code === "invalid_phone") setPhoneError(INVALID_PHONE);
+      else setError("Could not update your profile. Please try again.");
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return (
+    <Surface>
+      <h2 className="font-display text-xl font-semibold">Personal Information</h2>
+      <form onSubmit={(e) => void save(e)} className="mt-4 space-y-4">
+        <Field label="Full Name" error={nameError ?? undefined}>
+          <Input value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" maxLength={NAME_MAX} />
+        </Field>
+        <Field label="Phone Number" error={phoneError ?? undefined}>
+          <Input value={phone} onChange={(e) => setPhone(e.target.value)} autoComplete="tel" inputMode="tel" />
+        </Field>
+        <Field label="Email" hint="Managed by sign-in. Email cannot be changed here.">
+          <Input value={user?.primaryEmail ?? ""} disabled readOnly autoComplete="email" />
+        </Field>
+        {error ? (
+          <p className="text-sm text-clay" role="alert">
+            {error}
+          </p>
+        ) : null}
+        {message ? (
+          <p className="text-sm text-pine" role="status">
+            {message}
+          </p>
+        ) : null}
+        <Button type="submit" disabled={pending}>
+          {pending ? "Saving…" : "Save changes"}
+        </Button>
+      </form>
+    </Surface>
+  );
+}
+
+function ChangePassword({ refetchSession }: { refetchSession: SessionRefetch }) {
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [pending, setPending] = useState(false);
+  const [currentError, setCurrentError] = useState<string | null>(null);
+  const [newError, setNewError] = useState<string | null>(null);
+  const [confirmError, setConfirmError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+
+  async function updatePassword(e: React.FormEvent) {
+    e.preventDefault();
+    setCurrentError(null);
+    setNewError(null);
+    setConfirmError(null);
+    setError(null);
+    setMessage(null);
+
+    if (!currentPassword) {
+      setCurrentError("Current password is required.");
+      return;
+    }
+    if (newPassword.length < 8) {
+      setNewError("Use at least 8 characters.");
+      return;
+    }
+    if (!confirmPassword || newPassword !== confirmPassword) {
+      setConfirmError("New passwords do not match.");
+      return;
+    }
+
+    setPending(true);
+    try {
+      const { error: err } = await authClient.changePassword({
+        currentPassword,
+        newPassword,
+        revokeOtherSessions: true,
+      });
+      if (err) {
+        const copy = passwordFailureCopy(err);
+        if (copy === "Current password is incorrect.") setCurrentError(copy);
+        else if (copy === "Use at least 8 characters.") setNewError(copy);
+        else setError(copy);
+        return;
+      }
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      setMessage("Password updated successfully.");
+      try {
+        await refetchSession({ query: { disableCookieCache: true } });
+      } catch {
+        // Better Auth already replaced this session cookie.
+      }
+    } catch {
+      setError("Could not update password. Please try again.");
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return (
+    <Surface>
+      <h2 className="font-display text-xl font-semibold">Security</h2>
+      <h3 className="mt-4 font-display text-lg font-semibold">Change password</h3>
+      <p className="mt-2 text-sm text-muted">Update the password you use to sign in to your Darmelk account.</p>
+      <form onSubmit={(e) => void updatePassword(e)} className="mt-4 space-y-4">
+        <PasswordField
+          id="current-password"
+          label="Current password"
+          value={currentPassword}
+          onChange={setCurrentPassword}
+          autoComplete="current-password"
+          error={currentError ?? undefined}
+        />
+        <PasswordField
+          id="new-password"
+          label="New password"
+          value={newPassword}
+          onChange={setNewPassword}
+          autoComplete="new-password"
+          error={newError ?? undefined}
+        />
+        <PasswordField
+          id="confirm-password"
+          label="Confirm new password"
+          value={confirmPassword}
+          onChange={setConfirmPassword}
+          autoComplete="new-password"
+          error={confirmError ?? undefined}
+        />
+        {error ? (
+          <p className="text-sm text-clay" role="alert">
+            {error}
+          </p>
+        ) : null}
+        {message ? (
+          <p className="text-sm text-pine" role="status">
+            {message}
+          </p>
+        ) : null}
+        <Button type="submit" disabled={pending}>
+          {pending ? "Updating…" : "Update password"}
+        </Button>
+      </form>
+      <p className="mt-4 text-sm text-muted">
+        <Link to="/forgot-password" className="text-pine hover:underline">
+          Forgot your current password?
+        </Link>
+      </p>
+    </Surface>
   );
 }
 
