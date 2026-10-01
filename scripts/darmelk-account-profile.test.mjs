@@ -97,6 +97,16 @@ test("profile settings UI edits name and phone, keeps email read-only, and chang
   assert.match(personal, /Phone Number/);
   assert.match(personal, /onChange=\{\(e\) => setPhone\(e\.target\.value\)\}/);
   assert.match(personal, /normalizeBdMobile\(rawPhone\)/);
+  const localRule = "if (/^01[3-9]\\d{8}$/.test(compact)) return `+880${compact.slice(1)}`;";
+  const intlRule = "if (/^\\+8801[3-9]\\d{8}$/.test(compact)) return compact;";
+  assert.ok(settings.includes(localRule));
+  assert.ok(profile.includes(localRule));
+  assert.ok(settings.includes(intlRule));
+  assert.ok(profile.includes(intlRule));
+  assert.equal(settings.includes("/^01\\d{9}$/"), false);
+  assert.equal(profile.includes("/^01\\d{9}$/"), false);
+  assert.equal(settings.includes("/^\\+8801\\d{9}$/"), false);
+  assert.equal(profile.includes("/^\\+8801\\d{9}$/"), false);
   assert.match(settings, /INVALID_PHONE = "Enter a valid Bangladesh mobile number, like 01712345678 or \+8801712345678\."/);
   assert.match(personal, /Field label="Email" hint="Managed by sign-in\. Email cannot be changed here\."[\s\S]*disabled readOnly/);
   assert.doesNotMatch(personal, /Field label="Full Name"[\s\S]{0,240}disabled/);
@@ -272,4 +282,43 @@ test("PGlite: phone updates normalize, stay on the signed-in row, and leave iden
   assert.equal(Number((await row("user_a")).network_slot), 1);
   assert.equal((await row("user_b")).phone, "+8801711111111");
   assert.deepEqual(await financeCounts(), beforeFinance);
+});
+
+test("Bangladesh mobile prefixes 013-019 normalize and 010-012 are rejected", async () => {
+  const profile = await loadProfile();
+  for (const prefix of ["013", "014", "015", "016", "017", "018", "019"]) {
+    const local = `${prefix}12345678`;
+    assert.equal(profile.normalizeBdMobile(local), `+880${local.slice(1)}`);
+  }
+  assert.equal(profile.normalizeBdMobile("01712345678"), "+8801712345678");
+  assert.equal(profile.normalizeBdMobile("+8801312345678"), "+8801312345678");
+  assert.equal(profile.normalizeBdMobile("+8801912345678"), "+8801912345678");
+
+  const db = new PGlite();
+  await applyMigrations(db);
+  await db.exec(`
+    insert into "user" (id, name, email, "emailVerified", "createdAt", "updatedAt") values
+      ('user_prefix', 'Prefix', 'prefix-profile@example.com', true, now(), now());
+    insert into members (user_id, referral_code, phone, role, onboarding_complete, activation_status) values
+      ('user_prefix', 'DM-PREFIX', '', 'member', true, 'inactive');
+  `);
+  for (const bad of [
+    "01012345678",
+    "01112345678",
+    "01212345678",
+    "+8801012345678",
+    "+8801112345678",
+    "+8801212345678",
+    "02012345678",
+    "12345",
+  ]) {
+    await assert.rejects(
+      () => profile.updateOwnMemberPhone(db, "user_prefix", bad),
+      (err) => err.code === "invalid_phone" && err.status === 400 && err.message === INVALID_PHONE,
+    );
+  }
+  const stored = await db.query(`select phone from members where user_id = 'user_prefix'`);
+  assert.equal(stored.rows[0].phone, "");
+  const saved = await profile.updateOwnMemberPhone(db, "user_prefix", "01712345678");
+  assert.equal(saved.phone, "+8801712345678");
 });

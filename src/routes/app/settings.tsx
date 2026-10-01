@@ -21,8 +21,8 @@ type SessionRefetch = (queryParams?: { query?: { disableCookieCache?: boolean } 
 
 function normalizeBdMobile(raw: string): string | null {
   const compact = raw.replace(/[\s-]/g, "");
-  if (/^01\d{9}$/.test(compact)) return `+880${compact.slice(1)}`;
-  if (/^\+8801\d{9}$/.test(compact)) return compact;
+  if (/^01[3-9]\d{8}$/.test(compact)) return `+880${compact.slice(1)}`;
+  if (/^\+8801[3-9]\d{8}$/.test(compact)) return compact;
   return null;
 }
 

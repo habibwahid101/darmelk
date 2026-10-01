@@ -5,14 +5,14 @@ export const INVALID_PHONE_MESSAGE =
   "Enter a valid Bangladesh mobile number, like 01712345678 or +8801712345678.";
 
 /**
- * Accept 01XXXXXXXXX or +8801XXXXXXXXX. Store +8801XXXXXXXXX.
- * Spaces and hyphens are ignored. Anything else is rejected.
+ * Accept local 01[3-9]XXXXXXXX or +8801[3-9]XXXXXXXX. Store +8801XXXXXXXXX.
+ * Prefixes 010, 011, and 012 are rejected. Spaces and hyphens are ignored.
  */
 export function normalizeBdMobile(raw: unknown): string {
   if (typeof raw !== "string") throw badRequest(INVALID_PHONE_MESSAGE, "invalid_phone");
   const compact = raw.replace(/[\s-]/g, "");
-  if (/^01\d{9}$/.test(compact)) return `+880${compact.slice(1)}`;
-  if (/^\+8801\d{9}$/.test(compact)) return compact;
+  if (/^01[3-9]\d{8}$/.test(compact)) return `+880${compact.slice(1)}`;
+  if (/^\+8801[3-9]\d{8}$/.test(compact)) return compact;
   throw badRequest(INVALID_PHONE_MESSAGE, "invalid_phone");
 }
 
