@@ -12,7 +12,9 @@ export function AppErrorComponent({ error }: ErrorComponentProps) {
         </span>
         <h1 className="mt-4 font-display text-3xl font-semibold">Something went wrong</h1>
         <p className="mx-auto mt-3 max-w-md text-sm break-words text-muted">
-          {error.message || "An unexpected error occurred. Try reloading the page."}
+          {error instanceof Error && error.message
+            ? error.message
+            : "An unexpected error occurred. Try reloading the page."}
         </p>
         <Button asChild className="mt-6">
           <Link to="/">Back to home</Link>
