@@ -134,6 +134,16 @@ export async function createPaymentSubmission(
     if (!target || target.user_id !== userId) throw notFound("Merchant bundle purchase not found");
     if (target.status !== "pending") throw conflict(`Purchase is ${target.status}`);
     amount = target.purchase_amount;
+    const openPay = await client.query(
+      `select 1 from payment_submissions
+        where target_type = 'merchant_bundle' and target_id = $1
+          and status in ('submitted', 'under_review', 'approved')
+        limit 1`,
+      [targetId],
+    );
+    if (openPay.rows[0]) {
+      throw conflict("This Merchant bundle purchase already has a payment submission in progress.");
+    }
   } else {
     throw badRequest("Unsupported payment target");
   }
