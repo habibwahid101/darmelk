@@ -433,6 +433,15 @@ export async function startBundlePurchase(
   const bundleId = cleanText(input.bundleId, "Bundle", 80, true);
   const bundle = await getBundle(client, bundleId);
   await ensureMerchantRow(client, userId);
+  await client.query(`select * from merchants where user_id = $1 for update`, [userId]);
+  const pending = await client.query<MerchantPurchase>(
+    `select * from merchant_bundle_purchases
+      where user_id = $1 and bundle_id = $2 and status = 'pending'
+      order by created_at desc
+      limit 1`,
+    [userId, bundle.id],
+  );
+  if (pending.rows[0]) return normalizePurchase(pending.rows[0]);
   await recordConsents(client, userId, {
     keys: ["MERCHANT_PAYMENT_TERMS"],
     context: "merchant_bundle",
