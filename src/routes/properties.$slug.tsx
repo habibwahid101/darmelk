@@ -1,9 +1,10 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { FileText, MapPin } from "lucide-react";
+import { useEffect, useState } from "react";
 import { OfferAvailabilityNote, OfferCommercialTerms } from "@/components/offer-commercial-terms";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { fromApiOffer, getOffer, isBookable, isSoldOut, offerImages } from "@/lib/offers";
+import { fromApiOffer, getOffer, isBookable, isSoldOut, offerImages, resolveMediaSrc } from "@/lib/offers";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { api } from "@/lib/api-client";
 import { useAsync } from "@/lib/use-async";
@@ -31,31 +32,31 @@ function PropertyDetail() {
   const soldOut = isSoldOut(offer);
 
   return (
-    <div className="pb-16 pt-8 md:pt-10">
-      <section className="container-pg grid min-w-0 gap-8 py-8 lg:grid-cols-[1.2fr_.8fr] lg:py-12">
+    <div className="pb-6 pt-6 min-[769px]:pb-16 min-[769px]:pt-10">
+      <section className="container-pg grid min-w-0 gap-6 pb-6 min-[769px]:gap-8 min-[769px]:py-8 lg:grid-cols-[1.2fr_.8fr] lg:py-12">
         <div className="min-w-0">
           {hero ? (
-            <img
+            <PropertyPhoto
               src={hero}
               alt={offer.heroImageAlt || offer.imageAlt || offer.title}
-              className="aspect-[16/10] w-full rounded-2xl object-cover object-center"
+              frameClassName="aspect-[16/10] overflow-hidden rounded-2xl"
             />
           ) : null}
           {rest.length === 1 ? (
-            <img
+            <PropertyPhoto
               src={rest[0]}
               alt={`${offer.title} interior`}
-              className="mt-4 aspect-[16/10] w-full rounded-xl object-cover object-center sm:aspect-[4/3]"
+              frameClassName="mt-4 aspect-[16/10] overflow-hidden rounded-xl sm:aspect-[4/3]"
             />
           ) : null}
           {rest.length > 1 ? (
             <div className="mt-4 grid min-w-0 grid-cols-2 gap-3 sm:gap-4">
               {rest.map((src, i) => (
-                <img
+                <PropertyPhoto
                   key={src}
                   src={src}
                   alt={`${offer.title} view ${i + 2}`}
-                  className="aspect-[4/3] w-full min-w-0 rounded-xl object-cover object-center"
+                  frameClassName="aspect-[4/3] overflow-hidden rounded-xl"
                 />
               ))}
             </div>
@@ -77,14 +78,14 @@ function PropertyDetail() {
             </p>
           ) : null}
           <p className="mt-5 leading-relaxed text-muted text-pretty">{offer.summary}</p>
-          <div className="mt-6 rounded-2xl bg-cream p-5 shadow-[var(--shadow-card)] sm:p-6">
+          <div className="mt-6 rounded-2xl bg-cream p-6 shadow-[var(--shadow-card)] min-[769px]:p-6">
             <OfferCommercialTerms offer={offer} variant="public" />
             <OfferAvailabilityNote offer={offer} />
           </div>
           <PropertyCta slug={offer.slug} status={offer.status} bookable={bookable} soldOut={soldOut} />
         </div>
       </section>
-      <section className="border-y border-line bg-cream section-y">
+      <section className="border-y border-line bg-cream py-6 min-[769px]:py-[6.5rem]">
         <div className="container-pg grid gap-5 md:grid-cols-2">
           <Info title="What is being acquired?">
             {offer.details ||
@@ -107,14 +108,14 @@ function PropertyDetail() {
           </Info>
         </div>
       </section>
-      <section className="section-y">
-        <div className="container-pg grid min-w-0 gap-8 lg:grid-cols-2">
+      <section className="py-6 min-[769px]:py-[6.5rem]">
+        <div className="container-pg grid min-w-0 gap-6 min-[769px]:gap-8 lg:grid-cols-2">
           <div className="min-w-0">
             <p className="text-xs font-medium uppercase tracking-[.18em] text-pine">How to continue</p>
             <h2 className="mt-3 font-display text-3xl font-semibold text-pretty">From enquiry to a Darmelk conversation</h2>
             <ol className="mt-6 space-y-3">
               {["Review the property", "Request to Book", "Darmelk contacts you", "Discuss next steps"].map((s, i) => (
-                <li key={s} className="flex min-w-0 items-center gap-4 rounded-xl bg-cream p-4">
+                <li key={s} className="flex min-w-0 items-center gap-4 rounded-xl bg-cream p-6 min-[769px]:p-4">
                   <span className="shrink-0 font-display text-xl text-pine">{String(i + 1).padStart(2, "0")}</span>
                   <span className="min-w-0 font-medium">{s}</span>
                 </li>
@@ -144,6 +145,29 @@ function PropertyDetail() {
           </div>
         </div>
       </section>
+    </div>
+  );
+}
+
+function PropertyPhoto({ src, alt, frameClassName }: { src: string; alt: string; frameClassName: string }) {
+  const resolved = resolveMediaSrc(src);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => setFailed(false), [resolved]);
+  const usable = Boolean(resolved) && !failed;
+  return (
+    <div className={frameClassName}>
+      {usable ? (
+        <img
+          src={resolved}
+          alt={alt}
+          className="block h-full w-full object-cover object-center"
+          onError={() => setFailed(true)}
+        />
+      ) : (
+        <div className="grid h-full w-full place-items-center bg-cream px-4 text-center text-sm text-muted" role="img" aria-label="Property image unavailable">
+          Property image unavailable
+        </div>
+      )}
     </div>
   );
 }

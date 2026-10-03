@@ -19,6 +19,7 @@ const CATEGORY_MAP: Record<string, string> = {
 
 const ALLOWED_MIME = new Set(["image/jpeg", "image/jpg", "image/png", "image/webp"]);
 const MAX_IMAGE_BYTES = 1_500_000;
+const UNSUPPORTED_IMAGE = "Unsupported image format. Please upload JPG, PNG or WebP.";
 
 export type OfferRow = {
   slug: string;
@@ -215,6 +216,63 @@ function mediaPath(slug: string, id: string): string {
   return `/api/offers/${slug}/media/${id}`;
 }
 
+type MediaRef = { id: string; filename: string };
+
+function sniffImage(bytes: Buffer): "image/jpeg" | "image/png" | "image/webp" | null {
+  if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return "image/jpeg";
+  if (bytes.length >= 8 && bytes[0] === 0x89 && bytes.toString("ascii", 1, 4) === "PNG") return "image/png";
+  if (bytes.length >= 12 && bytes.toString("ascii", 0, 4) === "RIFF" && bytes.toString("ascii", 8, 12) === "WEBP") return "image/webp";
+  return null;
+}
+
+function canonicalMediaRef(slug: string, value: unknown, media: MediaRef[]): string | null {
+  if (typeof value !== "string") return null;
+  const text = value.trim();
+  if (!text || text.startsWith("blob:") || text.startsWith("data:")) return null;
+  const found = text.match(/\/api\/offers\/([^/]+)\/media\/([^/?#]+)/);
+  if (found) return `/api/offers/${found[1]}/media/${found[2]}`;
+  if (/^https?:\/\//i.test(text)) return text;
+  if (text.startsWith("/images/") || text.startsWith("/brand/")) return text;
+  if (text.startsWith("images/")) return `/${text}`;
+  if (text.startsWith("/")) return text;
+  const match = media.find((item) => item.filename === text);
+  if (match) return mediaPath(slug, match.id);
+  return text;
+}
+
+function canonicalizeOffer(row: OfferRow, media: MediaRef[]): OfferRow {
+  const gallery = Array.isArray(row.gallery) ? row.gallery : [];
+  return {
+    ...row,
+    image: canonicalMediaRef(row.slug, row.image, media),
+    hero_image: canonicalMediaRef(row.slug, row.hero_image, media),
+    gallery: gallery
+      .map((item) => canonicalMediaRef(row.slug, item, media))
+      .filter((item): item is string => Boolean(item)),
+  };
+}
+
+async function mediaForOffers(client: PoolClient, slugs: string[]): Promise<Map<string, MediaRef[]>> {
+  const grouped = new Map<string, MediaRef[]>();
+  if (!slugs.length) return grouped;
+  const { rows } = await client.query<MediaRef & { offer_slug: string }>(
+    `select id, offer_slug, filename from offer_media where offer_slug = any($1::text[]) order by sort_order asc, created_at asc`,
+    [slugs],
+  );
+  for (const row of rows) {
+    const list = grouped.get(row.offer_slug) ?? [];
+    list.push({ id: row.id, filename: row.filename });
+    grouped.set(row.offer_slug, list);
+  }
+  return grouped;
+}
+
+function referenceDropped(value: string, path: string, filename: string): boolean {
+  if (value === path) return true;
+  if (filename && value === filename) return true;
+  return path.length > 0 && value.endsWith(path);
+}
+
 export function isBookableStatus(status: string): boolean {
   return PUBLIC_STATUSES.has(status);
 }
@@ -257,10 +315,14 @@ async function withInventory(client: PoolClient, rows: OfferRow[]): Promise<Offe
     client,
     rows.map((row) => row.slug),
   );
-  return rows.map((row) => ({
-    ...normalize(row),
-    inventory: deriveInventory(row.total_quantity, counts.get(row.slug) ?? 0),
-  }));
+  const media = await mediaForOffers(client, rows.map((row) => row.slug));
+  return rows.map((row) => {
+    const canonical = canonicalizeOffer(normalize(row), media.get(row.slug) ?? []);
+    return {
+      ...canonical,
+      inventory: deriveInventory(row.total_quantity, counts.get(row.slug) ?? 0),
+    };
+  });
 }
 
 export async function listPublicOffers(client: PoolClient): Promise<OfferRow[]> {
@@ -503,6 +565,12 @@ export async function updateOffer(client: PoolClient, slug: string, body: OfferI
     categorySlug: body.categorySlug ?? body.category_slug ?? existing.category_slug,
     status: body.status ?? existing.status,
   });
+  const media = (await mediaForOffers(client, [slug])).get(slug) ?? [];
+  parsed.image = canonicalMediaRef(slug, parsed.image, media);
+  parsed.heroImage = canonicalMediaRef(slug, parsed.heroImage, media);
+  parsed.gallery = parsed.gallery
+    .map((item) => canonicalMediaRef(slug, item, media))
+    .filter((item): item is string => Boolean(item));
   if (parsed.status === "published") assertPublishable(parsed);
   await assertTotalQuantityAllowed(client, slug, parsed.totalQuantity);
   const economicsChanged =
@@ -568,16 +636,19 @@ export async function addOfferMedia(
   if (kind !== "cover" && kind !== "hero" && kind !== "gallery") throw badRequest("Image kind must be cover, hero, or gallery");
   const filename = cleanText(input.filename ?? "image.jpg", "Filename", 180, true);
   const mime = cleanText(input.mime ?? "", "Image type", 80, true).toLowerCase();
-  if (!ALLOWED_MIME.has(mime)) throw badRequest("Image must be JPG, PNG, or WebP");
+  if (!/\.(jpe?g|png|webp)$/i.test(filename) || !ALLOWED_MIME.has(mime)) throw badRequest(UNSUPPORTED_IMAGE);
   if (typeof input.bytesBase64 !== "string" || !input.bytesBase64) throw badRequest("Image data is required");
   const bytes = Buffer.from(input.bytesBase64, "base64");
   if (!bytes.length || bytes.length > MAX_IMAGE_BYTES) throw badRequest("Image must be 1.5 MB or smaller");
+  const sniffed = sniffImage(bytes);
+  const declared = mime === "image/jpg" ? "image/jpeg" : mime;
+  if (!sniffed || sniffed !== declared) throw badRequest(UNSUPPORTED_IMAGE);
   const alt = cleanText(input.alt ?? "", "Alt text", 160);
   const id = uid("img");
   await client.query(
     `insert into offer_media (id, offer_slug, kind, sort_order, filename, mime, bytes, alt)
      values ($1,$2,$3,coalesce((select max(sort_order)+1 from offer_media where offer_slug=$2), 0),$4,$5,$6,$7)`,
-    [id, slug, kind, filename, mime, bytes, alt],
+    [id, slug, kind, filename, sniffed, bytes, alt],
   );
   const src = mediaPath(slug, id);
   let sql = `update offers set updated_at = now()`;
@@ -598,25 +669,23 @@ export async function addOfferMedia(
 }
 
 export async function removeOfferMedia(client: PoolClient, slug: string, mediaId: string): Promise<OfferRow> {
-  const { rows: mediaRows } = await client.query<{ id: string }>(
-    `delete from offer_media where id = $1 and offer_slug = $2 returning id`,
+  const existing = await getOfferRow(client, slug, { includeDraft: true });
+  const { rows: mediaRows } = await client.query<{ id: string; filename: string }>(
+    `delete from offer_media where id = $1 and offer_slug = $2 returning id, filename`,
     [mediaId, slug],
   );
-  if (!mediaRows[0]) throw notFound("Image not found");
-  const src = mediaPath(slug, mediaId);
+  const removed = mediaRows[0];
+  if (!removed) throw notFound("Image not found");
+  const path = mediaPath(slug, removed.id);
+  const gallery = (Array.isArray(existing.gallery) ? existing.gallery : []).filter(
+    (item): item is string => typeof item === "string" && !referenceDropped(item, path, removed.filename),
+  );
+  const image = existing.image && referenceDropped(existing.image, path, removed.filename) ? null : existing.image;
+  const hero = existing.hero_image && referenceDropped(existing.hero_image, path, removed.filename) ? null : existing.hero_image;
   const { rows } = await client.query<OfferRow>(
-    `update offers set
-       image = case when image = $2 then null else image end,
-       hero_image = case when hero_image = $2 then null else hero_image end,
-       gallery = coalesce((
-         select jsonb_agg(value)
-           from jsonb_array_elements_text(coalesce(gallery, '[]'::jsonb)) as value
-          where value <> $2
-       ), '[]'::jsonb),
-       updated_at = now()
-     where slug = $1
-     returning *`,
-    [slug, src],
+    `update offers set image = $2, hero_image = $3, gallery = $4::jsonb, updated_at = now()
+      where slug = $1 returning *`,
+    [slug, image, hero, JSON.stringify(gallery)],
   );
   return (await withInventory(client, [rows[0]!]))[0]!;
 }

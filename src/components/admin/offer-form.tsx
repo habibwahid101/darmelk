@@ -85,7 +85,10 @@ export function emptyOfferForm(): OfferFormValue {
   };
 }
 
-export function formFromOffer(offer: PropertyOffer): OfferFormValue {
+export function formFromOffer(
+  offer: PropertyOffer,
+  raw?: { image?: string | null; hero_image?: string | null; gallery?: unknown },
+): OfferFormValue {
   return {
     title: offer.title,
     slug: offer.slug,
@@ -112,9 +115,12 @@ export function formFromOffer(offer: PropertyOffer): OfferFormValue {
     soldQuantity: offer.inventory?.sold ?? 0,
     reservedQuantity: offer.inventory?.reserved ?? null,
     availableQuantity: offer.inventory?.available ?? null,
-    image: persistMediaSrc(offer.image),
-    heroImage: persistMediaSrc(offer.heroImage ?? ""),
-    galleryText: (offer.gallery ?? []).map(persistMediaSrc).join("\n"),
+    image: persistMediaSrc(raw ? (raw.image ?? "") : offer.image),
+    heroImage: persistMediaSrc(raw ? (raw.hero_image ?? "") : (offer.heroImage ?? "")),
+    galleryText: (raw
+      ? (Array.isArray(raw.gallery) ? raw.gallery.filter((item): item is string => typeof item === "string") : [])
+      : (offer.gallery ?? [])
+    ).map((item) => persistMediaSrc(item)).join("\n"),
     flagship: Boolean(offer.flagship),
     displayOrder: String(offer.displayOrder ?? 0),
   };
@@ -194,7 +200,7 @@ export function OfferForm({
         onSubmit();
       }}
     >
-      {error ? <p className="text-sm text-clay">{error}</p> : null}
+      {error ? <p className="text-sm text-clay" role="alert">{error}</p> : null}
 
       <Section title="Basic information">
         <Field label="Title" htmlFor="offer-title">
@@ -387,9 +393,11 @@ export function OfferForm({
       </Section>
 
       <Section title="Images">
-        <p className="text-sm text-muted">Use an existing `/images/...` path or upload files after saving. Only this offer’s images are shown.</p>
-        {value.image ? (
-          <img src={resolveMediaSrc(value.image)} alt="" className="aspect-[16/10] max-w-sm rounded-xl object-cover" />
+        <p className="text-sm text-muted">
+          Use an existing `/images/...` path or the upload controls. A saved image stays in place when no new file is chosen.
+        </p>
+        {resolveMediaSrc(value.image) ? (
+          <img src={resolveMediaSrc(value.image)} alt="" className="aspect-[16/10] max-w-sm rounded-xl object-cover object-center" />
         ) : null}
         <Field label="Main / cover image URL" htmlFor="offer-image">
           <Input id="offer-image" value={value.image} onChange={(e) => set({ image: e.target.value })} placeholder="/images/flagship-suite.jpg" />
