@@ -135,3 +135,32 @@ function FilledImage({ src, alt, className }: { src: string; alt: string; classN
     />
   );
 }
+
+export function ResolvedPropertyImage({
+  src,
+  alt,
+  className,
+}: {
+  src: string | null | undefined;
+  alt: string;
+  className: string;
+}) {
+  const resolved = resolveMediaSrc(src);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => setFailed(false), [resolved]);
+  const frame = `${className} overflow-hidden`;
+  if (!resolved || failed) {
+    return (
+      <div
+        className={`${frame} grid place-items-center bg-cream px-2 text-center text-[11px] leading-tight text-muted`}
+        role="img"
+        aria-label="Property image unavailable"
+      >
+        Property image unavailable
+      </div>
+    );
+  }
+  return (
+    <img src={resolved} alt={alt} className={`${frame} object-cover object-center`} onError={() => setFailed(true)} />
+  );
+}

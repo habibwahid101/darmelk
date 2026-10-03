@@ -33,9 +33,19 @@ test("admin upload, remove, and save feedback stay on the persisted media path",
   const engine = read("backend/src/engine/offers.ts");
   assert.match(page, /Uploaded successfully/);
   assert.match(page, /Uploading…/);
-  assert.match(page, /Choose replacement image/);
-  assert.match(page, /Current image/);
-  assert.match(page, /No file chosen keeps the current image/);
+  assert.match(page, /Replace cover image/);
+  assert.match(page, /Upload cover image/);
+  assert.match(page, /Replace hero image/);
+  assert.match(page, /Upload hero image/);
+  assert.match(page, /Add gallery image/);
+  assert.match(page, /Current Cover Image/);
+  assert.match(page, /Current Hero Image/);
+  assert.match(page, /Gallery Image/);
+  assert.match(page, /className="sr-only"/);
+  assert.match(page, /type="button"/);
+  assert.match(page, /Retry/);
+  assert.doesNotMatch(page, /No file chosen keeps the current image/);
+  assert.doesNotMatch(page, /Choose replacement image/);
   assert.match(page, /Property details saved/);
   assert.match(page, /Unsupported image format\. Please upload JPG, PNG or WebP\./);
   assert.match(page, /Uploading image…/);
@@ -60,4 +70,40 @@ test("property detail mobile spacing is local and hero images cover their frame"
   assert.doesNotMatch(page, /section-y/);
   assert.doesNotMatch(page, /min-h-screen|100vh|min-h-\[100vh\]/);
   assert.doesNotMatch(read("src/styles.css"), /properties-\$slug/);
+});
+
+test("member property thumbnails reuse the shared media resolver", async () => {
+  const mod = await import(pathToFileURL(join(root, "src/lib/media-src.ts")).href);
+  const base = "https://api.darmelk.com";
+  const overview = read("src/routes/app/index.tsx");
+  const bookings = read("src/routes/app/bookings.tsx");
+  const detail = read("src/routes/app/bookings.$id.tsx");
+  const card = read("src/components/property-card.tsx");
+  for (const page of [overview, bookings, detail]) {
+    assert.match(page, /ResolvedPropertyImage/);
+    assert.doesNotMatch(page, /<img[^>]+src=\{(?:booking\.image|b\.image|FLAGSHIP\.image)/);
+  }
+  assert.match(card, /export function ResolvedPropertyImage/);
+  assert.match(card, /resolveMediaSrc\(src\)/);
+  assert.match(card, /Property image unavailable/);
+  assert.equal(mod.resolveMediaSrc("/api/offers/five-star-hotel-share/media/img_abc", base), "https://api.darmelk.com/api/offers/five-star-hotel-share/media/img_abc");
+  assert.equal(mod.resolveMediaSrc("https://api.darmelk.com/api/offers/five-star-hotel-share/media/img_abc", base), "https://api.darmelk.com/api/offers/five-star-hotel-share/media/img_abc");
+  assert.equal(mod.resolveMediaSrc("/images/flagship-suite.jpg", base), "/images/flagship-suite.jpg");
+  assert.equal(mod.resolveMediaSrc("image.jpg", base), "");
+  assert.equal(mod.resolveMediaSrc("image.jpg", base).includes("/app/"), false);
+  assert.equal(mod.resolveMediaSrc("image.jpg", base).includes("/properties/"), false);
+});
+
+test("admin media cards keep upload actions inside the card", () => {
+  const page = read("src/routes/admin/offers.$slug.index.tsx");
+  assert.match(page, /function MediaCard/);
+  assert.match(page, /aspect-\[4\/3\] overflow-hidden/);
+  assert.match(page, /grid-cols-1 items-start gap-8 sm:grid-cols-2 lg:grid-cols-3/);
+  assert.match(page, /size-full object-cover object-center/);
+  assert.doesNotMatch(page, /h-full w-full/);
+  assert.match(page, /if \(uploading\)/);
+  assert.match(page, /Uploading image…/);
+  assert.match(page, /phase === "error"/);
+  assert.match(page, /role="alert"/);
+  assert.match(page, /role="status"/);
 });

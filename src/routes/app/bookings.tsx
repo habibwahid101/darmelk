@@ -3,6 +3,7 @@ import { Building2 } from "lucide-react";
 import { EmptyState, LoadingState, PageHeader } from "@/components/states";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { ResolvedPropertyImage } from "@/components/property-card";
 import { useMemberSession } from "@/components/layout/use-member";
 import { FLAGSHIP, formatBdt } from "@/lib/offers";
 import { formatWhen } from "@/lib/platform";
@@ -54,10 +55,10 @@ function BookingsPage() {
                 params={{ id: b.id }}
                 className="grid min-w-0 gap-4 rounded-2xl bg-cream p-4 shadow-[var(--shadow-card)] sm:grid-cols-[7.5rem_1fr_auto] sm:items-center"
               >
-                <img
+                <ResolvedPropertyImage
                   src={b.image ?? "/images/hero-hotel.jpg"}
-                  alt=""
-                  className="aspect-[16/11] rounded-xl object-cover sm:h-20 sm:w-full sm:aspect-auto"
+                  alt={b.offer_title ?? b.offer_slug}
+                  className="aspect-[16/11] rounded-xl sm:h-20 sm:w-full sm:aspect-auto"
                 />
                 <div className="min-w-0">
                   <p className="font-display text-xl font-semibold">{b.offer_title ?? b.offer_slug}</p>
