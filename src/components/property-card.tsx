@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { MapPin } from "lucide-react";
+import { useEffect, useState } from "react";
 import { OfferCommercialTerms } from "@/components/offer-commercial-terms";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -22,11 +23,7 @@ export function PropertyCard({
       )}
     >
       <div className="relative aspect-[16/10] overflow-hidden">
-        <img
-          src={resolveMediaSrc(offer.image)}
-          alt={offer.title}
-          className="size-full object-cover"
-        />
+        <FilledImage src={resolveMediaSrc(offer.image)} alt={offer.title} />
         <div className="absolute left-3 top-3 flex max-w-[calc(100%-1.5rem)] flex-wrap gap-2">
           <Badge tone="cream">{offer.category}</Badge>
           {offer.flagship ? <Badge tone="pine">Flagship</Badge> : null}
@@ -69,7 +66,7 @@ export function FeaturedOffer({ offer }: { offer: PropertyOffer }) {
   return (
     <article className="grid min-w-0 overflow-hidden rounded-2xl bg-cream shadow-[var(--shadow-card)] md:grid-cols-[1.35fr_1fr]">
       <div className="relative overflow-hidden bg-mist md:min-h-[28rem]">
-        <img
+        <FilledImage
           src={resolveMediaSrc(offer.heroImage ?? offer.image)}
           alt={offer.title}
           className="aspect-[16/10] size-full object-cover md:absolute md:inset-0 md:aspect-auto"
@@ -116,5 +113,25 @@ export function FeaturedOffer({ offer }: { offer: PropertyOffer }) {
         </div>
       </div>
     </article>
+  );
+}
+
+function FilledImage({ src, alt, className }: { src: string; alt: string; className?: string }) {
+  const [failed, setFailed] = useState(false);
+  useEffect(() => setFailed(false), [src]);
+  if (!src || failed) {
+    return (
+      <div className="grid size-full place-items-center bg-cream px-4 text-center text-sm text-muted" role="img" aria-label="Property image unavailable">
+        Property image unavailable
+      </div>
+    );
+  }
+  return (
+    <img
+      src={src}
+      alt={alt}
+      className={className ?? "block size-full object-cover object-center"}
+      onError={() => setFailed(true)}
+    />
   );
 }

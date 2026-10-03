@@ -1,3 +1,5 @@
+import { persistMediaSrc as persistRef, resolveMediaSrc as resolveRef } from "@/lib/media-src";
+
 export type OfferStatus = "available" | "coming-soon" | "draft" | "published" | "closed";
 
 export type OfferInventory = {
@@ -179,19 +181,13 @@ export function installmentSummary(offer: Pick<PropertyOffer, "installmentEnable
 }
 
 export function resolveMediaSrc(src: string | null | undefined): string {
-  if (!src) return "";
-  if (src.startsWith("/api/")) {
-    const base = (import.meta.env.VITE_API_URL as string | undefined) ?? "";
-    return `${base}${src}`;
-  }
-  return src;
+  const base = ((import.meta.env.VITE_API_URL as string | undefined) ?? "").replace(/\/$/, "");
+  return resolveRef(src, base);
 }
 
 export function persistMediaSrc(src: string | null | undefined): string {
-  if (!src) return "";
   const base = ((import.meta.env.VITE_API_URL as string | undefined) ?? "").replace(/\/$/, "");
-  if (base && src.startsWith(base)) return src.slice(base.length) || src;
-  return src;
+  return persistRef(src, base);
 }
 
 
