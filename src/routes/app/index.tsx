@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { useMemberSession } from "@/components/layout/use-member";
 import { DashboardPromotions } from "@/components/promotions/dashboard-promotions";
+import { ResolvedPropertyImage } from "@/components/property-card";
 import { FLAGSHIP, formatBdt } from "@/lib/offers";
 import { api, type Booking } from "@/lib/api-client";
 import { useAsync } from "@/lib/use-async";
@@ -42,7 +43,7 @@ function OverviewPage() {
         />
         <DashboardPromotions userId={member.user_id} />
         <Surface className="grid gap-5 md:grid-cols-[9rem_1fr_auto] md:items-center">
-          <img src={FLAGSHIP.image} alt={FLAGSHIP.title} className="aspect-[4/3] w-full rounded-xl object-cover md:h-24 md:w-36" />
+          <ResolvedPropertyImage src={FLAGSHIP.image} alt={FLAGSHIP.title} className="aspect-[4/3] w-full rounded-xl md:h-24 md:w-36" />
           <div>
             <p className="text-xs uppercase tracking-wide text-subtle">Explore properties</p>
             <h2 className="mt-1 font-display text-2xl font-semibold">{FLAGSHIP.title}</h2>
@@ -96,7 +97,7 @@ function OverviewPage() {
             <p className="mt-2 text-sm text-muted">Active until {formatWhen(member.activation_expires_at)}.</p>
           </Surface>
           <Surface className="grid gap-5 md:grid-cols-[9rem_1fr_auto] md:items-center">
-            <img src={FLAGSHIP.image} alt={FLAGSHIP.title} className="aspect-[4/3] w-full rounded-xl object-cover md:h-24 md:w-36" />
+            <ResolvedPropertyImage src={FLAGSHIP.image} alt={FLAGSHIP.title} className="aspect-[4/3] w-full rounded-xl md:h-24 md:w-36" />
             <div>
               <p className="text-xs uppercase tracking-wide text-subtle">Choose your property</p>
               <h2 className="mt-1 font-display text-2xl font-semibold">{FLAGSHIP.title}</h2>
@@ -113,7 +114,11 @@ function OverviewPage() {
       ) : (
         <>
           <Surface className="grid gap-5 md:grid-cols-[9rem_1fr_auto] md:items-center">
-            <img src={booking.image ?? FLAGSHIP.image} alt="" className="aspect-[4/3] w-full rounded-xl object-cover md:h-24 md:w-36" />
+            <ResolvedPropertyImage
+              src={booking.image ?? FLAGSHIP.image}
+              alt={booking.offer_title ?? "Your property"}
+              className="aspect-[4/3] w-full rounded-xl md:h-24 md:w-36"
+            />
             <div>
               <p className="text-xs uppercase tracking-wide text-subtle">Your property</p>
               <h2 className="mt-1 font-display text-2xl font-semibold">{booking.offer_title}</h2>

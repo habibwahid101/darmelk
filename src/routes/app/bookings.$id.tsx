@@ -4,6 +4,7 @@ import { AmountRow, LoadingState, PageHeader, Surface } from "@/components/state
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { useMemberSession } from "@/components/layout/use-member";
+import { ResolvedPropertyImage } from "@/components/property-card";
 import { formatWhen } from "@/lib/platform";
 import { formatCalendarDate } from "@/lib/offers";
 import { api, ApiError } from "@/lib/api-client";
@@ -57,7 +58,11 @@ function BookingDetailPage() {
       />
 
       <div className="overflow-hidden rounded-2xl">
-        <img src={booking.image ?? "/images/hero-hotel.jpg"} alt="" className="aspect-[16/8] w-full object-cover" />
+        <ResolvedPropertyImage
+          src={booking.image ?? "/images/hero-hotel.jpg"}
+          alt={booking.offer_title ?? booking.offer_slug}
+          className="aspect-[16/8] w-full"
+        />
       </div>
 
       <Surface>

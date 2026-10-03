@@ -1,10 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { AlertTriangle, Check, Loader2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { OfferForm, formFromOffer, payloadFromForm } from "@/components/admin/offer-form";
 import { PageHeader, Surface } from "@/components/states";
 import { Button } from "@/components/ui/button";
-import { Field } from "@/components/ui/field";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { api, ApiError } from "@/lib/api-client";
 import { mediaIdFromRef, resolveMediaSrc, sameMediaRef } from "@/lib/media-src";
@@ -286,73 +285,195 @@ function MediaManager({
   onRetry: (kind: Slot) => void;
   onRemove: (src: string) => void;
 }) {
-  const images = [
-    offer.image ? { src: offer.image, label: "Cover" } : null,
-    offer.heroImage && offer.heroImage !== offer.image ? { src: offer.heroImage, label: "Hero" } : null,
-    ...(offer.gallery ?? []).filter((src) => src !== offer.image && src !== offer.heroImage).map((src, i) => ({ src, label: `Gallery ${i + 1}` })),
-  ].filter(Boolean) as Array<{ src: string; label: string }>;
-
-  const fields: Array<{ kind: Slot; label: string; replace: boolean }> = [
-    { kind: "cover", label: offer.image ? "Choose replacement image" : "Choose cover image", replace: Boolean(offer.image) },
-    { kind: "hero", label: offer.heroImage ? "Choose replacement image" : "Choose hero image", replace: Boolean(offer.heroImage) },
-    { kind: "gallery", label: "Choose gallery image", replace: Boolean(offer.gallery?.length) },
-  ];
+  const gallery = (offer.gallery ?? []).filter((src) => src !== offer.image && src !== offer.heroImage);
 
   return (
     <Surface>
       <h2 className="font-display text-xl font-semibold">Upload images</h2>
-      <p className="mt-1 text-sm text-muted">JPG, PNG, or WebP. 1.5 MB maximum. Uploads are stored with this offer only.</p>
-      <div className="mt-4 grid gap-3 sm:grid-cols-3">
-        {fields.map((field) => (
-          <Field key={field.kind} label={field.label} hint={field.replace ? "No file chosen keeps the current image." : undefined}>
-            <input
-              type="file"
-              accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
-              disabled={disabled}
-              aria-describedby={`${field.kind}-upload-status`}
-              onChange={(event) => {
-                const file = event.target.files?.[0];
-                event.target.value = "";
-                void onUpload(field.kind, file);
-              }}
-            />
-            <div id={`${field.kind}-upload-status`}>
-              <UploadStatus state={uploads[field.kind]} onRetry={() => onRetry(field.kind)} />
-            </div>
-          </Field>
-        ))}
+      <p className="mt-1 text-sm text-muted">JPG, PNG or WebP · Max 1.5 MB</p>
+      <div className="mt-6 grid grid-cols-1 items-start gap-8 sm:grid-cols-2 lg:grid-cols-3">
+        <MediaCard
+          title={offer.image ? "Current Cover Image" : "Cover Image"}
+          src={offer.image}
+          action={offer.image ? "Replace cover image" : "Upload cover image"}
+          inputId="cover-file"
+          statusId="cover-upload-status"
+          state={uploads.cover}
+          removing={removing}
+          disabled={disabled}
+          onPick={(file) => onUpload("cover", file)}
+          onRetry={() => onRetry("cover")}
+          onRemove={offer.image ? () => onRemove(offer.image!) : undefined}
+        />
+        <MediaCard
+          title={offer.heroImage ? "Current Hero Image" : "Hero Image"}
+          src={offer.heroImage}
+          action={offer.heroImage ? "Replace hero image" : "Upload hero image"}
+          inputId="hero-file"
+          statusId="hero-upload-status"
+          state={uploads.hero}
+          removing={removing}
+          disabled={disabled}
+          onPick={(file) => onUpload("hero", file)}
+          onRetry={() => onRetry("hero")}
+          onRemove={offer.heroImage ? () => onRemove(offer.heroImage!) : undefined}
+        />
       </div>
-      {images.length ? (
-        <ul className="mt-5 grid gap-3 sm:grid-cols-3">
-          {images.map((img) => {
-            const resolved = resolveMediaSrc(img.src);
-            return (
-              <li key={`${img.label}-${img.src}`} className="min-w-0">
-                <p className="mb-2 text-xs font-medium text-ink">Current image</p>
-                {resolved ? (
-                  <AdminImage src={resolved} alt={img.label} />
-                ) : (
-                  <p className="grid aspect-[4/3] place-items-center rounded-xl bg-paper px-3 text-center text-sm text-muted">
-                    Image unavailable
-                  </p>
-                )}
-                <div className="mt-2 flex items-center justify-between gap-2">
-                  <p className="text-xs text-muted">{img.label}</p>
-                  <button
-                    type="button"
-                    className="text-xs text-clay hover:underline disabled:opacity-50"
-                    disabled={disabled}
-                    onClick={() => onRemove(img.src)}
-                  >
-                    {removing === img.src ? "Removing…" : "Remove"}
-                  </button>
-                </div>
+      <div className="mt-8">
+        <h3 className="font-display text-lg font-semibold">Gallery</h3>
+        <GalleryAdder
+          state={uploads.gallery}
+          disabled={disabled}
+          onPick={(file) => onUpload("gallery", file)}
+          onRetry={() => onRetry("gallery")}
+        />
+        {gallery.length ? (
+          <ul className="mt-6 grid grid-cols-1 items-start gap-8 sm:grid-cols-2 lg:grid-cols-3">
+            {gallery.map((src, index) => (
+              <li key={src}>
+                <MediaCard
+                  title="Gallery Image"
+                  src={src}
+                  action=""
+                  inputId={`gallery-file-${index}`}
+                  statusId={`gallery-item-${index}`}
+                  state={{ phase: "idle" }}
+                  removing={removing}
+                  disabled={disabled}
+                  onRemove={() => onRemove(src)}
+                />
               </li>
-            );
-          })}
-        </ul>
-      ) : null}
+            ))}
+          </ul>
+        ) : null}
+      </div>
     </Surface>
+  );
+}
+
+function GalleryAdder({
+  state,
+  disabled,
+  onPick,
+  onRetry,
+}: {
+  state: UploadState;
+  disabled: boolean;
+  onPick: (file: File | undefined) => void;
+  onRetry: () => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  return (
+    <div className="mt-3">
+      <Button
+        type="button"
+        size="sm"
+        variant="secondary"
+        disabled={disabled}
+        aria-describedby="gallery-upload-status"
+        onClick={() => inputRef.current?.click()}
+      >
+        Add gallery image
+      </Button>
+      <input
+        ref={inputRef}
+        id="gallery-file"
+        type="file"
+        className="sr-only"
+        accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
+        disabled={disabled}
+        aria-label="Add gallery image"
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          event.target.value = "";
+          onPick(file);
+        }}
+      />
+      <div id="gallery-upload-status">
+        <UploadStatus state={state} onRetry={onRetry} />
+      </div>
+    </div>
+  );
+}
+
+function MediaCard({
+  title,
+  src,
+  action,
+  inputId,
+  statusId,
+  state,
+  removing,
+  disabled,
+  onPick,
+  onRetry,
+  onRemove,
+}: {
+  title: string;
+  src?: string | null;
+  action: string;
+  inputId: string;
+  statusId: string;
+  state: UploadState;
+  removing: string | null;
+  disabled: boolean;
+  onPick?: (file: File | undefined) => void;
+  onRetry?: () => void;
+  onRemove?: () => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const resolved = src ? resolveMediaSrc(src) : "";
+  return (
+    <article className="flex min-w-0 flex-col rounded-xl bg-paper p-4">
+      <p className="text-xs font-medium text-ink">{title}</p>
+      <div className="mt-2 aspect-[4/3] overflow-hidden rounded-xl bg-cream">
+        {resolved ? (
+          <AdminImage src={resolved} alt={title} />
+        ) : (
+          <p className="grid h-full place-items-center px-3 text-center text-sm text-muted">No image yet</p>
+        )}
+      </div>
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        {action && onPick ? (
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            disabled={disabled}
+            aria-describedby={statusId}
+            onClick={() => inputRef.current?.click()}
+          >
+            {action}
+          </Button>
+        ) : null}
+        {src && onRemove ? (
+          <Button type="button" size="sm" variant="secondary" disabled={disabled} onClick={onRemove}>
+            {removing === src ? "Removing…" : "Remove"}
+          </Button>
+        ) : null}
+      </div>
+      {onRetry ? (
+        <div id={statusId}>
+          <UploadStatus state={state} onRetry={onRetry} />
+        </div>
+      ) : null}
+      {onPick ? (
+        <input
+          ref={inputRef}
+          id={inputId}
+          type="file"
+          className="sr-only"
+          accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
+          disabled={disabled}
+          aria-label={action}
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            event.target.value = "";
+            onPick(file);
+          }}
+        />
+      ) : null}
+    </article>
   );
 }
 
@@ -361,17 +482,10 @@ function AdminImage({ src, alt }: { src: string; alt: string }) {
   useEffect(() => setFailed(false), [src]);
   if (failed) {
     return (
-      <p className="grid aspect-[4/3] place-items-center rounded-xl bg-paper px-3 text-center text-sm text-muted">
+      <p className="grid size-full place-items-center bg-paper px-3 text-center text-sm text-muted" role="img" aria-label="Image unavailable">
         Image unavailable
       </p>
     );
   }
-  return (
-    <img
-      src={src}
-      alt={alt}
-      className="block aspect-[4/3] h-full w-full rounded-xl object-cover object-center"
-      onError={() => setFailed(true)}
-    />
-  );
+  return <img src={src} alt={alt} className="block size-full object-cover object-center" onError={() => setFailed(true)} />;
 }
