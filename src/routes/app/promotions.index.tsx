@@ -3,6 +3,7 @@ import { Megaphone } from "lucide-react";
 import { EmptyState, PageHeader, Surface } from "@/components/states";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { PromotionCountdown } from "@/components/promotions/countdown";
+import { PromotionBanner } from "@/components/promotions/promotion-banner";
 import { api } from "@/lib/api-client";
 import { useAsync } from "@/lib/use-async";
 
@@ -42,27 +43,30 @@ function MemberPromotionsPage() {
                   : `${promo.offers.length} eligible properties`;
             return (
               <li key={promo.id}>
-                <Surface>
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div className="min-w-0">
-                      <p className="font-display text-xl font-semibold">{promo.title}</p>
-                      <p className="mt-2 text-sm leading-relaxed text-muted">{promo.short_description || rewardSummary}</p>
-                      <p className="mt-2 text-sm text-muted">Eligible: {scope}</p>
+                <Surface className={promo.has_banner ? "overflow-hidden p-0 sm:p-0" : undefined}>
+                  {promo.has_banner ? <PromotionBanner id={promo.id} title={promo.title} framed /> : null}
+                  <div className={promo.has_banner ? "p-5 sm:p-6" : undefined}>
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="min-w-0">
+                        <p className="font-display text-xl font-semibold">{promo.title}</p>
+                        <p className="mt-2 text-sm leading-relaxed text-muted">{promo.short_description || rewardSummary}</p>
+                        <p className="mt-2 text-sm text-muted">Eligible: {scope}</p>
+                      </div>
+                      <StatusBadge status={promo.lifecycle} />
                     </div>
-                    <StatusBadge status={promo.lifecycle} />
+                    {promo.lifecycle === "active" ? (
+                      <div className="mt-4 max-w-md">
+                        <PromotionCountdown endAt={promo.end_at} serverNow={data?.serverNow} />
+                      </div>
+                    ) : null}
+                    <Link
+                      to="/app/promotions/$id"
+                      params={{ id: promo.id }}
+                      className="mt-4 inline-flex text-sm font-medium text-pine underline-offset-2 hover:underline"
+                    >
+                      View details
+                    </Link>
                   </div>
-                  {promo.lifecycle === "active" ? (
-                    <div className="mt-4 max-w-md">
-                      <PromotionCountdown endAt={promo.end_at} serverNow={data?.serverNow} />
-                    </div>
-                  ) : null}
-                  <Link
-                    to="/app/promotions/$id"
-                    params={{ id: promo.id }}
-                    className="mt-4 inline-flex text-sm font-medium text-pine underline-offset-2 hover:underline"
-                  >
-                    View details
-                  </Link>
                 </Surface>
               </li>
             );
