@@ -25,6 +25,26 @@ test("dashboard promotion card uses a full-width information / time split", () =
   assert.match(src, /text-pretty/);
 });
 
+test("uploaded promotion banners keep their own shape on every view", () => {
+  const banner = read("src/components/promotions/promotion-banner.tsx");
+  const dashboard = read("src/components/promotions/dashboard-promotions.tsx");
+  const index = read("src/routes/app/promotions.index.tsx");
+  const detail = read("src/routes/app/promotions.$id.tsx");
+  const preview = read("src/routes/admin/promotions.campaigns.$id.preview.tsx");
+  assert.match(banner, /h-auto w-full/);
+  assert.match(banner, /object-contain/);
+  assert.doesNotMatch(banner, /object-cover/);
+  assert.doesNotMatch(banner, /aspect-\[/);
+  assert.doesNotMatch(banner, /max-h-/);
+  for (const src of [dashboard, index, detail, preview]) {
+    assert.match(src, /PromotionBanner/);
+    assert.doesNotMatch(src, /object-cover/);
+    assert.doesNotMatch(src, /max-h-36/);
+    assert.doesNotMatch(src, /aspect-\[16\/9\]/);
+  }
+  assert.match(dashboard, /overflow-hidden p-0/);
+});
+
 test("countdown stays server-time display with stable digit width", () => {
   const src = read("src/components/promotions/countdown.tsx");
   assert.match(src, /serverNow/);

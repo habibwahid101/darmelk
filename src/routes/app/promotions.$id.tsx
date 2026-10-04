@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { PageHeader, Surface } from "@/components/states";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { PromotionCountdown } from "@/components/promotions/countdown";
+import { PromotionBanner } from "@/components/promotions/promotion-banner";
 import { useMemberSession } from "@/components/layout/use-member";
 import { api } from "@/lib/api-client";
 import { formatWhen } from "@/lib/platform";
@@ -63,16 +64,14 @@ function MemberPromotionDetails() {
       : promotion.offers.map((o) => o.title).join(", ") || "Selected properties";
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <PageHeader
         kicker="Promotions"
         title={promotion.title}
         description={promotion.short_description || "A Darmelk booking campaign."}
         action={<StatusBadge status={promotion.lifecycle} />}
       />
-      {promotion.has_banner ? (
-        <img src={api.promotionBannerUrl(promotion.id)} alt="" className="aspect-[16/9] w-full rounded-2xl object-cover" />
-      ) : null}
+      {promotion.has_banner ? <PromotionBanner id={promotion.id} title={promotion.title} /> : null}
 
       <Surface>
         <p className="text-xs font-medium uppercase tracking-wide text-subtle">Your status</p>

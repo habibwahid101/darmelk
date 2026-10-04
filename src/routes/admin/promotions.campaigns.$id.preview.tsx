@@ -3,6 +3,7 @@ import { PageHeader, Surface } from "@/components/states";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { PromotionCountdown } from "@/components/promotions/countdown";
+import { PromotionBanner } from "@/components/promotions/promotion-banner";
 import { api } from "@/lib/api-client";
 import { formatWhen } from "@/lib/platform";
 import { useAsync } from "@/lib/use-async";
@@ -22,7 +23,7 @@ function AdminPreviewPromotion() {
       : promotion.offers.map((o) => o.title).join(", ");
 
   return (
-    <div className="mx-auto max-w-2xl space-y-8">
+    <div className="mx-auto max-w-2xl space-y-6">
       <PageHeader
         kicker="Preview"
         title={promotion.title}
@@ -36,9 +37,7 @@ function AdminPreviewPromotion() {
         }
       />
       <StatusBadge status={promotion.lifecycle} />
-      {promotion.has_banner ? (
-        <img src={api.promotionBannerUrl(promotion.id)} alt="" className="aspect-[16/9] w-full rounded-2xl object-cover" />
-      ) : null}
+      {promotion.has_banner ? <PromotionBanner id={promotion.id} title={promotion.title} /> : null}
       <Surface>
         <p className="text-sm leading-relaxed text-muted">{promotion.short_description || promotion.description}</p>
         <p className="mt-4 text-sm">Eligible properties: {scope || "None selected"}</p>

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { api, type Promotion, type PromotionReward } from "@/lib/api-client";
 import { useAsync } from "@/lib/use-async";
 import { PromotionCountdown } from "@/components/promotions/countdown";
+import { PromotionBanner } from "@/components/promotions/promotion-banner";
 
 function rewardLine(reward: PromotionReward) {
   return reward.quantity > 1 ? `${reward.quantity} × ${reward.name}` : reward.name;
@@ -27,7 +28,7 @@ function MetaBlock({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0">
       <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-subtle">{label}</p>
-      <p className="mt-1.5 font-display text-lg font-semibold leading-snug text-pretty">{value}</p>
+      <p className="mt-1 font-display text-lg font-semibold leading-snug text-pretty">{value}</p>
     </div>
   );
 }
@@ -47,30 +48,24 @@ export function DashboardPromotions({ userId }: { userId?: string }) {
   const scope = eligibleCopy(primary);
 
   return (
-    <Surface>
-      <div className="grid gap-6 md:grid-cols-[minmax(0,1.65fr)_minmax(14.5rem,0.92fr)] md:items-stretch md:gap-8">
+    <Surface className="overflow-hidden p-0 sm:p-0">
+      {primary.has_banner ? <PromotionBanner id={primary.id} title={primary.title} framed /> : null}
+      <div className="grid gap-5 p-5 md:grid-cols-[minmax(0,1.65fr)_minmax(14.5rem,0.92fr)] md:items-start md:gap-8 md:p-6">
         <div className="min-w-0">
-          {primary.has_banner ? (
-            <img
-              src={api.promotionBannerUrl(primary.id)}
-              alt=""
-              className="mb-5 aspect-[16/9] max-h-36 w-full rounded-xl object-cover"
-            />
-          ) : null}
           <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-pine">Current promotion</p>
-          <h2 className="mt-2 max-w-2xl text-pretty font-display text-[1.45rem] font-semibold leading-snug sm:text-2xl">
+          <h2 className="mt-1.5 max-w-2xl text-pretty font-display text-[1.45rem] font-semibold leading-snug sm:text-2xl">
             {primary.title}
           </h2>
           {primary.short_description ? (
-            <p className="mt-3 max-w-xl text-sm leading-relaxed text-muted text-pretty">{primary.short_description}</p>
+            <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted text-pretty">{primary.short_description}</p>
           ) : null}
-          <div className="mt-5 grid gap-4 sm:grid-cols-2 sm:gap-6">
+          <div className="mt-4 grid gap-4 sm:grid-cols-2 sm:gap-6">
             {rewards.length > 0 ? (
               <div className="min-w-0">
                 <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-subtle">
                   {rewards.length > 1 ? "Rewards" : "Reward"}
                 </p>
-                <ul className="mt-1.5 space-y-1">
+                <ul className="mt-1 space-y-1">
                   {rewards.map((reward, index) => (
                     <li key={reward.id ?? `${reward.name}-${index}`} className="font-display text-lg font-semibold leading-snug text-pretty">
                       {rewardLine(reward)}
@@ -83,10 +78,10 @@ export function DashboardPromotions({ userId }: { userId?: string }) {
           </div>
         </div>
 
-        <div className="flex min-w-0 flex-col justify-between gap-5 border-t border-line pt-5 md:border-l md:border-t-0 md:pl-8 md:pt-0">
+        <div className="flex min-w-0 flex-col gap-4 border-t border-line pt-4 md:border-l md:border-t-0 md:pl-8 md:pt-0">
           <div className="min-w-0">
             <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-subtle">Time remaining</p>
-            <div className="mt-3">
+            <div className="mt-2.5">
               <PromotionCountdown
                 endAt={primary.end_at}
                 serverNow={data?.serverNow}
@@ -94,7 +89,7 @@ export function DashboardPromotions({ userId }: { userId?: string }) {
               />
             </div>
           </div>
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-2.5">
             <Button asChild className="w-full">
               <Link to="/app/promotions/$id" params={{ id: primary.id }}>
                 View details

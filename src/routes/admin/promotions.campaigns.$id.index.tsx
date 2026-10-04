@@ -4,6 +4,7 @@ import { formFromPromotion, payloadFromPromotionForm, PromotionForm, emptyPromot
 import { PageHeader, Surface } from "@/components/states";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { PromotionBanner } from "@/components/promotions/promotion-banner";
 import { api, ApiError } from "@/lib/api-client";
 import { useAsync } from "@/lib/use-async";
 
@@ -97,18 +98,23 @@ function AdminEditPromotion() {
           </Button>
         ) : null}
       </div>
-      <Surface>
-        <p className="text-xs font-medium uppercase tracking-wide text-subtle">Optional banner</p>
-        <p className="mt-1 text-sm text-muted">JPG, PNG, or WebP up to 1.5 MB. Not required.</p>
-        <input
-          type="file"
-          accept="image/jpeg,image/png,image/webp"
-          className="mt-3 block w-full text-sm"
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) void onBanner(file);
-          }}
-        />
+      <Surface className="overflow-hidden p-0 sm:p-0">
+        {promotion.has_banner ? <PromotionBanner id={promotion.id} title={promotion.title} framed /> : null}
+        <div className="p-5 sm:p-6">
+          <p className="text-xs font-medium uppercase tracking-wide text-subtle">Optional banner</p>
+          <p className="mt-1 text-sm text-muted">
+            JPG, PNG, or WebP up to 1.5 MB. The upload is shown in full, at its own shape, on desktop and mobile. A wide image, about 1600×640, sits best. Keep type inside the artwork.
+          </p>
+          <input
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            className="mt-3 block w-full text-sm"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) void onBanner(file);
+            }}
+          />
+        </div>
       </Surface>
       {promotion.status === "closed" ? (
         <p className="text-sm text-muted">This campaign is closed. Historical qualifications are preserved.</p>
