@@ -5,17 +5,44 @@ import { EmptyState, LoadingState, PageHeader, Surface } from "@/components/stat
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { formatBdt } from "@/lib/offers";
-import { formatWhen } from "@/lib/platform";
-import { api } from "@/lib/api-client";
+import { api, type Booking } from "@/lib/api-client";
 import { useAsync } from "@/lib/use-async";
 
 export const Route = createFileRoute("/admin/bookings")({
   component: AdminBookings,
 });
 
+const STATUS_RANK: Record<Booking["status"], number> = {
+  pending: 0,
+  confirmed: 1,
+  activated: 2,
+  cancelled: 3,
+  reversed: 4,
+};
+
+function formatBookingWhen(iso: string) {
+  return new Date(iso).toLocaleString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: "Asia/Dhaka",
+  });
+}
+
+function paymentRail(status?: string | null) {
+  if (status === "pending" || status === "approved" || status === "settled") return "Pay by Merchant";
+  return "Darmelk Bank";
+}
+
 function AdminBookings() {
   const { data, reload, loading } = useAsync(() => api.admin.bookings(), []);
-  const bookings = data?.bookings ?? [];
+  const bookings = [...(data?.bookings ?? [])].sort((a, b) => {
+    const byStatus = (STATUS_RANK[a.status] ?? 9) - (STATUS_RANK[b.status] ?? 9);
+    if (byStatus !== 0) return byStatus;
+    return b.created_at.localeCompare(a.created_at);
+  });
   const [busyId, setBusyId] = useState<string | null>(null);
 
   async function run(id: string, fn: () => Promise<unknown>) {
@@ -51,9 +78,13 @@ function AdminBookings() {
               <li key={b.id} className="space-y-3 px-5 py-4">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0">
-                    <p className="font-medium">{b.offer_title ?? b.offer_slug}</p>
+                    <p className="font-medium">{b.user_name || "Member"}</p>
                     <p className="text-sm text-muted">
-                      {formatBdt(b.booking_amount)} · {formatWhen(b.created_at)}
+                      {b.user_email ? `${b.user_email} · ` : ""}
+                      {formatBookingWhen(b.created_at)}
+                    </p>
+                    <p className="mt-1 text-sm text-muted">
+                      {b.offer_title ?? b.offer_slug} · {formatBdt(b.booking_amount)} · {paymentRail(b.merchant_request_status)}
                     </p>
                   </div>
                   <StatusBadge status={b.status} />

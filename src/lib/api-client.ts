@@ -93,6 +93,8 @@ export type Booking = {
   activated_at: string | null;
   cancelled_at: string | null;
   merchant_request_status?: string | null;
+  user_name?: string;
+  user_email?: string;
 };
 
 export type Commission = {

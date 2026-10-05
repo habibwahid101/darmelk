@@ -49,6 +49,12 @@ test("issue 2: Cancel and Reverse share compact secondary row-action treatment",
   assert.match(cancel[0], /className="shrink-0"/);
   assert.match(reverse[0], /className="shrink-0"/);
   assert.match(bookings, /flex flex-wrap items-center gap-2/);
+  assert.match(bookings, /b\.user_name/);
+  assert.match(bookings, /b\.user_email/);
+  assert.match(bookings, /Asia\/Dhaka/);
+  assert.match(bookings, /Pay by Merchant/);
+  assert.match(bookings, /Darmelk Bank/);
+  assert.doesNotMatch(bookings, /delete from bookings/i);
 });
 
 test("issue 3: withdrawals follow Payment Review right-side status pattern", () => {
