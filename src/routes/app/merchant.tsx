@@ -1,12 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Store } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { AmountRow, EmptyState, PageHeader, StatCard, Surface } from "@/components/states";
 import { PaymentForm, merchantRequestStatusLabel } from "@/components/payment-form";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { useMemberSession } from "@/components/layout/use-member";
-import { api, ApiError, type MerchantBundle, type MerchantPaymentRequest, type MerchantPurchase, type PaymentSubmission } from "@/lib/api-client";
+import { api, ApiError, type MerchantBundle, type MerchantPurchase, type PaymentSubmission } from "@/lib/api-client";
 import { formatBdt } from "@/lib/offers";
 import { formatWhen } from "@/lib/platform";
 import { useAsync } from "@/lib/use-async";
@@ -45,7 +45,6 @@ function MerchantPage() {
   const status = data?.merchant?.status ?? sessionMerchant?.status;
   const active = status === "active";
   const showDashboard = status === "active" || status === "suspended" || status === "inactive";
-  const pendingIncoming = (data?.incomingRequests ?? []).filter((r) => r.status === "pending");
 
   return (
     <div className="space-y-8">
@@ -54,7 +53,6 @@ function MerchantPage() {
           userId={member.user_id}
           data={data}
           loading={loading && !data}
-          pendingIncoming={pendingIncoming}
           canApprove={active}
           onReload={async () => {
             await reload();
@@ -251,14 +249,12 @@ function MerchantDashboard({
   userId,
   data,
   loading,
-  pendingIncoming,
   canApprove,
   onReload,
 }: {
   userId: string;
   data: Awaited<ReturnType<typeof api.myMerchant>> | undefined;
   loading: boolean;
-  pendingIncoming: MerchantPaymentRequest[];
   canApprove: boolean;
   onReload: () => Promise<void>;
 }) {
@@ -268,6 +264,7 @@ function MerchantDashboard({
   const [busyId, setBusyId] = useState<string | null>(null);
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [errorId, setErrorId] = useState<string | null>(null);
   const [reviewBundle, setReviewBundle] = useState<MerchantBundle | null>(null);
   const [accepted, setAccepted] = useState(false);
   const [starting, setStarting] = useState(false);
@@ -276,20 +273,17 @@ function MerchantDashboard({
   const payments = paymentData?.payments ?? [];
   const canBuy = merchant?.status === "active";
 
-  const confirming = useMemo(
-    () => pendingIncoming.find((r) => r.id === confirmId) ?? null,
-    [pendingIncoming, confirmId],
-  );
-
   async function decide(id: string, action: "approve" | "decline") {
     setBusyId(id);
     setError(null);
+    setErrorId(null);
     try {
       if (action === "approve") await api.approveMerchantRequest(id, crypto.randomUUID());
       else await api.declineMerchantRequest(id, crypto.randomUUID());
       setConfirmId(null);
       await onReload();
     } catch (err) {
+      setErrorId(id);
       setError(err instanceof ApiError ? err.message : "Could not update this request.");
     } finally {
       setBusyId(null);
@@ -486,30 +480,7 @@ function MerchantDashboard({
         ) : null}
       </section>
 
-      {error && !reviewBundle ? <p className="text-sm text-clay">{error}</p> : null}
-
-      {confirming ? (
-        <Surface>
-          <p className="text-xs font-medium uppercase tracking-wide text-subtle">Confirm approval</p>
-          <h2 className="mt-2 font-display text-2xl font-semibold">Approve {formatBdt(confirming.amount)}?</h2>
-          <p className="mt-2 text-sm text-muted">
-            {confirming.customer_name ?? "Customer"} · {confirming.offer_title} · {confirming.purpose === "growth_activation" ? "Growth Program Activation" : confirming.booking_id}
-          </p>
-          <p className="mt-3 text-sm text-muted">
-            {confirming.purpose === "growth_activation"
-              ? "Approving settles this amount once and completes Growth Program Activation. No separate Darmelk approval is required."
-              : "Approving settles this amount once and confirms the booking. Inventory is consumed once. Commission is not posted until activation. No separate Darmelk payment approval is required."}
-          </p>
-          <div className="mt-5 flex flex-col gap-3 sm:flex-row">
-            <Button disabled={busyId === confirming.id} onClick={() => void decide(confirming.id, "approve")}>
-              {busyId === confirming.id ? "Approving…" : `Approve ${formatBdt(confirming.amount)}`}
-            </Button>
-            <Button variant="secondary" onClick={() => setConfirmId(null)}>
-              Cancel
-            </Button>
-          </div>
-        </Surface>
-      ) : null}
+      {error && !reviewBundle && !confirmId ? <p className="text-sm text-clay" role="alert">{error}</p> : null}
 
       <Surface>
         <h2 className="font-display text-xl font-semibold">Payment Requests</h2>
@@ -542,24 +513,49 @@ function MerchantDashboard({
                   </div>
                 </div>
                 {request.status === "pending" ? (
-                  <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+                  <div className="mt-4">
                     {canApprove ? (
-                      <>
-                        <Button size="sm" disabled={busyId === request.id} onClick={() => setConfirmId(request.id)}>
-                          Approve
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          disabled={busyId === request.id}
-                          onClick={() => void decide(request.id, "decline")}
-                        >
-                          Decline
-                        </Button>
-                      </>
+                      confirmId === request.id ? (
+                        <div>
+                          <p className="text-xs font-medium uppercase tracking-wide text-subtle">Confirm approval</p>
+                          <p className="mt-2 font-display text-xl font-semibold">Approve {formatBdt(request.amount)}?</p>
+                          <p className="mt-2 text-sm text-muted">
+                            {request.purpose === "growth_activation"
+                              ? "Approving settles this amount once and completes Growth Program Activation. No separate Darmelk approval is required."
+                              : "Approving settles this amount once and confirms the booking. Inventory is consumed once. Commission is not posted until activation. No separate Darmelk payment approval is required."}
+                          </p>
+                          {error ? <p className="mt-3 text-sm text-clay" role="alert">{error}</p> : null}
+                          <div className="mt-4 flex flex-col gap-2">
+                            <Button type="button" disabled={busyId === request.id} onClick={() => void decide(request.id, "approve")}>
+                              {busyId === request.id ? "Approving…" : `Approve ${formatBdt(request.amount)}`}
+                            </Button>
+                            <Button type="button" variant="secondary" disabled={busyId === request.id} onClick={() => { setConfirmId(null); setError(null); setErrorId(null); }}>
+                              Cancel
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col gap-2 sm:flex-row">
+                          <Button type="button" size="sm" disabled={busyId === request.id} onClick={() => { setError(null); setErrorId(null); setConfirmId(request.id); }}>
+                            Approve
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="secondary"
+                            disabled={busyId === request.id}
+                            onClick={() => void decide(request.id, "decline")}
+                          >
+                            {busyId === request.id ? "Declining…" : "Decline"}
+                          </Button>
+                        </div>
+                      )
                     ) : (
                       <p className="text-sm text-muted">Approvals are paused while this Merchant account is not active.</p>
                     )}
+                    {error && errorId === request.id && confirmId !== request.id ? (
+                      <p className="mt-3 text-sm text-clay" role="alert">{error}</p>
+                    ) : null}
                   </div>
                 ) : null}
               </li>
