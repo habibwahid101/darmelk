@@ -169,9 +169,9 @@ export function renderWebManifest(hostHeader) {
       id: "/",
       start_url: "/",
       scope: "/",
-      display: "standalone",
-      background_color: "#000000",
-      theme_color: "#000000",
+      display: "browser",
+      background_color: "#f7f3ec",
+      theme_color: "#AC6D50",
       icons: [
         {
           src: "/__grok/icon-180.png",
@@ -187,8 +187,8 @@ export function renderWebManifest(hostHeader) {
 
 export function grokPwaHeadTags(appName = DEFAULT_APP_NAME) {
   return [
-    // Standalone display comes from the manifest ("display": "standalone");
-    // the legacy *-web-app-capable metas it replaces are deliberately absent.
+    // Open in the browser so mobile does not paint a standalone splash logo
+    // before the page. The legacy *-web-app-capable metas stay absent.
     ["manifest", '<link rel="manifest" href="/__grok/manifest.webmanifest">'],
     ["apple-touch-icon", '<link rel="apple-touch-icon" href="/__grok/icon-180.png">'],
     [
@@ -197,9 +197,9 @@ export function grokPwaHeadTags(appName = DEFAULT_APP_NAME) {
     ],
     [
       "apple-mobile-web-app-status-bar-style",
-      '<meta name="apple-mobile-web-app-status-bar-style" content="black">',
+      '<meta name="apple-mobile-web-app-status-bar-style" content="default">',
     ],
-    ["theme-color", '<meta name="theme-color" content="#000000">'],
+    ["theme-color", '<meta name="theme-color" content="#AC6D50">'],
   ];
 }
 
